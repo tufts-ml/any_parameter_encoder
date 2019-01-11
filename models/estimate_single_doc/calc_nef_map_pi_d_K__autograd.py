@@ -3,8 +3,8 @@ import autograd.numpy as np
 from calc_nef_map_pi_d_K__defaults import DefaultSingleDocOptimKwargs
 
 def calc_nef_map_pi_d_K__autograd(
-        word_id_d_Ud=None,
-        word_ct_d_Ud=None,
+        word_id_d_U=None,
+        word_ct_d_U=None,
         topics_KUd=None,
         topics_KV=None,
         convex_alpha_minus_1=None,
@@ -35,12 +35,12 @@ def calc_nef_map_pi_d_K__autograd(
     pi_converge_thr = float(pi_converge_thr)
 
     if topics_KUd is None:
-        topics_KUd = topics_KV[:, word_id_d_Ud]
+        topics_KUd = topics_KV[:, word_id_d_U]
     K = topics_KUd.shape[0]
 
     # Precompute some useful things
     if ct_topics_KUd is None:
-        ct_topics_KUd = topics_KUd * word_ct_d_Ud[np.newaxis, :]
+        ct_topics_KUd = topics_KUd * word_ct_d_U[np.newaxis, :]
 
     # Parse convex_alpha_minus_1
     convex_alpha_minus_1 = float(convex_alpha_minus_1)
@@ -64,9 +64,9 @@ def calc_nef_map_pi_d_K__autograd(
     cur_L1_diff = 1.0
     while giter < pi_max_iters:
         giter = giter + 1
-        denom_Ud = 1.0 / np.dot(pi_d_K, topics_KUd)
+        denom_U = 1.0 / np.dot(pi_d_K, topics_KUd)
         grad_K = pi_step_size * (
-            np.dot(ct_topics_KUd, denom_Ud)
+            np.dot(ct_topics_KUd, denom_U)
             + convex_alpha_minus_1 / (1e-9 + pi_d_K)
             )
         grad_K = grad_K - np.max(grad_K)

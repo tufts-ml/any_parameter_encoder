@@ -59,8 +59,8 @@ except ImportError:
     calc_nef_map_pi_d_K__cython_linesearch = None
 
 def calc_nef_map_pi_d_K(
-        word_id_d_Ud=None,
-        word_ct_d_Ud=None,
+        word_id_d_U=None,
+        word_ct_d_U=None,
         topics_KUd=None,
         topics_KV=None,
         alpha=None,
@@ -78,10 +78,10 @@ def calc_nef_map_pi_d_K(
         **kwargs):
     # Common preprocessing
     if topics_KUd is None:
-        topics_KUd = topics_KV[:, word_id_d_Ud]
+        topics_KUd = topics_KV[:, word_id_d_U]
 
     # Precompute some useful things
-    ct_topics_KUd = topics_KUd * word_ct_d_Ud[np.newaxis, :]
+    ct_topics_KUd = topics_KUd * word_ct_d_U[np.newaxis, :]
     K = topics_KUd.shape[0]
 
     # Parse alpha into natural EF alpha (so estimation is always convex)
@@ -122,7 +122,7 @@ def calc_nef_map_pi_d_K(
     pi_d_K, info = calc_pi_d_K(
         init_pi_d_K=init_pi_d_K,
         topics_KUd=topics_KUd,
-        word_ct_d_Ud=np.asarray(word_ct_d_Ud, dtype=np.float64),
+        word_ct_d_U=np.asarray(word_ct_d_U, dtype=np.float64),
         ct_topics_KUd=ct_topics_KUd,
         convex_alpha_minus_1=convex_alpha_minus_1,
         pi_max_iters=int(pi_max_iters),
@@ -187,8 +187,8 @@ if __name__ == '__main__':
     if args.param_npz_path is not None and os.path.exists(args.param_npz_path):
         Params = dict(np.load(args.param_npz_path).items())
         nef_alpha = float(Params.get('nef_alpha', args.nef_alpha))
-        word_ct_d_Ud = Params.get('word_ct_d_Ud')
-        topics_KUd = Params.get('topics_KV')[:, Params.get('word_id_d_Ud')]
+        word_ct_d_U = Params.get('word_ct_d_U')
+        topics_KUd = Params.get('topics_KV')[:, Params.get('word_id_d_U')]
 
         K, Ud = topics_KUd.shape
     else:
@@ -199,8 +199,8 @@ if __name__ == '__main__':
         prng = np.random.RandomState(12342)
         topics_KUd = prng.rand(K, Ud)
         topics_KUd /= np.sum(topics_KUd, axis=1)[:,np.newaxis]
-        word_ct_d_Ud = prng.randint(low=1, high=3, size=Ud)
-        word_ct_d_Ud = np.asarray(word_ct_d_Ud, dtype=np.float64)
+        word_ct_d_U = prng.randint(low=1, high=3, size=Ud)
+        word_ct_d_U = np.asarray(word_ct_d_U, dtype=np.float64)
     print("Applying K=%d topics to doc with Ud=%d uniq terms" % (K, Ud))
     print("nef_alpha = ", nef_alpha)
     print("")
@@ -218,7 +218,7 @@ if __name__ == '__main__':
             ]:
         start_time = time.time()
         pi_d_K, info_dict = calc_nef_map_pi_d_K(
-            word_ct_d_Ud=word_ct_d_Ud,
+            word_ct_d_U=word_ct_d_U,
             topics_KUd=topics_KUd,
             nef_alpha=nef_alpha,
             method=method,

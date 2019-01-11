@@ -265,17 +265,22 @@ def estimate_local_params_for_single_doc(
         init_name_list = init_name.split("+")
     if init_name_list is None:
         init_name_list = [lstep_coldstart_initname]
+
+    ## Now, initialize unnorm'd probability of each topic P_d_K
     if init_LP is not None:
-        init_P_d_K = [init_LP['theta_d_K']]
+        init_P_d_K_list = [init_LP['theta_d_K']]
     if not isinstance(init_P_d_K, list):
-        init_P_d_K = [init_P_d_K]
+        init_P_d_K_list = [init_P_d_K for a in range(len(init_name_list))]
+    else:
+        init_P_d_K_list = init_P_d_K
+
     # Remember, init_P_d_K is a list
-    assert len(init_P_d_K) == len(init_name_list)
-    # Detect warm start without provided warm array to start from,
+    assert len(init_P_d_K_list) == len(init_name_list)
+    # Detect  warm start requested without provided warm array to start from,
     # and default to the prefered coldstart
     for aa in range(len(init_name_list)):
         name = init_name_list[aa]
-        P_d_K = init_P_d_K[aa]
+        P_d_K = init_P_d_K_list[aa]
         if name.count('warm') and P_d_K is None:
             init_name_list[aa] = lstep_coldstart_initname
 
@@ -304,7 +309,7 @@ def estimate_local_params_for_single_doc(
             else:
                 rep_key = init_name
             init_P_d_K = make_init_P_d_K(
-                init_name, prng, K, word_ct_d_U, lik_d_UK, alpha_K, init_P_d_K)
+                init_name, prng, K, word_ct_d_U, lik_d_UK, alpha_K, init_P_d_K_list)
             if verbose:
                 pprint__N_d_K(init_P_d_K, "init")
 
@@ -449,7 +454,7 @@ def make_init_P_d_K(
         p_d_K = prng.dirichlet(alpha_K)
     elif init_name.count('cold_nefmap'):
         p_d_K, info = calc_nef_map_pi_d_K(
-            word_ct_d_Ud=word_ct_d_U,
+            word_ct_d_U=word_ct_d_U,
             topics_KUd=lik_d_UK.T,
             nef_alpha=1.0 + alpha_K[0],
             converge_thr=0.00001)
@@ -587,3 +592,4 @@ def c_Dir_1D(alpha_K):
 def calc_dirichlet_logpdf_for_many_samples(pi_SK, alpha_K):
     log_norm_const = gammaln(np.sum(alpha_K)) - np.sum(gammaln(alpha_K))
     return log_norm_const + np.inner(np.log(pi_SK), alpha_K - 1.0)
+

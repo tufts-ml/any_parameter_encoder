@@ -3,8 +3,8 @@ import numpy as np
 from calc_nef_map_pi_d_K__defaults import DefaultDocTopicOptKwargs
 
 def calc_nef_map_pi_d_K__tensorflow(
-        word_id_d_Ud=None,
-        word_ct_d_Ud=None,
+        word_id_d_U=None,
+        word_ct_d_U=None,
         topics_KV=None,
         topics_KUd=None,
         convex_alpha_minus_1=None,
@@ -24,36 +24,36 @@ def calc_nef_map_pi_d_K__tensorflow(
         Contains non-negative entries that sum to one.
     info_dict : dict
     '''
-    Ud = word_ct_d_Ud.size
+    Ud = word_ct_d_U.size
 
     ## Form the graph
     if topics_KV is not None:
         K, V = topics_KV.shape
         _topics_KV = tf.placeholder(shape=[K, V], dtype=tf.float64)
-        _word_id_d_Ud = tf.placeholder(shape=[Ud], dtype=tf.int32)
-        _word_ct_d_Ud = tf.placeholder(shape=[Ud], dtype=tf.float64)
+        _word_id_d_U = tf.placeholder(shape=[Ud], dtype=tf.int32)
+        _word_ct_d_U = tf.placeholder(shape=[Ud], dtype=tf.float64)
         _pi_d_K, _info_dict = _calc_nef_map_pi_d_K__tensorflow_graph(
-            _word_id_d_Ud=_word_id_d_Ud,
-            _word_ct_d_Ud=_word_ct_d_Ud,
+            _word_id_d_U=_word_id_d_U,
+            _word_ct_d_U=_word_ct_d_U,
             _topics_KV=_topics_KV,
             convex_alpha_minus_1=convex_alpha_minus_1,
             **pi_opt_kwargs) 
         feed_dict={
-            _word_id_d_Ud:word_id_d_Ud,
-            _word_ct_d_Ud:word_ct_d_Ud,
+            _word_id_d_U:word_id_d_U,
+            _word_ct_d_U:word_ct_d_U,
             _topics_KV:topics_KV,
             } 
     else:
         K, Ud = topics_KUd.shape
         _topics_KUd = tf.placeholder(shape=[K, Ud], dtype=tf.float64)
-        _word_ct_d_Ud = tf.placeholder(shape=[Ud], dtype=tf.float64)
+        _word_ct_d_U = tf.placeholder(shape=[Ud], dtype=tf.float64)
         _pi_d_K, _info_dict, const_dict = _calc_nef_map_pi_d_K__tensorflow_graph(
-            _word_ct_d_Ud=_word_ct_d_Ud,
+            _word_ct_d_U=_word_ct_d_U,
             _topics_KUd=_topics_KUd,
             convex_alpha_minus_1=convex_alpha_minus_1,
             )
         feed_dict={
-            _word_ct_d_Ud:word_ct_d_Ud,
+            _word_ct_d_U:word_ct_d_U,
             _topics_KUd:topics_KUd,
             }
     sess = tf.Session()
@@ -64,8 +64,8 @@ def calc_nef_map_pi_d_K__tensorflow(
 
 
 def _calc_nef_map_pi_d_K__tensorflow_graph(
-        _word_id_d_Ud=None,
-        _word_ct_d_Ud=None,
+        _word_id_d_U=None,
+        _word_ct_d_U=None,
         _topics_KUd=None,
         _topics_KV=None,
         convex_alpha_minus_1=None,
@@ -94,18 +94,18 @@ def _calc_nef_map_pi_d_K__tensorflow_graph(
     '''
     if _topics_KUd is None:
         # Fancy indexing
-        # RHS equal to topics_KV[:, word_id_d_Ud]
+        # RHS equal to topics_KV[:, word_id_d_U]
         _topics_KUd = tf.transpose(
-            tf.gather(tf.transpose(_topics_KV), _word_id_d_Ud))
+            tf.gather(tf.transpose(_topics_KV), _word_id_d_U))
     K, Ud = _topics_KUd.get_shape().as_list()
-    _ct_topics_KUd = _topics_KUd * _word_ct_d_Ud
+    _ct_topics_KUd = _topics_KUd * _word_ct_d_U
 
     ## Define part 1/2 of while loop: How to update
     def update_pi_d_K_func(
             iterid, pi_d_K, pi_step_size, cur_l1_diff, did_converge, n_restarts):
-        _denom_Ud = 1.0 / tf.matmul(tf.reshape(pi_d_K, (1,K)), _topics_KUd)
+        _denom_U = 1.0 / tf.matmul(tf.reshape(pi_d_K, (1,K)), _topics_KUd)
         grad_K = pi_step_size * (
-            tf.matmul(_ct_topics_KUd, tf.transpose(_denom_Ud))[:,0]
+            tf.matmul(_ct_topics_KUd, tf.transpose(_denom_U))[:,0]
             + tf.cast(convex_alpha_minus_1, tf.float64) / (1e-9 + pi_d_K))
         grad_K = grad_K - tf.reduce_max(grad_K)
         new_pi_d_K = pi_d_K * tf.exp(grad_K)
