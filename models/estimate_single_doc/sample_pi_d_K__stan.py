@@ -6,11 +6,6 @@ import time
 import sys
 import hashlib
 
-from estimate_ML_upper_bound import (
-    estimate_single_doc_ML_upper_bound,
-    calc_single_doc_exact_marginal_lik_if_single_word,
-    )
-
 _cache = dict()
 stan_model_code_as_str = """
 
@@ -289,22 +284,4 @@ if __name__ == '__main__':
         print(" ML  pi_d_SK\n   %s" % (
             ' '.join(['%.4g' % a for a in ml_pi_d_K])))
 
-
-        logpx_UBML = estimate_single_doc_ML_upper_bound(
-            pi_d_K=ml_pi_d_K,
-            alpha_K=alpha_K,
-            topics_KV=topics_KV,
-            word_id_d_U=word_id_d_U,
-            word_ct_d_U=word_ct_d_U,
-            )
-        print("%.5f logpx_UBML" % (logpx_UBML))
-
-        if ct == 1.0:
-            logpx_exact = calc_single_doc_exact_marginal_lik_if_single_word(
-                alpha_K=alpha_K,
-                topics_KV=topics_KV,
-                word_id_d_U=word_id_d_U,
-                word_ct_d_U=word_ct_d_U,
-                )
-            print("%.5f logpx_EXACT_count1" % (logpx_exact))
 
