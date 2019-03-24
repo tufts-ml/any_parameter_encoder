@@ -31,7 +31,7 @@ data_tr, data_va, data_te = load_toy_bars(datadir, vocab_size)
 for n_hidden_layers in vae_params['n_hidden_layers']:
     for n_hidden_units in vae_params['n_hidden_units']:
         vae = mod.VAE_tf(n_hidden_layers=n_hidden_layers, n_hidden_units=n_hidden_units, n_topics=n_topics, vocab_size=vocab_size)
-        vae = train(data_tr, vae, training_epochs=2)
+        vae = train(data_tr, vae, training_epochs=100, tensorboard=True, tensorboard_logs_dir='logs_{}_{}'.format(n_hidden_layers, n_hidden_units))
         vae.save()
         vae.sess.close()
         tf.reset_default_graph()
