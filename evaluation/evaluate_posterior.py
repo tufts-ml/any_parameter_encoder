@@ -1,20 +1,9 @@
+import math
+import numpy as np
+import torch
+from pyro.distributions.util import logsumexp
 from bnpy.viz.BarsViz import show_square_images
 import matplotlib.pyplot as plt
-
-
-def evaluate(svi, test_generator, use_cuda=False):
-    # initialize loss accumulator
-    test_loss = 0.
-    # compute the loss over the entire test set
-    for x in test_generator:
-        # if on GPU put mini-batch into CUDA memory
-        if use_cuda:
-            x = x.cuda()
-        # compute ELBO estimate and accumulate loss
-        test_loss += svi.evaluate_loss(x)
-    normalizer_test = len(test_generator.dataset)
-    total_epoch_loss_test = test_loss / normalizer_test
-    return total_epoch_loss_test
 
 
 def evaluate_log_predictive_density(posterior_predictive_traces):
@@ -53,7 +42,7 @@ def reconstruct_data(posterior, vae):
     """
     # encode image x
     reconstructions = []
-    # TODO: ensure traces in arbitrary order
+    # each tr contains a trace for every datapoint
     for tr in posterior.exec_traces:
         z_loc = tr.nodes['latent']['value']
         # decode the image (note we don't sample in image space)
@@ -65,7 +54,18 @@ def reconstruct_data(posterior, vae):
     # return np.array(reconstructions).reshape((-1, VOCAB_SIZE))
 
 
-def plot_side_by_side_docs(docs, name, ncols=5):
+def normalize(x, axis):
+    """ Normalize a 2D array
+    """
+    if axis == 1:
+        return x / np.linalg.norm(x, axis=1, ord=1)[:, np.newaxis]
+    elif axis == 0:
+        return x / np.linalg.norm(x, axis=0, ord=1)
+    else:
+        raise ValueError('Only supports 2D normalization')
+
+
+def plot_side_by_side_docs(docs, name, ncols=10):
     """Plot recreated docs side by side (num_docs x num_methods)"""
     docs = np.asarray(docs, dtype=np.float32)
     # normalize each row so values are on a similar scale
