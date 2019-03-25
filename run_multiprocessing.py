@@ -26,6 +26,9 @@ mod = importlib.import_module(model)
 inference_techniques = ['vae', 'svi', 'hmc']
 
 
+# 0. load data
+data_tr, data_va, data_te = load_toy_bars(datadir, vocab_size)
+
 def train_save_VAE(n_hidden_layers, n_hidden_units):
     vae = mod.VAE_tf(n_hidden_layers=n_hidden_layers, n_hidden_units=n_hidden_units, n_topics=n_topics,
                      vocab_size=vocab_size, tensorboard=True)
@@ -36,14 +39,18 @@ def train_save_VAE(n_hidden_layers, n_hidden_units):
     tf.reset_default_graph()
 
 
-# 0. load data
-data_tr, data_va, data_te = load_toy_bars(datadir, vocab_size)
-
-
 # 1. train vae
-for n_hidden_layers in vae_params['n_hidden_layers']:
-    for n_hidden_units in vae_params['n_hidden_units']:
-        train_save_VAE(n_hidden_layers, n_hidden_units)
+with concurrent.futures.ProcessPoolExecutor() as executor:
+    for n_hidden_layers in vae_params['n_hidden_layers']:
+        for n_hidden_units in vae_params['n_hidden_units']:
+            future = executor.submit(train_save_VAE, n_hidden_layers, n_hidden_units)
+            print("Run with: %s | %s" % (n_hidden_layers, n_hidden_units))
+
+    for future in concurrent.futures.as_completed():
+            try:
+                future.result()
+            except Exception as exc:
+                print('Exception raised: %s' % (exc))
 
 # 2. infer from model
 sample_docs = torch.from_numpy(data_tr[:5].astype(np.float32))
