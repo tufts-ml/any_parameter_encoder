@@ -290,9 +290,9 @@ class VAE_tf(object):
         return self.sess.run(self.x_reconstr_mean,
                              feed_dict={self.z: z_mu})
 
-    def save(self):
-        os.system('mkdir -p dump/')
-        h5f = h5py.File('dump/lda_lognorm_{}_{}.h5'.format(self.n_hidden_layers, self.n_hidden_units), 'w')
+    def save(self, results_dir):
+        os.system('mkdir -p ' + results_dir)
+        h5f = h5py.File(results_dir + '/lda_lognorm_{}_{}.h5'.format(self.n_hidden_layers, self.n_hidden_units), 'w')
         for i in range(self.n_hidden_layers):
             weights = self.sess.graph.get_tensor_by_name('recognition_network/h{}:0'.format(i + 1)).eval(session=self.sess)
             biases = self.sess.graph.get_tensor_by_name('recognition_network/b{}:0'.format(i + 1)).eval(session=self.sess)
@@ -473,9 +473,9 @@ class VAE_pyro(nn.Module):
         word_probs = self.decoder(z_loc)
         return word_probs
 
-    def load(self):
+    def load(self, results_dir):
         state_dict = {}
-        h5f = h5py.File('dump/lda_lognorm_{}_{}.h5'.format(self.n_hidden_layers, self.n_hidden_units), 'r')
+        h5f = h5py.File(results_dir + '/lda_lognorm_{}_{}.h5'.format(self.n_hidden_layers, self.n_hidden_units), 'r')
         for i in range(self.n_hidden_layers):
             state_dict['encoder.enc_layers.{}.fc.weight'.format(i)] = torch.from_numpy(h5f['weights_{}'.format(i + 1)][()]).t()
             state_dict['encoder.enc_layers.{}.fc.bias'.format(i)] = torch.from_numpy(h5f['biases_{}'.format(i + 1)][()])
