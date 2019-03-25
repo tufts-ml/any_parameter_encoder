@@ -373,12 +373,17 @@ class Encoder(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, n_hidden_units, n_topics, vocab_size):
+    def __init__(self, n_hidden_units, n_topics, vocab_size, topic_init, topic_fixed):
         super(Decoder, self).__init__()
-        self.topics = torch.nn.Parameter(torch.randn(n_topics, vocab_size))
-        # the topics are already in inverse_softmax form
-        # topics = np.load('resources/topics_10x10.txt.npy')
-        # self.topics = torch.tensor(topics, requires_grad=False)
+        if topic_init:
+            # the topics are already in inverse_softmax form
+            topics = np.load(topic_init)
+            if topic_fixed:
+                self.topics = torch.tensor(topics, requires_grad=False)
+            else:
+                self.topics = torch.tensor(topics)
+        else:
+            self.topics = torch.nn.Parameter(torch.randn(n_topics, vocab_size))
         self.softmax = nn.Softmax(dim=1)
 
     def forward(self, z):
@@ -387,11 +392,11 @@ class Decoder(nn.Module):
 
 
 class VAE_pyro(nn.Module):
-    def __init__(self, n_hidden_units, n_hidden_layers, alpha=.1, vocab_size=9, n_topics=4, use_cuda=False):
+    def __init__(self, n_hidden_units, n_hidden_layers, topic_init=None, topic_fixed=False, alpha=.1, vocab_size=9, n_topics=4, use_cuda=False):
         super(VAE_pyro, self).__init__()
         # create the encoder and decoder networks
         self.encoder = Encoder(n_hidden_units, n_hidden_layers, n_topics=n_topics, vocab_size=vocab_size)
-        self.decoder = Decoder(n_hidden_units, n_topics, vocab_size)
+        self.decoder = Decoder(n_hidden_units, n_topics, vocab_size, topic_init, topic_fixed)
 
         if use_cuda:
             # calling cuda() here will put all the parameters of
@@ -409,10 +414,6 @@ class VAE_pyro(nn.Module):
         self.n_topics = n_topics
         self.n_hidden_layers = n_hidden_layers
         self.n_hidden_units = n_hidden_units
-        print(self.z_loc)
-        print(self.z_scale)
-        print(self.z_loc.shape)
-        print(self.z_scale.shape)
 
     # define the model p(x|z)p(z)
     def model(self, x):

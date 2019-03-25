@@ -16,11 +16,16 @@ from evaluation.evaluate_posterior import evaluate_log_predictive_density
 from evaluation.evaluate_posterior import reconstruct_data
 from evaluation.evaluate_posterior import plot_side_by_side_docs
 
+# this only differs from run.py in that the decoder is fixed
+# as a result, the ordering of inference is slightly different since we don't have to rerun
+# inference multiple times for SVI and HMC
 # global params
+topic_init = 'resources/topics_10x10.npy'
+topic_fixed = True
 datadir = 'toy_bars_10x10'
 vocab_size = 100
 n_topics = 18
-results_dir = 'dump'
+results_dir = 'dump_fixed'
 
 # vae params
 vae_params = {
@@ -36,9 +41,9 @@ inference_techniques = ['vae', 'svi', 'hmc']
 
 def train_save_VAE(n_hidden_layers, n_hidden_units):
     vae = mod.VAE_tf(n_hidden_layers=n_hidden_layers, n_hidden_units=n_hidden_units, n_topics=n_topics,
-                     vocab_size=vocab_size, tensorboard=True)
+                     vocab_size=vocab_size, tensorboard=True, topic_init=topic_init, topic_fixed=topic_fixed)
     vae = train(data_tr, vae, training_epochs=100, tensorboard=True,
-                tensorboard_logs_dir='dump/logs_{}_{}'.format(n_hidden_layers, n_hidden_units))
+                tensorboard_logs_dir=results_dir + '/logs_{}_{}'.format(n_hidden_layers, n_hidden_units))
     vae.save(results_dir)
     vae.sess.close()
     tf.reset_default_graph()
@@ -48,14 +53,18 @@ def train_save_VAE(n_hidden_layers, n_hidden_units):
 data_tr, data_va, data_te = load_toy_bars(datadir, vocab_size)
 
 # 1. train vae
-# for n_hidden_layers in vae_params['n_hidden_layers']:
-#     for n_hidden_units in vae_params['n_hidden_units']:
-#         train_save_VAE(n_hidden_layers, n_hidden_units)
-
-# 2. infer from model and evaluate
 for n_hidden_layers in vae_params['n_hidden_layers']:
     for n_hidden_units in vae_params['n_hidden_units']:
-        vae = mod.VAE_pyro(n_hidden_layers=n_hidden_layers, n_hidden_units=n_hidden_units, n_topics=n_topics, vocab_size=vocab_size)
+        train_save_VAE(n_hidden_layers, n_hidden_units)
+
+# 2. infer from model and evaluate
+# get the indices for sample docs that will be consistent across runs
+random_docs_idx = np.random.randint(0, 1000, size=10)
+
+for n_hidden_layers in vae_params['n_hidden_layers']:
+    for n_hidden_units in vae_params['n_hidden_units']:
+        vae = mod.VAE_pyro(n_hidden_layers=n_hidden_layers, n_hidden_units=n_hidden_units,
+                           n_topics=n_topics, vocab_size=vocab_size, topic_init=topic_init, topic_fixed=topic_fixed)
         state_dict = vae.load(results_dir)
         vae.load_state_dict(state_dict)
         # instantiate the inference methods
@@ -69,11 +78,14 @@ for n_hidden_layers in vae_params['n_hidden_layers']:
         for data_name, data in zip(['train', 'valid', 'test'], [data_tr, data_va, data_te]):
             # get the sample docs for reconstruction
             n_docs = len(data)
-            random_docs_idx = np.random.randint(0, n_docs, size=10)
             sample_docs = data[random_docs_idx]
             image = [sample_docs]
             data = torch.from_numpy(data.astype(np.float32))
             for inference_name, inference in zip(['vae', 'svi', 'mcmc'], [vae_svi, svi, mcmc]):
+                # hack to avoid rerunning SVI and MCMC
+                if (inference_name in ['svi', 'mcmc'] and n_hidden_layers != vae_params['n_hidden_layers'][0]
+                    and n_hidden_units != vae_params['n_hidden_layers'][0]):
+                    continue
                 posterior = inference.run(data)
                 posterior_predictive = TracePredictive(vae.model, posterior, num_samples=10)
                 posterior_predictive_traces = posterior_predictive.run(data)

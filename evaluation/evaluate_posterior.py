@@ -48,7 +48,7 @@ def reconstruct_data(posterior, vae):
         # decode the image (note we don't sample in image space)
         reconstruction = vae.decoder(z_loc).detach().numpy()
         reconstructions.append(reconstruction)
-    return reconstructions
+    return np.array(reconstructions)
     # we want each set of reconstructions to be a column
     # reconstructions = zip(*reconstructions)
     # return np.array(reconstructions).reshape((-1, VOCAB_SIZE))
