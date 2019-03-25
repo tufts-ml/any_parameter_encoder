@@ -9,9 +9,9 @@ import concurrent.futures
 
 # global params
 topic_init_and_fixed = True
-datadir = 'toy_bars'
-vocab_size = 9
-n_topics = 4
+datadir = 'toy_bars_10x10'
+vocab_size = 100
+n_topics = 18
 
 # vae params
 n_runs = 5
