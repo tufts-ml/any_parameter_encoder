@@ -14,6 +14,28 @@ def create_doc(topic, min_n_words_per_doc=45, max_n_words_per_doc=60, d=0):
     return words
 
 
+def draw_random_doc(
+        topic_list,
+        min_n_words_per_doc=45,
+        max_n_words_per_doc=60,
+        do_return_square=True,
+        proba_positive_label=0.2,
+        d=0):
+    prng = np.random.RandomState(d)
+    V = topic_list[0].size
+
+    # Pick which template
+    # Each document is only in one topic
+    k = prng.choice(len(topic_list))
+    n_words = prng.randint(low=min_n_words_per_doc, high=max_n_words_per_doc)
+    words = prng.choice(
+        V,
+        p=topic_list[k].flatten(),
+        replace=True,
+        size=n_words)
+    return words
+
+
 for t in train_topics:
     t /= t.sum()
 
@@ -22,9 +44,12 @@ test_topics = test_single_topics + test_double_topics + test_triple_topics
 for t in test_topics:
     t /= t.sum()
 
-train = [create_doc(t, d=d) for t in train_topics for d in range(100000/len(train_topics))]
-valid = [create_doc(t, d=d) for t in train_topics for d in range(1000/len(train_topics))]
-test = [create_doc(t, d=d) for t in test_topics for d in range(1000/len(test_topics))]
+train = [draw_random_doc(train_topics) for _ in range(100000)]
+valid = [draw_random_doc(train_topics) for _ in range(1000)]
+test = [draw_random_doc(test_topics) for _ in range(1000)]
+# train = [create_doc(t, d=d) for t in train_topics for d in range(100000/len(train_topics))]
+# valid = [create_doc(t, d=d) for t in train_topics for d in range(1000/len(train_topics))]
+# test = [create_doc(t, d=d) for t in test_topics for d in range(1000/len(test_topics))]
 
 filepath = os.path.dirname(__file__)
 train_filepath = os.path.join(filepath, "train.txt.npy")
