@@ -26,6 +26,7 @@ datadir = 'toy_bars_10x10'
 vocab_size = 100
 n_topics = 18
 results_dir = 'dump_fixed'
+results_file = 'results.csv'
 
 # vae params
 vae_params = {
@@ -53,13 +54,14 @@ def train_save_VAE(n_hidden_layers, n_hidden_units):
 data_tr, data_va, data_te = load_toy_bars(datadir, vocab_size)
 
 # 1. train vae
-for n_hidden_layers in vae_params['n_hidden_layers']:
-    for n_hidden_units in vae_params['n_hidden_units']:
-        train_save_VAE(n_hidden_layers, n_hidden_units)
+# for n_hidden_layers in vae_params['n_hidden_layers']:
+#     for n_hidden_units in vae_params['n_hidden_units']:
+#         train_save_VAE(n_hidden_layers, n_hidden_units)
 
 # 2. infer from model and evaluate
 # get the indices for sample docs that will be consistent across runs
 random_docs_idx = np.random.randint(0, 1000, size=10)
+data_tr_small = data_tr[:1000]
 
 for n_hidden_layers in vae_params['n_hidden_layers']:
     for n_hidden_units in vae_params['n_hidden_units']:
@@ -67,20 +69,22 @@ for n_hidden_layers in vae_params['n_hidden_layers']:
                            n_topics=n_topics, vocab_size=vocab_size, topic_init=topic_init, topic_fixed=topic_fixed)
         state_dict = vae.load(results_dir)
         vae.load_state_dict(state_dict)
-        # instantiate the inference methods
-        # pyro scheduler is used for both VAE and standard SVI, but it doesn't have any effect in the VAE case since
-        # we never take any optimization steps
-        pyro_scheduler = StepLR(
-            {'optimizer': torch.optim.Adam, 'optim_args': {"lr": .1}, 'step_size': 1000, 'gamma': 0.9})
-        vae_svi = SVI(vae.model, vae.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=0)
-        svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=TraceMeanField_ELBO(), num_steps=30)
-        mcmc = MCMC(NUTS(vae.model, adapt_step_size=True), num_samples=10, warmup_steps=500)
-        for data_name, data in zip(['train', 'valid', 'test'], [data_tr, data_va, data_te]):
+        for data_name, data in zip(['train', 'valid', 'test'], [data_tr_small, data_va, data_te]):
+            # instantiate the inference methods
+            # pyro scheduler is used for both VAE and standard SVI, but it doesn't have any effect in the VAE case since
+            # we never take any optimization steps
+            pyro_scheduler = StepLR(
+                {'optimizer': torch.optim.Adam, 'optim_args': {"lr": .1}, 'step_size': 1000, 'gamma': 0.9})
+            vae_svi = SVI(vae.model, vae.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=0)
+            svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=TraceMeanField_ELBO(), num_steps=30)
+            mcmc = MCMC(NUTS(vae.model, adapt_step_size=True), num_samples=10, warmup_steps=50)
+
             # get the sample docs for reconstruction
             n_docs = len(data)
             sample_docs = data[random_docs_idx]
             image = [sample_docs]
             data = torch.from_numpy(data.astype(np.float32))
+
             for inference_name, inference in zip(['vae', 'svi', 'mcmc'], [vae_svi, svi, mcmc]):
                 # hack to avoid rerunning SVI and MCMC
                 if (inference_name in ['svi', 'mcmc'] and n_hidden_layers != vae_params['n_hidden_layers'][0]
@@ -92,7 +96,7 @@ for n_hidden_layers in vae_params['n_hidden_layers']:
                 # get the posterior predictive log likelihood
                 posterior_predictive_density = evaluate_log_predictive_density(posterior_predictive_traces)
                 # columns: inference, model, dataset, n_hidden_layers, n_hidden_units, posterior_predictive_density
-                with open('results.csv', 'a') as f:
+                with open(os.path.join(results_dir, results_file), 'a') as f:
                     row = [inference_name, model, data_name, n_hidden_layers, n_hidden_units, posterior_predictive_density]
                     csv_writer = csv.writer(f)
                     csv_writer.writerow(row)
@@ -101,7 +105,5 @@ for n_hidden_layers in vae_params['n_hidden_layers']:
                 # save sample reconstructions
                 averaged_reconstructions = np.mean(reconstructions[:, random_docs_idx], axis=0)
                 image.extend(averaged_reconstructions)
-            plot_name = os.path.join(results_dir, '_'.join([model, data_name, n_hidden_layers, n_hidden_units, inference_name] + '.pdf'))
+            plot_name = os.path.join(results_dir, '_'.join([model, data_name, str(n_hidden_layers), str(n_hidden_units), inference_name]) + '.pdf')
             plot_side_by_side_docs(sample_docs, plot_name, ncols=10)
-
-# 3. visualize
