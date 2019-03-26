@@ -414,6 +414,7 @@ class VAE_pyro(nn.Module):
         self.n_topics = n_topics
         self.n_hidden_layers = n_hidden_layers
         self.n_hidden_units = n_hidden_units
+        self.topic_init = topic_init
 
     # define the model p(x|z)p(z)
     def model(self, x):
@@ -495,7 +496,8 @@ class VAE_pyro(nn.Module):
         state_dict['encoder.bnmu.running_var'] = torch.from_numpy(h5f['running_var_out_mean'][()])
         state_dict['encoder.bnsigma.running_var'] = torch.from_numpy(h5f['running_var_out_log_sigma'][()])
 
-        state_dict['decoder.topics'] = torch.from_numpy(h5f['topics'][()])
+        if not self.topic_init:
+            state_dict['decoder.topics'] = torch.from_numpy(h5f['topics'][()])
 
         h5f.close()
 
