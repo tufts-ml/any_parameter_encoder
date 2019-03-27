@@ -44,9 +44,9 @@ test_topics = test_single_topics + test_double_topics + test_triple_topics
 for t in test_topics:
     t /= t.sum()
 
-train = [draw_random_doc(train_topics) for _ in range(100000)]
-valid = [draw_random_doc(train_topics) for _ in range(1000)]
-test = [draw_random_doc(test_topics) for _ in range(1000)]
+train = [draw_random_doc(train_topics, d=d) for d in range(100000)]
+valid = [draw_random_doc(train_topics, d=d + 100000) for d in range(1000)]
+test = [draw_random_doc(test_topics, d=d) for d in range(1000)]
 # train = [create_doc(t, d=d) for t in train_topics for d in range(100000/len(train_topics))]
 # valid = [create_doc(t, d=d) for t in train_topics for d in range(1000/len(train_topics))]
 # test = [create_doc(t, d=d) for t in test_topics for d in range(1000/len(test_topics))]
