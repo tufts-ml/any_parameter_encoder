@@ -25,7 +25,7 @@ topic_fixed = True
 datadir = 'toy_bars_10x10'
 vocab_size = 100
 n_topics = 18
-results_dir = 'dump_fixed'
+results_dir = 'dump_fixed2'
 results_file = 'results.csv'
 
 # vae params
@@ -38,7 +38,7 @@ mod = importlib.import_module(model)
 
 # inference params
 inference_techniques = ['vae', 'svi', 'hmc']
-
+num_examples = 10
 
 def train_save_VAE(n_hidden_layers, n_hidden_units):
     vae = mod.VAE_tf(n_hidden_layers=n_hidden_layers, n_hidden_units=n_hidden_units, n_topics=n_topics,
@@ -60,7 +60,8 @@ data_tr, data_va, data_te = load_toy_bars(datadir, vocab_size)
 
 # 2. infer from model and evaluate
 # get the indices for sample docs that will be consistent across runs
-random_docs_idx = np.random.randint(0, 1000, size=10)
+random_docs_idx = np.random.randint(0, 1000, size=num_examples)
+# mcmc can't handle too much data
 data_tr_small = data_tr[:1000]
 
 for n_hidden_layers in vae_params['n_hidden_layers']:
@@ -74,9 +75,9 @@ for n_hidden_layers in vae_params['n_hidden_layers']:
             # pyro scheduler is used for both VAE and standard SVI, but it doesn't have any effect in the VAE case since
             # we never take any optimization steps
             pyro_scheduler = StepLR(
-                {'optimizer': torch.optim.Adam, 'optim_args': {"lr": .1}, 'step_size': 1000, 'gamma': 0.9})
+                {'optimizer': torch.optim.Adam, 'optim_args': {"lr": .1}, 'step_size': 10000, 'gamma': 0.95})
             vae_svi = SVI(vae.model, vae.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=0)
-            svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=TraceMeanField_ELBO(), num_steps=30)
+            svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=TraceMeanField_ELBO(), num_steps=100)
             mcmc = MCMC(NUTS(vae.model, adapt_step_size=True), num_samples=10, warmup_steps=50)
 
             # get the sample docs for reconstruction
@@ -87,14 +88,15 @@ for n_hidden_layers in vae_params['n_hidden_layers']:
 
             for inference_name, inference in zip(['vae', 'svi', 'mcmc'], [vae_svi, svi, mcmc]):
                 # hack to avoid rerunning SVI and MCMC
-                if (inference_name in ['svi', 'mcmc'] and n_hidden_layers != vae_params['n_hidden_layers'][0]
-                    and n_hidden_units != vae_params['n_hidden_layers'][0]):
-                    continue
+                # if (inference_name in ['svi', 'mcmc'] and n_hidden_layers != vae_params['n_hidden_layers'][0]
+                #     and n_hidden_units != vae_params['n_hidden_layers'][0]):
+                #     continue
                 posterior = inference.run(data)
                 posterior_predictive = TracePredictive(vae.model, posterior, num_samples=10)
                 posterior_predictive_traces = posterior_predictive.run(data)
                 # get the posterior predictive log likelihood
                 posterior_predictive_density = evaluate_log_predictive_density(posterior_predictive_traces)
+                posterior_predictive_density = float(posterior_predictive_density.detach().numpy())
                 # columns: inference, model, dataset, n_hidden_layers, n_hidden_units, posterior_predictive_density
                 with open(os.path.join(results_dir, results_file), 'a') as f:
                     row = [inference_name, model, data_name, n_hidden_layers, n_hidden_units, posterior_predictive_density]
@@ -104,6 +106,8 @@ for n_hidden_layers in vae_params['n_hidden_layers']:
                 reconstructions = reconstruct_data(posterior, vae)
                 # save sample reconstructions
                 averaged_reconstructions = np.mean(reconstructions[:, random_docs_idx], axis=0)
-                image.extend(averaged_reconstructions)
-            plot_name = os.path.join(results_dir, '_'.join([model, data_name, str(n_hidden_layers), str(n_hidden_units), inference_name]) + '.pdf')
-            plot_side_by_side_docs(sample_docs, plot_name, ncols=10)
+                image.append(averaged_reconstructions)
+            plot_name = os.path.join(results_dir, '_'.join([model, data_name, str(n_hidden_layers), str(n_hidden_units)]) + '.pdf')
+            num_rows = len(image)
+            image = np.array(image).reshape(num_rows * num_examples, vocab_size)
+            plot_side_by_side_docs(image, plot_name, ncols=num_examples)
