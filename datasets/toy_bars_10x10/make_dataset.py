@@ -47,17 +47,23 @@ for t in test_topics:
 train = [draw_random_doc(train_topics, d=d) for d in range(100000)]
 valid = [draw_random_doc(train_topics, d=d + 100000) for d in range(1000)]
 test = [draw_random_doc(test_topics, d=d) for d in range(1000)]
-# train = [create_doc(t, d=d) for t in train_topics for d in range(100000/len(train_topics))]
-# valid = [create_doc(t, d=d) for t in train_topics for d in range(1000/len(train_topics))]
-# test = [create_doc(t, d=d) for t in test_topics for d in range(1000/len(test_topics))]
+test_single = [draw_random_doc(test_single_topics, d=d) for d in range(1000)]
+test_double = [draw_random_doc(test_double_topics, d=d) for d in range(1000)]
+test_triple = [draw_random_doc(test_triple_topics, d=d) for d in range(1000)]
 
 filepath = os.path.dirname(__file__)
 train_filepath = os.path.join(filepath, "train.txt.npy")
 valid_filepath = os.path.join(filepath, "valid.txt.npy")
 test_filepath = os.path.join(filepath, "test.txt.npy")
+test_single_filepath = os.path.join(filepath, "test_single.txt.npy")
+test_double_filepath = os.path.join(filepath, "test_double.txt.npy")
+test_triple_filepath = os.path.join(filepath, "test_triple.txt.npy")
 np.save(train_filepath, train)
 np.save(valid_filepath, valid)
 np.save(test_filepath, test)
+np.save(test_single_filepath, test_single)
+np.save(test_double_filepath, test_double)
+np.save(test_triple_filepath, test_triple)
 
 
 def plot_topics(topics, name):
