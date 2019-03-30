@@ -35,8 +35,8 @@ vae_params = {
     'n_hidden_units': [10, 20, 50, 100, 200, 300, 500]
 
 }
-model = 'lda_lognorm'
-mod = importlib.import_module('models.' + model)
+model = 'models.lda_lognorm'
+mod = importlib.import_module(model)
 
 # inference params
 inference_techniques = ['vae', 'svi', 'hmc']
