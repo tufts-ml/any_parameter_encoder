@@ -43,6 +43,7 @@ state_dict = vae.load()
 vae.load_state_dict(state_dict)
 for data_name, data in zip(dataset_names, datasets):
     # pyro scheduler doesn't have any effect in the VAE case since we never take any optimization steps
+    data = torch.from_numpy(data.astype(np.float32))
     pyro_scheduler = StepLR(
         {'optimizer': torch.optim.Adam, 'optim_args': {"lr": .1}, 'step_size': 10000, 'gamma': 0.95})
     svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=TraceMeanField_ELBO(), num_steps=100,
@@ -51,11 +52,10 @@ for data_name, data in zip(dataset_names, datasets):
     mcmc_lda = MCMC(NUTS(vae.lda_model, adapt_step_size=True), num_samples=1000, warmup_steps=50)
     for inference_name, inference in zip(['svi', 'mcmc', 'mcmc_lda'], [svi, mcmc, mcmc_lda]):
         # run inference
-        data = torch.from_numpy(data.astype(np.float32))
         posterior = inference.run(data)
         model_config.update({
             'data_name': data_name,
-            'inference': inference
+            'inference': inference_name
         })
         print(model_config)
         save_reconstruction_array(vae, posterior, sample_idx, model_config)

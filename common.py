@@ -6,19 +6,23 @@ import tensorflow as tf
 from pyro.infer.abstract_infer import TracePredictive
 from evaluation.evaluate_posterior import evaluate_log_predictive_density
 from evaluation.evaluate_posterior import reconstruct_data
-from evaluation.evaluate_posterior import plot_side_by_side_docs
+from visualization.reconstructions import plot_side_by_side_docs
 
 from models.lda_lognorm import VAE_tf, VAE_pyro
-from training.train_vae import train
+from training.train_vae import train, train_with_hallucinations
 
 
-def train_save_VAE(data, model_config):
+def train_save_VAE(data, model_config, hallucinations=False):
     vae = VAE_tf(tensorboard=True, **model_config)
     tensorboard_logs_dir = os.path.join(
         model_config['results_dir'], model_config['model_name'],
         'logs_{}_{}'.format(model_config['n_hidden_layers'], model_config['n_hidden_units']))
-    vae = train(data, vae, training_epochs=100, tensorboard=True,
-                tensorboard_logs_dir=tensorboard_logs_dir)
+    if hallucinations:
+        vae = train_with_hallucinations(data, vae, model_config, training_epochs=100, tensorboard=True,
+                                        tensorboard_logs_dir=tensorboard_logs_dir)
+    else:
+        vae = train(data, vae, training_epochs=100, tensorboard=True,
+                    tensorboard_logs_dir=tensorboard_logs_dir)
     vae.save()
     vae.sess.close()
     tf.reset_default_graph()

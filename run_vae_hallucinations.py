@@ -44,7 +44,7 @@ init_params = {
 
 lda_orig = init_params.copy()
 lda_orig.update({
-    'model_name': 'lda_orig',
+    'model_name': 'lda_orig_hallucinations',
     'enc_topic_init': None,
     'enc_topic_trainable': True,
     'scale_trainable': False
@@ -52,7 +52,7 @@ lda_orig.update({
 
 lda_scale = init_params.copy()
 lda_scale.update({
-    'model_name': 'lda_scale',
+    'model_name': 'lda_scale_hallucinations',
     'enc_topic_init': None,
     'enc_topic_trainable': True,
     'scale_trainable': True
@@ -61,7 +61,7 @@ lda_scale.update({
 
 lda_sym_fixed = init_params.copy()
 lda_sym_fixed.update({
-    'model_name': 'lda_sym_fixed',
+    'model_name': 'lda_sym_fixed_hallucinations',
     'enc_topic_init': 'resources/topics_10x10.npy',
     'enc_topic_trainable': False,
     'scale_trainable': False,
@@ -70,7 +70,7 @@ lda_sym_fixed.update({
 
 lda_sym = init_params.copy()
 lda_sym.update({
-    'model_name': 'lda_sym',
+    'model_name': 'lda_sym_hallucinations',
     'enc_topic_init': 'resources/topics_10x10.npy',
     'enc_topic_trainable': True,
     'scale_trainable': False,
@@ -80,7 +80,7 @@ lda_sym.update({
 
 lda_sym_fixed_with_scale = init_params.copy()
 lda_sym_fixed_with_scale.update({
-    'model_name': 'lda_sym_fixed_with_scale',
+    'model_name': 'lda_sym_fixed_with_scale_hallucinations',
     'enc_topic_init': 'resources/topics_10x10.npy',
     'enc_topic_trainable': False,
     'scale_trainable': True,
@@ -89,7 +89,7 @@ lda_sym_fixed_with_scale.update({
 
 lda_sym_with_scale = init_params.copy()
 lda_sym_with_scale.update({
-    'model_name': 'lda_sym_with_scale',
+    'model_name': 'lda_sym_with_scale_hallucinations',
     'enc_topic_init': 'resources/topics_10x10.npy',
     'enc_topic_trainable': True,
     'scale_trainable': True,
@@ -104,7 +104,7 @@ model_configs_sym = [
     lda_sym_fixed, lda_sym, lda_sym_fixed_with_scale, lda_sym_with_scale
 ]
 
-for model_config in [lda_scale]:
+for model_config in model_configs:
     for n_hidden_layers in vae_params['n_hidden_layers']:
         for n_hidden_units in vae_params['n_hidden_units']:
             model_config.update({
@@ -112,7 +112,7 @@ for model_config in [lda_scale]:
                 'n_hidden_units': n_hidden_units,
             })
             print(model_config)
-            train_save_VAE(data_tr, model_config)
+            train_save_VAE(data_tr, model_config, hallucinations=True)
 
 for model_config in model_configs_sym:
     for n_hidden_layers in vae_params['n_hidden_layers']:
@@ -120,7 +120,7 @@ for model_config in model_configs_sym:
             'n_hidden_layers': n_hidden_layers,
         })
         print(model_config)
-        train_save_VAE(data_tr, model_config)
+        train_save_VAE(data_tr, model_config, hallucinations=True)
 
 for model_config in model_configs:
     for n_hidden_layers in vae_params['n_hidden_layers']:

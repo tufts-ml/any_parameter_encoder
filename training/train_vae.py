@@ -1,7 +1,13 @@
 import sys
+import os
 import math
 import numpy as np
 import tensorflow as tf
+
+
+from datasets.create import draw_random_doc
+from utils import inverse_softmax
+from visualization.reconstructions import plot_side_by_side_docs
 
 
 def create_minibatch(data, batch_size):
@@ -9,7 +15,6 @@ def create_minibatch(data, batch_size):
     shuffled_data = np.random.shuffle(data)
     for start_idx in range(0, data.shape[0], batch_size):
         yield data[start_idx: start_idx + batch_size]
-
 
 
 def train(
@@ -65,4 +70,39 @@ def train(
                                    feed_dict={vae.x: batch_xs, vae.keep_prob: 1.0})
             train_writer.add_summary(summary, epoch)
 
+    return vae
+
+
+def generate_data(vae, zs, vocab_size, num_docs=10000, min_n_words_per_doc=45, max_n_words_per_doc=60, d=0):
+    prng = np.random.RandomState(d)
+    reconstructed = vae.generate(inverse_softmax(zs))
+    # bring it to count space
+    new_docs = []
+    for i in range(num_docs):
+        new_doc = draw_random_doc(
+            reconstructed,
+            do_return_square=False, d=i
+        )
+        new_docs.append(new_doc)
+
+    new_docs = np.array(
+        [
+            np.bincount(doc.astype("int"), minlength=vocab_size)
+            for doc in new_docs
+            if np.sum(doc) != 0
+        ]
+    )
+    return np.array(new_docs)
+
+
+def train_with_hallucinations(data, vae, model_config, alpha=.01, num_samples=10000,
+                              batch_size=200, training_epochs=100, display_step=5,
+                              tensorboard=False, tensorboard_logs_dir=None):
+    zs = np.random.dirichlet(alpha=alpha * np.ones(model_config['n_topics']), size=num_samples)
+    fake_data = generate_data(vae, zs, vocab_size=model_config['vocab_size'], num_docs=100000)
+
+    plot_side_by_side_docs(fake_data, os.path.join(model_config['results_dir'], "fake_data.png"))
+
+    vae = train(np.concatenate([data, fake_data]), vae, training_epochs=100, tensorboard=True,
+                tensorboard_logs_dir=tensorboard_logs_dir)
     return vae

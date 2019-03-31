@@ -53,27 +53,3 @@ def reconstruct_data(posterior, vae):
     # reconstructions = zip(*reconstructions)
     # return np.array(reconstructions).reshape((-1, VOCAB_SIZE))
 
-
-def normalize(x, axis):
-    """ Normalize a 2D array
-    """
-    if axis == 1:
-        return x / np.linalg.norm(x, axis=1, ord=1)[:, np.newaxis]
-    elif axis == 0:
-        return x / np.linalg.norm(x, axis=0, ord=1)
-    else:
-        raise ValueError('Only supports 2D normalization')
-
-
-def plot_side_by_side_docs(docs, name, ncols=10):
-    """Plot recreated docs side by side (num_docs x num_methods)"""
-    docs = np.asarray(docs, dtype=np.float32)
-    # normalize each row so values are on a similar scale
-    # (the first counts row is very different from the "recreated docs" rows)
-    docs = normalize(docs, axis=1)
-    vmax = np.mean(np.sum(docs, axis=1))
-    show_square_images(docs * 10, vmin=0, vmax=vmax, ncols=ncols)
-    plt.tight_layout()
-    plt.savefig(name)
-    plt.clf()
-    plt.close()
