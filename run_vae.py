@@ -12,13 +12,15 @@ from common import train_save_VAE, save_loglik_to_csv, save_reconstruction_array
 # global params
 datadir = 'toy_bars_10x10'
 results_dir = 'problem_toy_bars'
-results_file = 'results.csv'
+results_file = 'results_train.csv'
 n_topics = 18
 
 # vae params
 vae_params = {
-    'n_hidden_layers': [1, 2, 5, 10, 20],
-    'n_hidden_units': [10, 20, 50, 100, 200, 300, 500]
+    # 'n_hidden_layers': [1, 2, 5, 10, 20],
+    # 'n_hidden_units': [10, 20, 50, 100, 200, 300, 500]
+    'n_hidden_layers': [1, 2, 5],
+    'n_hidden_units': [10, 20, 50, 100]
 }
 # vae_params = {
 #     'n_hidden_layers': [1, 2],
@@ -30,6 +32,7 @@ sample_idx = list(range(10))
 dataset_names = ['train', 'valid', 'test', 'test_single', 'test_double', 'test_triple']
 datasets = load_toy_bars('toy_bars_10x10')
 data_tr = datasets[0]
+datasets[0] = data_tr[:1000]
 
 # various VAEs, all with fixed decoders
 init_params = {
@@ -104,27 +107,31 @@ model_configs_sym = [
     lda_sym_fixed, lda_sym, lda_sym_fixed_with_scale, lda_sym_with_scale
 ]
 
-for model_config in [lda_scale]:
+# for model_config in model_configs:
+#     for n_hidden_layers in vae_params['n_hidden_layers']:
+#         for n_hidden_units in vae_params['n_hidden_units']:
+#             model_config.update({
+#                 'n_hidden_layers': n_hidden_layers,
+#                 'n_hidden_units': n_hidden_units,
+#             })
+#             print(model_config)
+#             train_save_VAE(data_tr, model_config)
+
+# for model_config in model_configs_sym:
+#     for n_hidden_layers in vae_params['n_hidden_layers']:
+#         model_config.update({
+#             'n_hidden_layers': n_hidden_layers,
+#         })
+#         print(model_config)
+#         train_save_VAE(data_tr, model_config)
+
+for model_config in model_configs:
     for n_hidden_layers in vae_params['n_hidden_layers']:
         for n_hidden_units in vae_params['n_hidden_units']:
             model_config.update({
                 'n_hidden_layers': n_hidden_layers,
                 'n_hidden_units': n_hidden_units,
             })
-            print(model_config)
-            train_save_VAE(data_tr, model_config)
-
-for model_config in model_configs_sym:
-    for n_hidden_layers in vae_params['n_hidden_layers']:
-        model_config.update({
-            'n_hidden_layers': n_hidden_layers,
-        })
-        print(model_config)
-        train_save_VAE(data_tr, model_config)
-
-for model_config in model_configs:
-    for n_hidden_layers in vae_params['n_hidden_layers']:
-        for n_hidden_units in vae_params['n_hidden_units']:
             vae = VAE_pyro(**model_config)
             state_dict = vae.load()
             vae.load_state_dict(state_dict)
@@ -136,8 +143,6 @@ for model_config in model_configs:
                 data = torch.from_numpy(data.astype(np.float32))
                 posterior = vae_svi.run(data)
                 model_config.update({
-                    'n_hidden_layers': n_hidden_layers,
-                    'n_hidden_units': n_hidden_units,
                     'data_name': data_name
                 })
                 print(model_config)
@@ -148,6 +153,9 @@ for model_config in model_configs:
 
 for model_config in model_configs_sym:
     for n_hidden_layers in vae_params['n_hidden_layers']:
+        model_config.update({
+            'n_hidden_layers': n_hidden_layers
+        })
         vae = VAE_pyro(**model_config)
         state_dict = vae.load()
         vae.load_state_dict(state_dict)

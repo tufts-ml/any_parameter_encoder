@@ -13,7 +13,7 @@ from common import save_loglik_to_csv, save_reconstruction_array
 
 # global params
 datadir = 'toy_bars_10x10'
-results_dir = 'problem_toy_bars'
+results_dir = 'svi_baseline'
 results_file = 'results.csv'
 
 num_examples = 10
@@ -29,7 +29,8 @@ model_config = {
     'vocab_size': 100,
     'n_topics': 18,
     'model_name': 'lda_orig',
-    'results_dir': results_dir,
+    # we first define this for the model we load to instantiate the inference algorithms
+    'results_dir': 'problem_toy_bars',
     'results_file': results_file,
     # these values don't matter because we're only taking the fixed decoder
     # # they're just needed to instantiate the model
@@ -50,14 +51,22 @@ for data_name, data in zip(dataset_names, datasets):
               num_samples=1000)
     mcmc = MCMC(NUTS(vae.model, adapt_step_size=True), num_samples=1000, warmup_steps=50)
     mcmc_lda = MCMC(NUTS(vae.lda_model, adapt_step_size=True), num_samples=1000, warmup_steps=50)
-    for inference_name, inference in zip(['svi', 'mcmc', 'mcmc_lda'], [svi, mcmc, mcmc_lda]):
-        # run inference
-        posterior = inference.run(data)
-        model_config.update({
-            'data_name': data_name,
-            'inference': inference_name
-        })
-        print(model_config)
-        save_reconstruction_array(vae, posterior, sample_idx, model_config)
-        for i in range(10):
-            save_loglik_to_csv(data, vae.model, posterior, model_config, num_samples=10)
+    # for inference_name, inference in zip(['svi', 'mcmc', 'mcmc_lda'], [svi, mcmc, mcmc_lda]):
+    for run in range(5):
+        for inference_name, inference in zip(['svi'], [svi]):
+            # if (data_name == 'train') and (inference_name in ['svi', 'mcmc']):
+            #     continue
+            # run inference
+            posterior = inference.run(data)
+            model_config.update({
+                'data_name': data_name,
+                'inference': inference_name,
+                # hack to get the various runs to save different files
+                'n_hidden_layers': run,
+                # we first define this for the model we load to instantiate the inference algorithms
+                'results_dir': results_dir,
+            })
+            print(model_config)
+            save_reconstruction_array(vae, posterior, sample_idx, model_config)
+            for i in range(10):
+                save_loglik_to_csv(data, vae.model, posterior, model_config, num_samples=10)
