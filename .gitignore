@@ -110,3 +110,5 @@ dump/*
 *.out
 dump*/
 problem_toy_bars/*
+svi_baseline/*
+lda.gensim*
