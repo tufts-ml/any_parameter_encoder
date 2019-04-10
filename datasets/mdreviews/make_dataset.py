@@ -4,6 +4,7 @@ import numpy as np
 from scipy.sparse import csr_matrix
 
 from gensim.models import LdaModel
+from gensim.models.wrappers import LdaMallet
 
 from utils import make_square
 from visualization.reconstructions import plot_side_by_side_docs
@@ -31,23 +32,28 @@ for doc in X:
 
 
 # run SVI on the corpus
-# lda = LdaModel(corpus[:1000], num_topics=20, alpha='auto')
+# lda = LdaModel(corpus, num_topics=20, alpha='auto')
 # topics = lda.get_topics()
 # np.save('true_topics.npy', topics)
 # lda.save('lda.gensim')
-lda = LdaModel.load('lda.gensim')
+
+path_to_mallet_binary = "/Users/lilyzhang/Documents/coding_projects/Mallet/bin/mallet"
+lda = LdaMallet(path_to_mallet_binary, corpus=corpus, num_topics=20)
 topics = lda.get_topics()
+
+# lda = LdaModel.load('lda.gensim')
+# topics = lda.get_topics()
 
 # run inference on a sample from the training set
 # to recreate the bars
-print'Inference on training set'
-topic_weights = []
-for doc in corpus[:1000]:
-	topic_weights.append(lda.get_document_topics(doc))
+# print'Inference on training set'
+# topic_weights = []
+# for doc in corpus[:1000]:
+# 	topic_weights.append(lda.get_document_topics(doc))
 
 
 # topic_weights, _ = lda.inference(corpus[:10])
-np.save('doc_topic_weights.npy', np.array(topic_weights))
+# np.save('doc_topic_weights.npy', np.array(topic_weights))
 # reconstruction = np.dot(topic_weights, topics)
 
 
