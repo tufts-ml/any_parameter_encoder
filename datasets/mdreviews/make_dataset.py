@@ -5,6 +5,7 @@ from scipy.sparse import csr_matrix
 
 from gensim.models import LdaModel
 
+from utils import make_square
 from visualization.reconstructions import plot_side_by_side_docs
 
 
@@ -30,29 +31,24 @@ for doc in X:
 
 
 # run SVI on the corpus
-lda = LdaModel(corpus, alpha='auto')
+# lda = LdaModel(corpus[:1000], num_topics=20, alpha='auto')
+# topics = lda.get_topics()
+# np.save('true_topics.npy', topics)
+# lda.save('lda.gensim')
+lda = LdaModel.load('lda.gensim')
 topics = lda.get_topics()
-
-
-def make_square(image):
-    vocab_size = image.shape[1]
-    nearest_square = math.pow(math.ceil(math.sqrt(vocab_size)), 2)
-    pad_len = nearest_square - vocab_size
-    if pad_len % 2 == 0:
-        left_pad = pad_len / 2
-        right_pad = pad_len / 2
-    else:
-        left_pad = pad_len / 2
-        right_pad = pad_len / 2 + 1
-    return np.pad(image, (left_pad, right_pad), 'constant', constant_values=(0, 0))
-
 
 # run inference on a sample from the training set
 # to recreate the bars
 print'Inference on training set'
-topic_weights, _ = lda.inference(corpus[:10])
-image = [X[:10]]
-image.append(np.dot(topic_weights, topics))
-image = np.array(image).reshape(-1, vocab_size)
-image = make_square(image)
-plot_side_by_side_docs(image, 'recreated_docs_train.png')
+topic_weights = []
+for doc in corpus[:1000]:
+	topic_weights.append(lda.get_document_topics(doc))
+
+
+# topic_weights, _ = lda.inference(corpus[:10])
+np.save('doc_topic_weights.npy', np.array(topic_weights))
+# reconstruction = np.dot(topic_weights, topics)
+
+
+
