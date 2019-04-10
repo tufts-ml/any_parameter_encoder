@@ -394,7 +394,7 @@ class Encoder(nn.Module):
         x = x.reshape(-1, self.vocab_size)
         # then return a mean vector and a (positive) square root covariance
         # each of size batch_size x n_topics
-        z_loc = torch.multiply(self.scale, self.bnmu(self.fcmu(self.enc_layers(x))))
+        z_loc = torch.mul(self.scale, self.bnmu(self.fcmu(self.enc_layers(x))))
         z_scale = torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x))))
         return z_loc, z_scale
 
@@ -416,9 +416,11 @@ class Decoder(nn.Module):
 
 
 class VAE_pyro(nn.Module):
-    def __init__(self, n_hidden_units, n_hidden_layers, model_name, results_dir, topic_init=None, topic_trainable=True,
+    def __init__(self, n_hidden_units=100, n_hidden_layers=2, model_name=None, results_dir=None, topic_init=None, topic_trainable=True,
                  alpha=.1, vocab_size=9, n_topics=4, use_cuda=False, **kwargs):
         super(VAE_pyro, self).__init__()
+        print(n_hidden_units)
+        print(n_hidden_layers)
         # create the encoder and decoder networks
         self.encoder = Encoder(n_hidden_units, n_hidden_layers, n_topics=n_topics, vocab_size=vocab_size)
         self.decoder = Decoder(n_topics, vocab_size, topic_init, topic_trainable)
@@ -429,12 +431,13 @@ class VAE_pyro(nn.Module):
             self.cuda()
         self.use_cuda = use_cuda
         self.n_topics = n_topics
-        self.alpha = alpha * np.ones((1, n_topics)).astype(np.float32)
-        self.z_loc = torch.from_numpy((np.log(self.alpha).T - np.mean(np.log(self.alpha), 1)).T)
+        alpha_vec = alpha * np.ones((1, n_topics)).astype(np.float32)
+        self.z_loc = torch.from_numpy((np.log(alpha_vec).T - np.mean(np.log(alpha_vec), 1)).T)
         self.z_scale = torch.from_numpy((
-            ((1.0 / self.alpha) * (1 - (2.0 / n_topics))).T +
-            (1.0 / (n_topics * n_topics)) * np.sum(1.0 / self.alpha, 1)
+            ((1.0 / alpha_vec) * (1 - (2.0 / n_topics))).T +
+            (1.0 / (n_topics * n_topics)) * np.sum(1.0 / alpha_vec, 1)
         ).T)
+        self.alpha = alpha * np.ones(n_topics).astype(np.float32)
 
         self.n_topics = n_topics
         self.n_hidden_layers = n_hidden_layers
@@ -462,7 +465,7 @@ class VAE_pyro(nn.Module):
         pyro.module("decoder", self.decoder)
         with pyro.plate("data", x.shape[0]):
             z = pyro.sample("latent",
-                            dist.Dirichlet(self.alpha).to_event(1))
+                            dist.Dirichlet(torch.from_numpy(self.alpha)))
             word_probs = self.decoder.forward(z)
             return pyro.sample("doc_words",
                         dist.Multinomial(probs=word_probs),
