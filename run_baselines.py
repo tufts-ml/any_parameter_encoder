@@ -13,7 +13,7 @@ from common import save_loglik_to_csv, save_reconstruction_array
 
 # global params
 datadir = 'toy_bars_10x10'
-results_dir = 'svi_baseline'
+results_dir = 'mcmc_baseline'
 results_file = 'results.csv'
 
 num_examples = 10
@@ -52,8 +52,8 @@ for data_name, data in zip(dataset_names, datasets):
     mcmc = MCMC(NUTS(vae.model, adapt_step_size=True), num_samples=1000, warmup_steps=50)
     mcmc_lda = MCMC(NUTS(vae.lda_model, adapt_step_size=True), num_samples=1000, warmup_steps=50)
     # for inference_name, inference in zip(['svi', 'mcmc', 'mcmc_lda'], [svi, mcmc, mcmc_lda]):
-    for run in range(5):
-        for inference_name, inference in zip(['svi'], [svi]):
+    for run in range(4):
+        for inference_name, inference in zip(['mcmc'], [mcmc]):
             # if (data_name == 'train') and (inference_name in ['svi', 'mcmc']):
             #     continue
             # run inference
