@@ -53,20 +53,22 @@ for data_name, data in zip(dataset_names, datasets):
     mcmc_lda = MCMC(NUTS(vae.lda_model, adapt_step_size=True), num_samples=1000, warmup_steps=50)
     # for inference_name, inference in zip(['svi', 'mcmc', 'mcmc_lda'], [svi, mcmc, mcmc_lda]):
     for run in range(4):
-        for inference_name, inference in zip(['mcmc'], [mcmc]):
+        inference = MCMC(NUTS(vae.model, adapt_step_size=True), num_samples=1000, warmup_steps=50)
+        inference_name = 'mcmc'
+        # for inference_name, inference in zip(['mcmc'], [mcmc]):
             # if (data_name == 'train') and (inference_name in ['svi', 'mcmc']):
             #     continue
             # run inference
-            posterior = inference.run(data)
-            model_config.update({
-                'data_name': data_name,
-                'inference': inference_name,
-                # hack to get the various runs to save different files
-                'n_hidden_layers': run,
-                # we first define this for the model we load to instantiate the inference algorithms
-                'results_dir': results_dir,
-            })
-            print(model_config)
-            save_reconstruction_array(vae, posterior, sample_idx, model_config)
-            for i in range(10):
-                save_loglik_to_csv(data, vae.model, posterior, model_config, num_samples=10)
+        posterior = inference.run(data)
+        model_config.update({
+            'data_name': data_name,
+            'inference': inference_name,
+            # hack to get the various runs to save different files
+            'n_hidden_layers': run,
+            # we first define this for the model we load to instantiate the inference algorithms
+            'results_dir': results_dir,
+        })
+        print(model_config)
+        save_reconstruction_array(vae, posterior, sample_idx, model_config)
+        for i in range(10):
+            save_loglik_to_csv(data, vae.model, posterior, model_config, num_samples=10)
