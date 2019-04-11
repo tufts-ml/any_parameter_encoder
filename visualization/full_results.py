@@ -51,7 +51,7 @@ linestyles_dict = {
 #     df['posterior_predictive_density'].apply(lambda s: float(s.split('tensor(')[1].split(')')[0].split(',')[0])))
 n_rows = 3
 n_cols = int(math.ceil(len(datasets)/3))
-fig, axes = plt.subplots(n_rows, n_cols, figsize=(n_rows * 6, n_cols * 8), sharex=True, sharey=False)
+fig, axes = plt.subplots(n_rows, n_cols, figsize=(n_rows * 6, n_cols * 8), sharex=True, sharey=True)
 if n_cols == 1:
     axes = np.expand_dims(axes, 1)
 for i, dataset in enumerate(datasets):
@@ -59,6 +59,7 @@ for i, dataset in enumerate(datasets):
     ax = axes[i%3][i/3]
     ax.set_xlabel('Number of hidden units per layer')
     ax.set_ylabel('Posterior Predictive Log Likelihood')
+    ax.set_ylim([-150000, -70000])
     if dataset == 'train':
         ax.set_title('Training Data')
     elif dataset == 'valid':
