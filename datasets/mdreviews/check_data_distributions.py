@@ -26,10 +26,6 @@ print(X_train.shape)
 print(X_valid.shape)
 print(X_test.shape)
 
-np.save('datasets/mdreview/train.npy', X_train)
-np.save('datasets/mdreview/valid.npy', X_valid)
-np.save('datasets/mdreview/test.npy', X_test)
-
 lda_mallet = LdaMallet.load('lda_gibbs.gensim')
 doc_topics = lda_mallet.load_document_topics()
 

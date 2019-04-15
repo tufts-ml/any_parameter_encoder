@@ -25,10 +25,15 @@ sparse = np.load(os.path.join(base_path, 'raw/X_csr_test.npz'))
 X_test = csr_matrix((sparse['data'], sparse['indices'], sparse['indptr']), shape=sparse['shape']).todense()
 X_test = np.squeeze(np.asarray(X_test))
 
-X = np.concatenate([X_train, X_valid, X_test])
-corpus = []
-for doc in X:
-	corpus.append([(word_idx, count) for word_idx, count in enumerate(doc)])
+filepath = os.path.dirname(__file__)
+np.save(os.path.join(filepath, 'train.npy'), X_train)
+np.save(os.path.join(filepath, 'valid.npy'), X_valid)
+np.save(os.path.join(filepath, 'test.npy'), X_test)
+
+# X = np.concatenate([X_train, X_valid, X_test])
+# corpus = []
+# for doc in X:
+# 	corpus.append([(word_idx, count) for word_idx, count in enumerate(doc)])
 
 
 # run SVI on the corpus
@@ -37,11 +42,11 @@ for doc in X:
 # np.save('true_topics.npy', topics)
 # lda.save('lda.gensim')
 
-path_to_mallet_binary = "/Users/lilyzhang/Documents/coding_projects/Mallet/bin/mallet"
-lda = LdaMallet(path_to_mallet_binary, corpus=corpus, num_topics=20)
-topics = lda.get_topics()
-np.save('true_topics.npy', topics)
-lda.save('lda_gibbs.gensim')
+# path_to_mallet_binary = "/Users/lilyzhang/Documents/coding_projects/Mallet/bin/mallet"
+# lda = LdaMallet(path_to_mallet_binary, corpus=corpus, num_topics=20)
+# topics = lda.get_topics()
+# np.save('true_topics.npy', topics)
+# lda.save('lda_gibbs.gensim')
 
 # lda = LdaModel.load('lda.gensim')
 # topics = lda.get_topics()
