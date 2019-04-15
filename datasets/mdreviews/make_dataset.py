@@ -40,6 +40,8 @@ for doc in X:
 path_to_mallet_binary = "/Users/lilyzhang/Documents/coding_projects/Mallet/bin/mallet"
 lda = LdaMallet(path_to_mallet_binary, corpus=corpus, num_topics=20)
 topics = lda.get_topics()
+np.save('true_topics.npy', topics)
+lda.save('lda_gibbs.gensim')
 
 # lda = LdaModel.load('lda.gensim')
 # topics = lda.get_topics()
