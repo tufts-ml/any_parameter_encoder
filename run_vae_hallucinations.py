@@ -29,10 +29,19 @@ vae_params = {
 num_examples = 10
 sample_idx = list(range(10))
 
-dataset_names = ['train', 'valid', 'test', 'test_single', 'test_double', 'test_triple']
-datasets = load_toy_bars('toy_bars_10x10')
+# dataset_names = ['train', 'valid', 'test', 'test_single', 'test_double', 'test_triple']
+# datasets = load_toy_bars('toy_bars_10x10')
+# data_tr = datasets[0]
+# datasets[0] = data_tr[:1000]
+
+dataset_names = ['train', 'valid', 'test']
+train = np.load('datasets/mdreviews/train.npy')
+valid = np.load('datasets/mdreviews/valid.npy')
+test = np.load('datasets/mdreviews/test.npy')
+datasets = [train, valid, test]
 data_tr = datasets[0]
-datasets[0] = data_tr[:1000]
+datasets[0] = data_tr[:792]
+datasets[2] = datasets[2][:792]
 
 # various VAEs, all with fixed decoders
 init_params = {

@@ -37,20 +37,27 @@ dataset_names = ['train', 'valid', 'test', 'test_single', 'test_double', 'test_t
 #     plot_name = os.path.join(results_dir, '{}_svi_vs_mcmc.pdf'.format(data_name))
 #     plot_saved_samples(data[sample_idx], filenames, plot_name, vocab_size=vocab_size)
 
-for data_name, data in zip(dataset_names, datasets):
-    if data_name == 'train':
-        n_hidden_layers = 0
-    elif data_name == 'valid':
-        n_hidden_layers = 3
-    elif data_name == 'test':
-        n_hidden_layers = 3
-    elif data_name == 'test_single':
-        n_hidden_layers = 3
-    elif data_name == 'test_double':
-        n_hidden_layers = 4
-    elif data_name == 'test_triple':
-        n_hidden_layers = 4
-    filenames = [os.path.join(os.getcwd(), 'svi_baseline', 'svi_lda_orig_{}_{}_10.npy'.format(data_name, n_hidden_layers)),
-                 os.path.join(os.getcwd(), results_dir, 'mcmc_lda_orig_{}_1_10.npy'.format(data_name))]
-    plot_name = os.path.join('svi_baseline', '{}_best_svi_vs_mcmc.pdf'.format(data_name))
-    plot_saved_samples(data[sample_idx], filenames, plot_name, vocab_size=vocab_size)
+# for data_name, data in zip(dataset_names, datasets):
+#     if data_name == 'train':
+#         n_hidden_layers = 0
+#     elif data_name == 'valid':
+#         n_hidden_layers = 3
+#     elif data_name == 'test':
+#         n_hidden_layers = 3
+#     elif data_name == 'test_single':
+#         n_hidden_layers = 3
+#     elif data_name == 'test_double':
+#         n_hidden_layers = 4
+#     elif data_name == 'test_triple':
+#         n_hidden_layers = 4
+#     filenames = [os.path.join(os.getcwd(), 'svi_baseline', 'svi_lda_orig_{}_{}_10.npy'.format(data_name, n_hidden_layers)),
+#                  os.path.join(os.getcwd(), results_dir, 'mcmc_lda_orig_{}_1_10.npy'.format(data_name))]
+#     plot_name = os.path.join('svi_baseline', '{}_best_svi_vs_mcmc.pdf'.format(data_name))
+#     plot_saved_samples(data[sample_idx], filenames, plot_name, vocab_size=vocab_size)
+
+
+filenames = [os.path.join(os.getcwd(), results_dir, 'vae_lda_scale_valid_5_20.npy'),
+             os.path.join(os.getcwd(), results_dir, 'svi_lda_orig_valid_1_10.npy'),
+             os.path.join(os.getcwd(), results_dir, 'mcmc_lda_orig_valid_1_10.npy'),]
+plot_name = os.path.join(results_dir, 'valid_compare_inference.pdf')
+plot_saved_samples(datasets[1][sample_idx], filenames, plot_name, vocab_size=vocab_size)
