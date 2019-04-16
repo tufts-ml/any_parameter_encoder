@@ -43,7 +43,7 @@ datasets[2] = datasets[2][:792]
 init_params = {
     'topic_init': 'resources/mdreviews_topics.npy',
     'topic_trainable': False,
-    'vocab_size': 100,
+    'vocab_size': datasets[0].shape[1],
     'n_topics': n_topics,
     'results_dir': results_dir,
     'results_file': results_file,
