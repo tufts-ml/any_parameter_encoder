@@ -37,15 +37,15 @@ model_config = {
     'topic_init': 'resources/mdreviews_topics.npy',
     'topic_trainable': False,
     'vocab_size': datasets[0].shape[1],
-    'n_topics': 18,
-    'model_name': 'lda_scale',
+    'n_topics': 20,
+    'model_name': 'lda_orig',
     # we first define this for the model we load to instantiate the inference algorithms
-    'results_dir': 'problem_toy_bars',
+    'results_dir': 'mdreviews',
     'results_file': results_file,
     # these values don't matter because we're only taking the fixed decoder
     # # they're just needed to instantiate the model
     'n_hidden_units': 10,
-    'n_hidden_layers': 2,
+    'n_hidden_layers': 1,
 }
 
 
