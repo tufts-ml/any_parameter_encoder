@@ -30,23 +30,26 @@ np.save(os.path.join(filepath, 'train.npy'), X_train)
 np.save(os.path.join(filepath, 'valid.npy'), X_valid)
 np.save(os.path.join(filepath, 'test.npy'), X_test)
 
-# X = np.concatenate([X_train, X_valid, X_test])
-# corpus = []
-# for doc in X:
-# 	corpus.append([(word_idx, count) for word_idx, count in enumerate(doc)])
+X = np.concatenate([X_train, X_valid, X_test])
+corpus = []
+for doc in X:
+	corpus.append([(word_idx, count) for word_idx, count in enumerate(doc)])
 
-
-# run SVI on the corpus
-# lda = LdaModel(corpus, num_topics=20, alpha='auto')
-# topics = lda.get_topics()
-# np.save('true_topics.npy', topics)
-# lda.save('lda.gensim')
-
+id2word = {}
+with open('datasets/mdreviews/raw/X_colnames.txt', 'r') as f:
+    for i, line in enumerate(f):
+        id2word[i] = line.strip()
 # path_to_mallet_binary = "/Users/lilyzhang/Documents/coding_projects/Mallet/bin/mallet"
 # lda = LdaMallet(path_to_mallet_binary, corpus=corpus, num_topics=20)
-# topics = lda.get_topics()
-# np.save('true_topics.npy', topics)
-# lda.save('lda_gibbs.gensim')
+lda = LdaModel(corpus, num_topics=20, id2word=id2word)
+print(lda.print_topics())
+topics = lda.get_topics()
+np.save('true_topics.npy', topics)
+lda.save('lda_gibbs.gensim')
+
+# topics = np.load('true_topics.npy')
+# take the inverse softmax
+
 
 # lda = LdaModel.load('lda.gensim')
 # topics = lda.get_topics()
