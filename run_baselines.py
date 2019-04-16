@@ -20,14 +20,23 @@ results_file = 'results.csv'
 num_examples = 10
 sample_idx = list(range(10))
 
-dataset_names = ['train', 'valid', 'test', 'test_single', 'test_double', 'test_triple']
-datasets = load_toy_bars('toy_bars_10x10')
-datasets[0] = datasets[0][:1000]
+# dataset_names = ['train', 'valid', 'test', 'test_single', 'test_double', 'test_triple']
+# datasets = load_toy_bars('toy_bars_10x10')
+# datasets[0] = datasets[0][:1000]
+
+dataset_names = ['train', 'valid', 'test']
+train = np.load('datasets/mdreviews/train.npy')
+valid = np.load('datasets/mdreviews/valid.npy')
+test = np.load('datasets/mdreviews/test.npy')
+datasets = [train, valid, test]
+data_tr = datasets[0]
+datasets[0] = data_tr[:792]
+datasets[2] = datasets[2][:792]
 
 model_config = {
-    'topic_init': 'resources/topics_10x10.npy',
+    'topic_init': 'resources/mdreviews_topics.npy',
     'topic_trainable': False,
-    'vocab_size': 100,
+    'vocab_size': datasets[0].shape[1],
     'n_topics': 18,
     'model_name': 'lda_scale',
     # we first define this for the model we load to instantiate the inference algorithms
@@ -43,8 +52,7 @@ model_config = {
 vae = VAE_pyro(**model_config)
 state_dict = vae.load()
 vae.load_state_dict(state_dict)
-# for data_name, data in zip(dataset_names, datasets):
-for data_name, data in zip(['valid'], [datasets[1]]):
+for data_name, data in zip(dataset_names, datasets):
     # pyro scheduler doesn't have any effect in the VAE case since we never take any optimization steps
     data = torch.from_numpy(data.astype(np.float32))
     pyro_scheduler = StepLR(
@@ -63,23 +71,21 @@ for data_name, data in zip(['valid'], [datasets[1]]):
         posterior = inference.run(data)
         latent_mean = np.mean([trace.nodes['latent']['value'][0].detach().numpy() for trace in posterior.exec_traces], axis=0)
         latent_std = np.std([trace.nodes['latent']['value'][0].detach().numpy() for trace in posterior.exec_traces], axis=0)
-        print(inference_name)
-        print(latent_mean)
-        print(latent_std)
         with open(os.path.join(results_dir, 'posterior_mean_and_sd.txt'), 'a') as f:
-            f.write(inference_name)
+            f.write(inference_name + '\n')
             f.write(repr(latent_mean))
             f.write(repr(latent_std))
+            f.write('\n')
 
-        # model_config.update({
-        #     'data_name': data_name,
-        #     'inference': inference_name,
-        #     # hack to get the various runs to save different files
-        #     'n_hidden_layers': run,
-        #     # we first define this for the model we load to instantiate the inference algorithms
-        #     'results_dir': results_dir,
-        # })
-        # print(model_config)
-        # save_reconstruction_array(vae, posterior, sample_idx, model_config)
-        # for i in range(10):
-        #     save_loglik_to_csv(data, vae.model, posterior, model_config, num_samples=10)
+        model_config.update({
+            'data_name': data_name,
+            'inference': inference_name,
+            # hack to get the various runs to save different files
+            # 'n_hidden_layers': run,
+            # we first define this for the model we load to instantiate the inference algorithms
+            'results_dir': results_dir,
+        })
+        print(model_config)
+        save_reconstruction_array(vae, posterior, sample_idx, model_config)
+        for i in range(10):
+            save_loglik_to_csv(data, vae.model, posterior, model_config, num_samples=10)
