@@ -13,8 +13,7 @@ from common import save_loglik_to_csv, save_reconstruction_array
 
 
 # global params
-datadir = 'toy_bars_10x10'
-results_dir = 'problem_toy_bars'
+results_dir = 'mdreviews'
 results_file = 'results.csv'
 
 num_examples = 10
