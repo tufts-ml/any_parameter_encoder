@@ -5,20 +5,23 @@ import numpy as np
 import seaborn as sns
 import math
 
+# toy bars
+results_dir = 'test'
+results_csv = 'results.csv'
+plot_name = 'problem.pdf'
+# could be automated; specified for now to make sure the plots come in the right order
+datasets = ['train', 'valid', 'test', 'test_single', 'test_double', 'test_triple']
 
-results_dir = 'problem_toy_bars'
-# results_dir = 'dump_fixed2'
-results_csv = 'results_corrected_full.csv'
-plot_name = 'problem_corrected_full.pdf'
+# Amazon reviews
+# results_dir = 'mdreviews'
 # results_csv = 'results.csv'
-# plot_name = 'problem_full.pdf'
-
+# plot_name = 'problem_5_layers.pdf'
+# datasets = ['train', 'valid', 'test']
 
 df = pd.read_csv(os.path.join(results_dir, results_csv), header=None)
 df.columns = ['inference', 'model', 'dataset', 'n_hidden_layers', 'n_hidden_units', 'posterior_predictive_density']
 df = df[df.model.isin(['lda_orig', 'lda_scale', 'lda_orig_hallucinations', 'lda_scale_hallucinations'])]
 
-datasets = ['train', 'valid', 'test', 'test_single', 'test_double', 'test_triple']
 inferences = np.unique(df.inference)
 models = np.unique(df.model)
 n_hidden_layers_lst = sorted(np.unique(df[df.inference=='vae'].n_hidden_layers))
@@ -43,12 +46,6 @@ linestyles_dict = {
     'lda_scale_hallucinations': (0, (3, 5, 1, 5))  # dash dotted
 }
 
-# lop off the first three numbers since they were tests and not fully run and trained
-# df = df[3:]
-
-# grossing formatting I have do to since I didn't take care to save the numbers in a float format
-# df['posterior_predictive_density'] = (
-#     df['posterior_predictive_density'].apply(lambda s: float(s.split('tensor(')[1].split(')')[0].split(',')[0])))
 n_rows = 3
 n_cols = int(math.ceil(len(datasets)/3))
 fig, axes = plt.subplots(n_rows, n_cols, figsize=(n_rows * 6, n_cols * 8), sharex=True, sharey=True)
@@ -59,7 +56,6 @@ for i, dataset in enumerate(datasets):
     ax = axes[i%3][i/3]
     ax.set_xlabel('Number of hidden units per layer')
     ax.set_ylabel('Posterior Predictive Log Likelihood')
-    ax.set_ylim([-150000, -70000])
     if dataset == 'train':
         ax.set_title('Training Data')
     elif dataset == 'valid':
@@ -86,8 +82,7 @@ for i, dataset in enumerate(datasets):
                 ax.fill_between(range(10, 100), mean_results - 2 * sd_results, mean_results + 2 * sd_results,
                                 color=colors_dict[inference], alpha=0.4)
             except:
-                print(dataset, inference)
-                print(results.shape)
+                print("No results available for {} on {} dataset".format(inference, dataset))
         else:
             for model in models:
                 df_data_inference_model = df_data_inference[df_data_inference.model==model]
