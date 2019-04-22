@@ -9,6 +9,7 @@ import pyro.distributions as dist
 
 import numpy as np
 import tensorflow as tf
+from functools import partial
 
 
 l2_norm = lambda t: tf.sqrt(tf.reduce_sum(tf.pow(t, 2)))
@@ -37,6 +38,7 @@ class VAE_tf(object):
             starting_learning_rate=0.002,
             decay_steps=1000,
             decay_rate=.9,
+            n_samples=1,
             batch_size=200,
             alpha=1,
             tensorboard=False,
@@ -57,6 +59,7 @@ class VAE_tf(object):
         self.starting_learning_rate = starting_learning_rate
         self.decay_steps = decay_steps
         self.decay_rate = decay_rate
+        self.n_samples = n_samples
         self.batch_size = batch_size
         self.tensorboard = tensorboard
         self.global_step = tf.Variable(0, trainable=False, name='global_step')
@@ -90,16 +93,16 @@ class VAE_tf(object):
         self.z_mean, self.z_log_sigma_sq = self._recognition_network(
             self.network_weights["weights_recog"], self.network_weights["biases_recog"]
         )
-
-        eps = tf.random_normal((1, self.n_topics), 0, 1, dtype=tf.float32)
-        self.z = tf.add(
-            self.z_mean, tf.multiply(tf.sqrt(tf.exp(self.z_log_sigma_sq)), eps)
+        eps = tf.random_normal((self.n_samples, self.n_topics), 0, 1, dtype=tf.float32)
+        z = tf.add(
+            tf.expand_dims(self.z_mean, axis=1), tf.multiply(tf.sqrt(tf.exp(tf.expand_dims(self.z_log_sigma_sq, axis=1))), eps)
         )
-        self.z = tf.multiply(self.scale, self.z)
+        z = tf.multiply(self.scale, z)
+        self.z = tf.reduce_mean(z, axis=1)
         self.sigma = tf.exp(self.z_log_sigma_sq)
-        self.x_reconstr_mean = self._generator_network(
-            self.z, self.network_weights["weights_gener"]
-        )
+        # generator = partial(self._generator_network, self.network_weights['weights_gener'])
+        # self.x_reconstr_mean = tf.reduce_mean(tf.map_fn(generator, self.z), axis=1)
+        self.x_reconstr_mean = self._generator_network(self.network_weights['weights_gener'], z)
 
     def _initialize_weights(self):
         all_weights = dict()
@@ -189,20 +192,22 @@ class VAE_tf(object):
 
         return (z_mean, z_log_sigma_sq)
 
-    def _generator_network(self, z, weights):
+    def _generator_network(self, weights, z):
+        """
+
+        :param weights:
+        :param z: (batch, n_samples, n_topics)
+        :return:
+        """
         with tf.variable_scope("generator_network"):
             self.layer_do_0 = tf.nn.softmax(z)
+            topic_weights = tf.tile(tf.expand_dims(tf.nn.softmax(weights["g1"]), 0), [tf.shape(z)[0], 1, 1])
+            x_reconstr_means =tf.matmul(self.layer_do_0, topic_weights)  # (batch, n_samples, vocab_size)
+            x_reconstr_mean = tf.reduce_mean(x_reconstr_means, axis=1)
 
-            x_reconstr_mean = tf.add(
-                tf.matmul(
-                    self.layer_do_0,
-                    tf.nn.softmax(weights["g1"]),
-                ),
-                0.0,
-            )
-            if self.tensorboard:
-                self.summaries.append(tf.summary.histogram("weights", weights["g1"]))
-                self.summaries.append(tf.summary.histogram("z", self.layer_do_0))
+            # if self.tensorboard:
+            #     self.summaries.append(tf.summary.histogram("weights", weights["g1"]))
+            #     self.summaries.append(tf.summary.histogram("z", self.layer_do_0))
 
         return x_reconstr_mean
 
