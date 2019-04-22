@@ -102,7 +102,8 @@ class VAE_tf(object):
         self.sigma = tf.exp(self.z_log_sigma_sq)
         # generator = partial(self._generator_network, self.network_weights['weights_gener'])
         # self.x_reconstr_mean = tf.reduce_mean(tf.map_fn(generator, self.z), axis=1)
-        self.x_reconstr_mean = self._generator_network(self.network_weights['weights_gener'], z)
+        self.x_reconstr_means = self._generator_network(self.network_weights['weights_gener'], z)
+        self.x_reconstr_mean = tf.reduce_mean(self.x_reconstr_means, axis=1)
 
     def _initialize_weights(self):
         all_weights = dict()
@@ -203,33 +204,33 @@ class VAE_tf(object):
             self.layer_do_0 = tf.nn.softmax(z)
             topic_weights = tf.tile(tf.expand_dims(tf.nn.softmax(weights["g1"]), 0), [tf.shape(z)[0], 1, 1])
             x_reconstr_means =tf.matmul(self.layer_do_0, topic_weights)  # (batch, n_samples, vocab_size)
-            x_reconstr_mean = tf.reduce_mean(x_reconstr_means, axis=1)
+            # x_reconstr_mean = tf.reduce_mean(x_reconstr_means, axis=1)
 
             # if self.tensorboard:
             #     self.summaries.append(tf.summary.histogram("weights", weights["g1"]))
             #     self.summaries.append(tf.summary.histogram("z", self.layer_do_0))
 
-        return x_reconstr_mean
+        return x_reconstr_means
 
     def _create_loss_optimizer(self):
-        self.x_reconstr_mean += 1e-10
+        self.x_reconstr_means += 1e-10
         # The probability of the posterior of z under q
+        x_expanded = tf.tile(tf.expand_dims(self.x, 1), [1, self.n_samples, 1])
         reconstr_loss = -tf.reduce_sum(
-            self.x * tf.log(self.x_reconstr_mean), 1
+            x_expanded * tf.log(self.x_reconstr_means), axis=2
         )
         # KL Divergence
         latent_loss = 0.5 * (
-                tf.reduce_sum(tf.div(self.sigma, self.var2), 1)
-                + tf.reduce_sum(
-            tf.multiply(
-                tf.div((self.mu2 - self.z_mean), self.var2),
-                (self.mu2 - self.z_mean),
-            ),
-            1,
-        )
-                - self.h_dim
-                + tf.reduce_sum(tf.log(self.var2), 1)
-                - tf.reduce_sum(self.z_log_sigma_sq, 1)
+            tf.reduce_sum(tf.div(self.sigma, self.var2), axis=1) +
+            tf.reduce_sum(
+                tf.multiply(
+                    tf.div((self.mu2 - self.z_mean), self.var2),
+                    (self.mu2 - self.z_mean)
+                ), axis=1,
+            )
+            - self.h_dim
+            + tf.reduce_sum(tf.log(self.var2), axis=1)
+            - tf.reduce_sum(self.z_log_sigma_sq, axis=1)
         )
         self.cost = tf.reduce_mean(reconstr_loss) + tf.reduce_mean(latent_loss)
 
