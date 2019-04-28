@@ -6,21 +6,24 @@ import seaborn as sns
 import math
 
 # toy bars
-results_dir = 'test'
-results_csv = 'results.csv'
-plot_name = 'problem.pdf'
-# could be automated; specified for now to make sure the plots come in the right order
-datasets = ['train', 'valid', 'test', 'test_single', 'test_double', 'test_triple']
+# results_dir = 'problem_toy_bars'
+# results_csv = 'results_normalized.csv'
+# plot_name = 'problem_normalized.pdf'
+# # could be automated; specified for now to make sure the plots come in the right order
+# datasets = ['train', 'valid', 'test', 'test_single', 'test_double', 'test_triple']
 
 # Amazon reviews
-# results_dir = 'mdreviews'
-# results_csv = 'results.csv'
-# plot_name = 'problem_5_layers.pdf'
-# datasets = ['train', 'valid', 'test']
+results_dir = 'mdreviews'
+results_csv = 'results_normalized.csv'
+plot_name = 'problem_normalized.pdf'
+datasets = ['train', 'valid', 'test']
 
 df = pd.read_csv(os.path.join(results_dir, results_csv), header=None)
 df.columns = ['inference', 'model', 'dataset', 'n_hidden_layers', 'n_hidden_units', 'posterior_predictive_density']
 df = df[df.model.isin(['lda_orig', 'lda_scale', 'lda_orig_hallucinations', 'lda_scale_hallucinations'])]
+
+# remove outliers
+df = df[df.posterior_predictive_density > -100]
 
 inferences = np.unique(df.inference)
 models = np.unique(df.model)
@@ -48,7 +51,10 @@ linestyles_dict = {
 
 n_rows = 3
 n_cols = int(math.ceil(len(datasets)/3))
-fig, axes = plt.subplots(n_rows, n_cols, figsize=(n_rows * 6, n_cols * 8), sharex=True, sharey=True)
+# toy bars
+# fig, axes = plt.subplots(n_rows, n_cols, figsize=(n_rows * 6, n_cols * 8), sharex=True, sharey=True)
+# mdreviews
+fig, axes = plt.subplots(n_rows, n_cols, figsize=(n_rows * 4, n_cols * 10), sharex=True, sharey=True)
 if n_cols == 1:
     axes = np.expand_dims(axes, 1)
 for i, dataset in enumerate(datasets):
