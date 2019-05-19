@@ -6,16 +6,16 @@ import seaborn as sns
 import math
 
 # toy bars
-# results_dir = 'problem_toy_bars'
-# results_csv = 'results_normalized.csv'
-# plot_name = 'problem_normalized.pdf'
-# # could be automated; specified for now to make sure the plots come in the right order
-# datasets = ['train', 'valid', 'test', 'test_single', 'test_double', 'test_triple']
+results_dir = 'problem_toy_bars'
+results_csv = 'results_normalized.csv'
+plot_name = 'problem_normalized.pdf'
+# could be automated; specified for now to make sure the plots come in the right order
+datasets = ['train', 'valid', 'test', 'test_single', 'test_double', 'test_triple']
 
 # Amazon reviews
 results_dir = 'mdreviews'
 results_csv = 'results_normalized.csv'
-plot_name = 'problem_normalized.pdf'
+plot_name = 'problem_normalized_5_layers.pdf'
 datasets = ['train', 'valid', 'test']
 
 df = pd.read_csv(os.path.join(results_dir, results_csv), header=None)
@@ -24,6 +24,7 @@ df = df[df.model.isin(['lda_orig', 'lda_scale', 'lda_orig_hallucinations', 'lda_
 
 # remove outliers
 df = df[df.posterior_predictive_density > -100]
+df = df[(df.n_hidden_layers==5) & (df.model.isin(['lda_orig', 'lda_orig_hallucinations']))]
 
 inferences = np.unique(df.inference)
 models = np.unique(df.model)

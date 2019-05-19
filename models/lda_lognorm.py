@@ -206,9 +206,9 @@ class VAE_tf(object):
             x_reconstr_means =tf.matmul(self.layer_do_0, topic_weights)  # (batch, n_samples, vocab_size)
             # x_reconstr_mean = tf.reduce_mean(x_reconstr_means, axis=1)
 
-            # if self.tensorboard:
-            #     self.summaries.append(tf.summary.histogram("weights", weights["g1"]))
-            #     self.summaries.append(tf.summary.histogram("z", self.layer_do_0))
+            if self.tensorboard:
+                self.summaries.append(tf.summary.histogram("weights", weights["g1"]))
+                self.summaries.append(tf.summary.histogram("z", self.layer_do_0))
 
         return x_reconstr_means
 

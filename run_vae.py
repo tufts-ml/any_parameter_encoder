@@ -12,7 +12,7 @@ from common import train_save_VAE, save_loglik_to_csv, save_reconstruction_array
 # global params
 datadir = 'toy_bars_10x10'
 results_dir = 'problem_toy_bars'
-results_file = 'results_train.csv'
+results_file = 'results_normalized.csv'
 n_topics = 18
 
 # vae params
@@ -151,26 +151,26 @@ for model_config in model_configs:
                     save_loglik_to_csv(data, vae.model, posterior, model_config, num_samples=10)
 
 
-for model_config in model_configs_sym:
-    for n_hidden_layers in vae_params['n_hidden_layers']:
-        model_config.update({
-            'n_hidden_layers': n_hidden_layers
-        })
-        vae = VAE_pyro(**model_config)
-        state_dict = vae.load()
-        vae.load_state_dict(state_dict)
-        for data_name, data in zip(dataset_names, datasets):
-            # pyro scheduler doesn't have any effect in the VAE case since we never take any optimization steps
-            pyro_scheduler = StepLR(
-                {'optimizer': torch.optim.Adam, 'optim_args': {"lr": .1}, 'step_size': 10000, 'gamma': 0.95})
-            vae_svi = SVI(vae.model, vae.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=0)
-            data = torch.from_numpy(data.astype(np.float32))
-            posterior = vae_svi.run(data)
-            model_config.update({
-                'n_hidden_layers': n_hidden_layers,
-                'data_name': data_name
-            })
-            print(model_config)
-            save_reconstruction_array(vae, posterior, sample_idx, model_config)
-            for i in range(10):
-                save_loglik_to_csv(data, vae.model, posterior, model_config, num_samples=10)
+# for model_config in model_configs_sym:
+#     for n_hidden_layers in vae_params['n_hidden_layers']:
+#         model_config.update({
+#             'n_hidden_layers': n_hidden_layers
+#         })
+#         vae = VAE_pyro(**model_config)
+#         state_dict = vae.load()
+#         vae.load_state_dict(state_dict)
+#         for data_name, data in zip(dataset_names, datasets):
+#             # pyro scheduler doesn't have any effect in the VAE case since we never take any optimization steps
+#             pyro_scheduler = StepLR(
+#                 {'optimizer': torch.optim.Adam, 'optim_args': {"lr": .1}, 'step_size': 10000, 'gamma': 0.95})
+#             vae_svi = SVI(vae.model, vae.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=0)
+#             data = torch.from_numpy(data.astype(np.float32))
+#             posterior = vae_svi.run(data)
+#             model_config.update({
+#                 'n_hidden_layers': n_hidden_layers,
+#                 'data_name': data_name
+#             })
+#             print(model_config)
+#             save_reconstruction_array(vae, posterior, sample_idx, model_config)
+#             for i in range(10):
+#                 save_loglik_to_csv(data, vae.model, posterior, model_config, num_samples=10)

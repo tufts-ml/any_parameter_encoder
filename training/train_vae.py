@@ -103,6 +103,6 @@ def train_with_hallucinations(data, vae, model_config, alpha=.01, num_samples=10
 
     # plot_side_by_side_docs(fake_data, os.path.join(model_config['results_dir'], "fake_data.png"))
 
-    vae = train(np.concatenate([data, fake_data]), vae, training_epochs=100, tensorboard=tensorboard,
+    vae = train(np.concatenate([data, fake_data]), vae, training_epochs=100, tensorboard=tensorboard, batch_size=batch_size,
                 tensorboard_logs_dir=tensorboard_logs_dir)
     return vae

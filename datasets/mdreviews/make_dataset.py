@@ -5,6 +5,7 @@ from scipy.sparse import csr_matrix
 
 from gensim.models import LdaModel
 from gensim.models.wrappers import LdaMallet
+from utils import inverse_softmax
 
 from utils import make_square
 from visualization.reconstructions import plot_side_by_side_docs
@@ -26,9 +27,9 @@ X_test = csr_matrix((sparse['data'], sparse['indices'], sparse['indptr']), shape
 X_test = np.squeeze(np.asarray(X_test))
 
 filepath = os.path.dirname(__file__)
-np.save(os.path.join(filepath, 'train.npy'), X_train)
-np.save(os.path.join(filepath, 'valid.npy'), X_valid)
-np.save(os.path.join(filepath, 'test.npy'), X_test)
+# np.save(os.path.join(filepath, 'train.npy'), X_train)
+# np.save(os.path.join(filepath, 'valid.npy'), X_valid)
+# np.save(os.path.join(filepath, 'test.npy'), X_test)
 
 X = np.concatenate([X_train, X_valid, X_test])
 corpus = []
@@ -39,13 +40,14 @@ id2word = {}
 with open('datasets/mdreviews/raw/X_colnames.txt', 'r') as f:
     for i, line in enumerate(f):
         id2word[i] = line.strip()
-# path_to_mallet_binary = "/Users/lilyzhang/Documents/coding_projects/Mallet/bin/mallet"
-# lda = LdaMallet(path_to_mallet_binary, corpus=corpus, num_topics=20)
-lda = LdaModel(corpus, num_topics=20, id2word=id2word)
+path_to_mallet_binary = "/Users/lilyzhang/Documents/coding_projects/Mallet/bin/mallet"
+lda = LdaMallet(path_to_mallet_binary, corpus=corpus, id2word=id2word, num_topics=20, iterations=1000, alpha=.1)
+print(lda.fdoctopics())
+# lda = LdaModel(corpus, num_topics=20, id2word=id2word)
 print(lda.print_topics())
 topics = lda.get_topics()
-np.save('true_topics.npy', topics)
-lda.save('lda_gibbs.gensim')
+np.save('mdreviews_topics1.npy', inverse_softmax(topics))
+lda.save('lda_gibbs.gensim1')
 
 # topics = np.load('true_topics.npy')
 # take the inverse softmax

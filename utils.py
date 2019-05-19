@@ -13,6 +13,11 @@ def normalize(x, axis):
         raise ValueError('Only supports 2D normalization')
 
 
+def softmax(x):
+    """Note: x should be a 2D array"""
+    return np.exp(x) / np.sum(np.exp(x), axis=1)[:,None]
+
+
 def inverse_softmax(x):
 	eps = 1e-10
 	return np.log(x + eps)

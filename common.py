@@ -12,15 +12,15 @@ from models.lda_lognorm import VAE_tf, VAE_pyro
 from training.train_vae import train, train_with_hallucinations
 
 
-def train_save_VAE(data, model_config, training_epochs=120, tensorboard=True, hallucinations=False):
+def train_save_VAE(data, model_config, training_epochs=120, batch_size=200, tensorboard=True, hallucinations=False):
     vae = VAE_tf(tensorboard=tensorboard, **model_config)
     tensorboard_logs_dir = os.path.join(
         model_config['results_dir'], model_config['model_name'],
         'logs_{}_{}'.format(model_config['n_hidden_layers'], model_config['n_hidden_units']))
     if hallucinations:
-        vae = train_with_hallucinations(data, vae, model_config, training_epochs=training_epochs, tensorboard=tensorboard, tensorboard_logs_dir=tensorboard_logs_dir)
+        vae = train_with_hallucinations(data, vae, model_config, training_epochs=training_epochs, batch_size=batch_size, tensorboard=tensorboard, tensorboard_logs_dir=tensorboard_logs_dir)
     else:
-        vae = train(data, vae, training_epochs=training_epochs, tensorboard=tensorboard, tensorboard_logs_dir=tensorboard_logs_dir)
+        vae = train(data, vae, training_epochs=training_epochs, tensorboard=tensorboard, batch_size=batch_size, tensorboard_logs_dir=tensorboard_logs_dir)
     vae.save()
     vae.sess.close()
     tf.reset_default_graph()

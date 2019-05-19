@@ -13,7 +13,7 @@ from common import save_loglik_to_csv, save_reconstruction_array
 
 
 # global params
-results_dir = 'mdreviews'
+results_dir = 'mdreviews1'
 results_file = 'results.csv'
 
 num_examples = 10
@@ -61,10 +61,10 @@ for data_name, data in zip(dataset_names, datasets):
     svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=TraceMeanField_ELBO(), num_steps=100,
               num_samples=1000)
     mcmc = MCMC(NUTS(vae.model, adapt_step_size=True), num_samples=1000, warmup_steps=50)
-    mcmc_lda = MCMC(NUTS(vae.lda_model, adapt_step_size=True), num_samples=1000, warmup_steps=50)
-    for inference_name, inference in zip(['vae', 'svi', 'mcmc'], [vae_svi, svi, mcmc]):
-        # for inference_name, inference in zip(['mcmc'], [mcmc]):
-            # if (data_name == 'train') and (inference_name in ['svi', 'mcmc']):
+    # mcmc_lda = MCMC(NUTS(vae.lda_model, adapt_step_size=True), num_samples=1000, warmup_steps=50)
+    # for inference_name, inference in zip(['svi', 'mcmc'], [svi, mcmc]):
+    for inference_name, inference in zip(['mcmc'], [mcmc]):
+        #     if (data_name == 'train') and (inference_name in ['svi', 'mcmc']):
             #     continue
             # run inference
         posterior = inference.run(data)
