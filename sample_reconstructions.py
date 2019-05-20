@@ -6,7 +6,7 @@ import numpy as np
 
 
 datadir = 'toy_bars_10x10'
-results_dir = 'problem_toy_bars4'
+results_dir = 'experiments/vae_experiments/problem_toy_bars5'
 vocab_size = 100
 sample_idx = list(range(10))
 datasets = load_toy_bars(datadir)
@@ -15,8 +15,8 @@ datasets = load_toy_bars(datadir)
 data_tr = datasets[0]
 data_tr_single = data_tr[np.count_nonzero(data_tr, axis=1) <= 10]
 data_tr_double = data_tr[np.count_nonzero(data_tr, axis=1) > 10]
-datasets = [data_tr_single[:1000], data_tr_double[:1000]]
-dataset_names = ['train_single', 'train_double']
+datasets = [data_tr_single[:1000], data_tr_double[:1000]] + datasets[1:]
+dataset_names = ['train_single', 'train_double', 'valid', 'test', 'test_single', 'test_double', 'test_triple']
 n_hidden_units = 100
 n_hidden_layers = 5
 models = ['lda_orig']
@@ -35,7 +35,7 @@ for data_name, data in zip(dataset_names, datasets):
             filepath = os.path.join(os.getcwd(), results_dir, file)
             filenames.append(filepath)
 
-    plot_name = data_name + '_vae_reconstructions.pdf'
+    plot_name = os.path.join(results_dir, data_name + '_vae_reconstructions.pdf')
     plot_saved_samples(data[sample_idx], filenames, plot_name, vocab_size=vocab_size)
 
 # for data_name, data in zip(dataset_names, datasets):
