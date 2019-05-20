@@ -13,7 +13,7 @@ from visualization.reconstructions import plot_side_by_side_docs
 from utils import softmax
 
 # where to write the results
-results_dir = 'problem_toy_bars4'
+results_dir = 'experiments/vae_experiments/problem_toy_bars5'
 results_file = 'results.csv'
 
 # global params
@@ -29,7 +29,7 @@ data_tr = datasets[0]
 data_tr_single = data_tr[np.count_nonzero(data_tr, axis=1) <= 10]
 data_tr_double = data_tr[np.count_nonzero(data_tr, axis=1) > 10]
 datasets = [data_tr_single[:1000], data_tr_double[:1000]] + datasets[1:]
-dataset_names = ['train_single', 'train_double', 'test', 'test_single', 'test_double', 'test_triple']
+dataset_names = ['train_single', 'train_double', 'valid', 'test', 'test_single', 'test_double', 'test_triple']
 # datasets[0] = data_tr[:1000]
 
 # Amazon product reviews data
@@ -67,8 +67,8 @@ model_config = {
 
 
 # train the VAE and save the weights
-train_save_VAE(data_tr, model_config, training_epochs=80, batch_size=30, hallucinations=False, tensorboard=True)
-# train_save_VAE(data_tr, model_config, training_epochs=80, batch_size=200, hallucinations=False, tensorboard=True)
+# train_save_VAE(data_tr, model_config, training_epochs=80, batch_size=30, hallucinations=False, tensorboard=True)
+train_save_VAE(data_tr, model_config, training_epochs=80, batch_size=200, hallucinations=False, tensorboard=True)
 # train_save_VAE(np.concatenate([data_tr_single[:10], data_tr_double[:10]]), model_config, training_epochs=80, hallucinations=False, tensorboard=True)
 # load the VAE into pyro for evaluation
 vae = VAE_pyro(**model_config)
