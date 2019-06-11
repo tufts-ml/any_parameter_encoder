@@ -13,7 +13,7 @@ from visualization.reconstructions import plot_side_by_side_docs
 from utils import softmax
 
 # where to write the results
-results_dir = 'experiments/vae_experiments/problem_toy_bars5'
+results_dir = 'experiments/vae_experiments/1e3_8_100'
 results_file = 'results.csv'
 
 # global params
@@ -31,6 +31,8 @@ data_tr_double = data_tr[np.count_nonzero(data_tr, axis=1) > 10]
 datasets = [data_tr_single[:1000], data_tr_double[:1000]] + datasets[1:]
 dataset_names = ['train_single', 'train_double', 'valid', 'test', 'test_single', 'test_double', 'test_triple']
 # datasets[0] = data_tr[:1000]
+
+# datasets = [d[:2] for d in datasets]
 
 # Amazon product reviews data
 # dataset_names = ['train', 'valid', 'test']
@@ -57,19 +59,20 @@ model_config = {
     'enc_topic_init': None,
     'enc_topic_trainable': True,
     'scale_trainable': False,
-    'n_hidden_layers': 5,
+    'n_hidden_layers': 8,
     'n_hidden_units': 100,
     'n_samples': 1,
     'decay_rate': .5,
-    'decay_steps': 1000,
+    'decay_steps': 100,
     'starting_learning_rate': .01,
 }
 
-
+# for i in [1e4, 1e3, 1e2]:
+i = int(1e3)
+data_tr_sample = data_tr[np.random.choice(int(1e5), i, replace=False)]
+model_config['model_name'] = 'lda_orig_' + str(i) + '_samples'
 # train the VAE and save the weights
-# train_save_VAE(data_tr, model_config, training_epochs=80, batch_size=30, hallucinations=False, tensorboard=True)
-train_save_VAE(data_tr, model_config, training_epochs=80, batch_size=200, hallucinations=False, tensorboard=True)
-# train_save_VAE(np.concatenate([data_tr_single[:10], data_tr_double[:10]]), model_config, training_epochs=80, hallucinations=False, tensorboard=True)
+train_save_VAE(data_tr_sample, model_config, training_epochs=80, batch_size=200, hallucinations=False, tensorboard=True)
 # load the VAE into pyro for evaluation
 vae = VAE_pyro(**model_config)
 state_dict = vae.load()
@@ -86,6 +89,9 @@ for data_name, data in zip(dataset_names, datasets):
     # mcmc = MCMC(NUTS(vae.model, adapt_step_size=True), num_samples=1000, warmup_steps=50)
     for inference_name, inference in zip(['vae', 'svi'], [vae_svi, svi]):
         posterior = inference.run(data)
+        z_loc, z_scale = vae.encoder.forward(data)
+        print("z_loc", z_loc)
+        print("z_scale", z_scale)
         model_config.update({
             'data_name': data_name,
             'inference': inference_name,
