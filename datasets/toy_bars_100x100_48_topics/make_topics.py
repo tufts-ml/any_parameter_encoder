@@ -1,5 +1,5 @@
 import numpy as np
-from datasets.toy_bars_100x100_18_topics.make_topics import get_bars
+from datasets.create import get_bars
 
 from utils import inverse_softmax
 
