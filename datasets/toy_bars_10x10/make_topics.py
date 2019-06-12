@@ -61,7 +61,7 @@ for i in range(1, 5):
     test_single_topics.append(horizontal_topic)
 
 # rightmost (5 bars)
-for j in range(6, 10):
+for j in range(5, 10):
     vertical_topic = np.zeros((10, 10))
     vertical_topic[:, j] = 1
     test_single_topics.append(vertical_topic)
