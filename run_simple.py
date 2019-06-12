@@ -13,21 +13,21 @@ from visualization.reconstructions import plot_side_by_side_docs
 from utils import softmax
 
 # where to write the results
-results_dir = 'experiments/vae_experiments/1e3_8_100'
+results_dir = 'experiments/vae_experiments/100x100_48_topics'
 results_file = 'results.csv'
 
 # global params
-n_topics = 18
+n_topics = 48
 num_examples = 10
 sample_idx = list(range(10))
 
 
 # toy bars data
 # dataset_names = ['train', 'valid', 'test', 'test_single', 'test_double', 'test_triple']
-datasets = load_toy_bars('toy_bars_10x10')
+datasets = load_toy_bars('toy_bars_100x100_48_topics', VOCAB_SIZE=10000)
 data_tr = datasets[0]
-data_tr_single = data_tr[np.count_nonzero(data_tr, axis=1) <= 10]
-data_tr_double = data_tr[np.count_nonzero(data_tr, axis=1) > 10]
+data_tr_single = data_tr[np.count_nonzero(data_tr, axis=1) <= 100 * 4]
+data_tr_double = data_tr[np.count_nonzero(data_tr, axis=1) > 100 * 4]
 datasets = [data_tr_single[:1000], data_tr_double[:1000]] + datasets[1:]
 dataset_names = ['train_single', 'train_double', 'valid', 'test', 'test_single', 'test_double', 'test_triple']
 # datasets[0] = data_tr[:1000]
@@ -47,7 +47,8 @@ dataset_names = ['train_single', 'train_double', 'valid', 'test', 'test_single',
 
 model_config = {
     # 'topic_init': 'resources/mdreviews_topics1.npy',
-    'topic_init': 'resources/topics_10x10.npy',
+    # 'topic_init': 'resources/topics_10x10.npy',
+    'topic_init': 'resources/topics_100x100_48_topics.npy',
     # 'topic_init': None,
     'topic_trainable': False,
     'vocab_size': datasets[0].shape[1],
@@ -59,16 +60,16 @@ model_config = {
     'enc_topic_init': None,
     'enc_topic_trainable': True,
     'scale_trainable': False,
-    'n_hidden_layers': 8,
+    'n_hidden_layers': 5,
     'n_hidden_units': 100,
     'n_samples': 1,
     'decay_rate': .5,
-    'decay_steps': 100,
+    'decay_steps': 1000,
     'starting_learning_rate': .01,
 }
 
 # for i in [1e4, 1e3, 1e2]:
-i = int(1e3)
+i = int(1e5)
 data_tr_sample = data_tr[np.random.choice(int(1e5), i, replace=False)]
 model_config['model_name'] = 'lda_orig_' + str(i) + '_samples'
 # train the VAE and save the weights
