@@ -232,7 +232,36 @@ class VAE_tf(object):
             + tf.reduce_sum(tf.log(self.var2), axis=1)
             - tf.reduce_sum(self.z_log_sigma_sq, axis=1)
         )
+        # # KL annealing
+        # self.cost = tf.reduce_mean(reconstr_loss) + tf.minimum(1.0, 1/50000. * tf.cast(self.global_step, tf.float32)) * tf.reduce_mean(latent_loss)
+        
+        # # standard training
         self.cost = tf.reduce_mean(reconstr_loss) + tf.reduce_mean(latent_loss)
+        
+        # beta-VAE
+        # self.cost = tf.reduce_mean(reconstr_loss) + 3 * tf.reduce_mean(latent_loss)
+
+        # # diffferent learning rates for encoder and decoder
+        # enc_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='recognition_network')
+        # dec_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator_network')
+        # learning_rate_enc = tf.train.exponential_decay(
+        #     self.starting_learning_rate, self.global_step, self.decay_steps,
+        #     self.decay_rate, staircase=True)
+        # learning_rate = learning_rate_enc
+        # optimizer_enc = tf.train.AdamOptimizer(learning_rate_enc, beta1=0.99)
+        # learning_rate_dec = tf.train.exponential_decay(
+        #     self.starting_learning_rate / 100, self.global_step, self.decay_steps,
+        #     self.decay_rate, staircase=True)
+        # optimizer_dec = tf.train.AdamOptimizer(learning_rate_enc, beta1=0.99)
+        # grad_and_vars_enc = optimizer_enc.compute_gradients(self.cost, enc_vars)
+        # grad_and_vars_dec = optimizer_dec.compute_gradients(self.cost, dec_vars)
+        # grad_and_vars = grad_and_vars_enc + grad_and_vars_dec
+        # grads1 = [g for g, _ in grad_and_vars_enc]
+        # grads2 = [g for g, _ in grad_and_vars_dec]
+        # train_op1 = optimizer_enc.apply_gradients(zip(grads1, enc_vars))
+        # train_op2 = optimizer_dec.apply_gradients(zip(grads2, dec_vars))
+        # train_op = tf.group(train_op1, train_op2)
+        # self.optimizer = train_op
 
         learning_rate = tf.train.exponential_decay(
             self.starting_learning_rate, self.global_step, self.decay_steps,
