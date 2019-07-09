@@ -41,6 +41,7 @@ class VAE_tf(object):
             n_samples=1,
             batch_size=200,
             alpha=1,
+            n_steps_enc=1,
             tensorboard=False,
             **kwargs
     ):
@@ -61,6 +62,7 @@ class VAE_tf(object):
         self.decay_rate = decay_rate
         self.n_samples = n_samples
         self.batch_size = batch_size
+        self.n_steps_enc = n_steps_enc
         self.tensorboard = tensorboard
         self.global_step = tf.Variable(0, trainable=False, name='global_step')
         self.summaries = []
@@ -263,13 +265,39 @@ class VAE_tf(object):
         # train_op = tf.group(train_op1, train_op2)
         # self.optimizer = train_op
 
-        learning_rate = tf.train.exponential_decay(
+        # diffferent number of steps for encoder and decoder
+        enc_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='recognition_network')
+        dec_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator_network')
+        learning_rate_enc = tf.train.exponential_decay(
             self.starting_learning_rate, self.global_step, self.decay_steps,
             self.decay_rate, staircase=True)
-        optimizer = tf.train.AdamOptimizer(learning_rate, beta1=0.99)
-        grad_and_vars = optimizer.compute_gradients(loss=self.cost)
-        # Passing global_step to minimize() will increment it at each step.
-        self.optimizer = optimizer.apply_gradients(grad_and_vars, global_step=self.global_step)
+        learning_rate = learning_rate_enc
+        optimizer_enc = tf.train.AdamOptimizer(learning_rate_enc, beta1=0.99)
+        learning_rate_dec = tf.train.exponential_decay(
+            self.starting_learning_rate, self.global_step, self.decay_steps,
+            self.decay_rate, staircase=True)
+        optimizer_dec = tf.train.AdamOptimizer(learning_rate_enc, beta1=0.99)
+        grad_and_vars_dec = optimizer_dec.compute_gradients(self.cost, dec_vars)
+        train_op_dec = optimizer_dec.apply_gradients(grad_and_vars_dec)
+        train_ops = [train_op_dec]
+        enc_gv_collection = []
+        for i in range(self.n_steps_enc):
+            grad_and_vars_enc = optimizer_enc.compute_gradients(self.cost, enc_vars)
+            enc_gv_collection.append(grad_and_vars_enc)
+            train_ops.append(optimizer_enc.apply_gradients(grad_and_vars_enc))
+        train_op = tf.group(train_ops)
+        self.optimizer = train_op
+        # TODO: add the accumulated gradients from the encoder
+        grad_and_vars = grad_and_vars_dec
+
+        # # typical learning rate
+        # learning_rate = tf.train.exponential_decay(
+        #     self.starting_learning_rate, self.global_step, self.decay_steps,
+        #     self.decay_rate, staircase=True)
+        # optimizer = tf.train.AdamOptimizer(learning_rate, beta1=0.99)
+        # grad_and_vars = optimizer.compute_gradients(loss=self.cost)
+        # # Passing global_step to minimize() will increment it at each step.
+        # self.optimizer = optimizer.apply_gradients(grad_and_vars, global_step=self.global_step)
 
         if self.tensorboard:
             with tf.name_scope("performance"):
@@ -347,7 +375,8 @@ class VAE_tf(object):
                              feed_dict={self.z: z_mu})
 
     def save(self):
-        os.system('mkdir -p ' + self.results_dir)
+        if not os.path.exists(self.results_dir):
+            os.system('mkdir -p ' + self.results_dir)
         file_name = '_'.join([self.model_name, str(self.n_hidden_layers), str(self.n_hidden_units)]) + '.h5'
         h5f = h5py.File(os.path.join(self.results_dir, file_name), 'w')
         for i in range(self.n_hidden_layers):

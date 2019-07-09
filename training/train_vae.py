@@ -6,7 +6,7 @@ import tensorflow as tf
 
 
 from datasets.create import draw_random_doc
-from utils import inverse_softmax
+from utils import inverse_softmax, softmax
 from visualization.reconstructions import plot_side_by_side_docs
 
 
@@ -24,7 +24,8 @@ def train(
     training_epochs=100,
     display_step=5,
     tensorboard=False,
-    tensorboard_logs_dir=None
+    tensorboard_logs_dir=None,
+    results_dir=None
 ):
     if tensorboard:
         train_writer = tf.summary.FileWriter(
@@ -55,6 +56,11 @@ def train(
                 # return vae,emb
                 sys.exit()
 
+        if epoch < 15:
+            topics = softmax(vae.topic_prop(batch_xs))
+            plot_side_by_side_docs(topics, os.path.join(results_dir, 'topics_{}.pdf'.format(str(epoch).zfill(2))))
+            recreated_docs, _, _ = vae.recreate_input(batch_xs[:10])
+            plot_side_by_side_docs(np.concatenate([batch_xs[:10], recreated_docs]), os.path.join(results_dir, 'recreated_docs_{}.pdf'.format(str(epoch).zfill(2))))
         # Display logs per epoch step
         if epoch % display_step == 0:
             # print(vae.sess.run(vae.layer_do_0,
@@ -63,6 +69,7 @@ def train(
                 "Epoch: %04d" % (epoch + 1),
                 "cost={:.9f}".format(total_cost / num_batches),
             )
+
 
         if tensorboard:
             merge = tf.summary.merge(vae.summaries)
@@ -97,12 +104,12 @@ def generate_data(vae, zs, vocab_size, num_docs=10000, min_n_words_per_doc=45, m
 
 def train_with_hallucinations(data, vae, model_config, alpha=.01, num_samples=10000,
                               batch_size=200, training_epochs=100, display_step=5,
-                              tensorboard=False, tensorboard_logs_dir=None):
+                              tensorboard=False, tensorboard_logs_dir=None, results_dir=None):
     zs = np.random.dirichlet(alpha=alpha * np.ones(model_config['n_topics']), size=num_samples)
     fake_data = generate_data(vae, zs, vocab_size=model_config['vocab_size'], num_docs=100000)
 
     # plot_side_by_side_docs(fake_data, os.path.join(model_config['results_dir'], "fake_data.png"))
 
     vae = train(np.concatenate([data, fake_data]), vae, training_epochs=100, tensorboard=tensorboard, batch_size=batch_size,
-                tensorboard_logs_dir=tensorboard_logs_dir)
+                tensorboard_logs_dir=tensorboard_logs_dir, results_dir=results_dir)
     return vae
