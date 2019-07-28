@@ -8,7 +8,7 @@ from evaluation.evaluate_posterior import evaluate_log_predictive_density
 from evaluation.evaluate_posterior import reconstruct_data
 from visualization.reconstructions import plot_side_by_side_docs
 
-from models.lda_lognorm import VAE_tf, VAE_pyro
+from models.lda_sym_with_scale import VAE_tf, VAE_pyro
 from training.train_vae import train, train_with_hallucinations
 
 

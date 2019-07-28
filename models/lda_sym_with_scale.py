@@ -19,6 +19,8 @@ cwd = os.getcwd()
 class VAE_tf(object):
     """
     See "Auto-Encoding Variational Bayes" by Kingma and Welling for more details.
+
+    Here, the first layer has n.num_topics hidden units. We test to see if the bottleneck up front proves to be a problem.
     """
 
     def __init__(
@@ -122,12 +124,15 @@ class VAE_tf(object):
 
             # add more layers
             if self.n_hidden_layers > 1:
-                for i in range(2, self.n_hidden_layers + 1):
-                    if not self.enc_topic_init:
-                        all_weights["weights_recog"]["h{}".format(i)] = tf.get_variable(
-                            "h{}".format(i), [self.n_hidden_units, self.n_hidden_units])
-                        all_weights["biases_recog"]["b{}".format(i)] = tf.get_variable(
-                            "b{}".format(i), [self.n_hidden_units], initializer=tf.zeros_initializer())
+                all_weights["weights_recog"]["h2"] = tf.get_variable(
+                    "h2", [self.n_topics, self.n_hidden_units])
+                all_weights["biases_recog"]["b2"] = tf.get_variable(
+                    "b2", [self.n_hidden_units], initializer=tf.zeros_initializer())
+                for i in range(3, self.n_hidden_layers + 1):
+                    all_weights["weights_recog"]["h{}".format(i)] = tf.get_variable(
+                        "h{}".format(i), [self.n_hidden_units, self.n_hidden_units])
+                    all_weights["biases_recog"]["b{}".format(i)] = tf.get_variable(
+                        "b{}".format(i), [self.n_hidden_units], initializer=tf.zeros_initializer())
 
             if self.enc_topic_init:
                 # if self.n_hidden_units != self.n_topics:
@@ -137,13 +142,15 @@ class VAE_tf(object):
                 all_weights["weights_recog"].update({
                     "h1": tf.get_variable(
                         "h1", initializer=toy_bars, trainable=self.enc_topic_trainable)})
-                all_weights["weights_recog"].update({
+                all_weights["biases_recog"].update({
                     "b1": tf.get_variable("b1", [self.n_topics], initializer=tf.zeros_initializer()),
                 })
             else:
                 all_weights["weights_recog"].update({
-                    "h1": tf.get_variable("h1", [self.vocab_size, self.n_hidden_units]),
-                    "b1": tf.get_variable("b1", [self.n_hidden_units], initializer=tf.zeros_initializer())})
+                    "h1": tf.get_variable("h1", [self.vocab_size, self.n_topics])})
+                all_weights["biases_recog"].update({
+                    "b1": tf.get_variable("b1", [self.n_topics], initializer=tf.zeros_initializer()),
+                })
 
             self.scale = tf.Variable(tf.ones([]), name="scale", trainable=self.scale_trainable)
 
@@ -166,14 +173,14 @@ class VAE_tf(object):
 
     def _recognition_network(self, weights, biases):
         with tf.variable_scope("recognition_network"):
-            layer = self.transfer_fct(
-                tf.add(tf.matmul(self.x, weights["h1"]), biases["b1"]))
+            layer = tf.contrib.layers.batch_norm(self.transfer_fct(
+                tf.add(tf.matmul(self.x, weights["h1"]), biases["b1"])))
 
             for i in range(2, self.n_hidden_layers + 1):
-                layer = self.transfer_fct(
+                layer = tf.contrib.layers.batch_norm(self.transfer_fct(
                     tf.add(tf.matmul(layer, weights["h{}".format(i)]),
                            biases["b{}".format(i)])
-                )
+                ))
             z_mean = tf.contrib.layers.batch_norm(
                 tf.add(tf.matmul(layer, weights["out_mean"]), biases["out_mean"])
             )
@@ -269,20 +276,24 @@ class VAE_tf(object):
         # self.optimizer = train_op
 
         # diffferent number of steps for encoder and decoder
+        train_ops = []
+
         enc_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='recognition_network')
-        dec_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator_network')
         learning_rate_enc = tf.train.exponential_decay(
             self.starting_learning_rate, self.global_step, self.decay_steps,
             self.decay_rate, staircase=True)
-        learning_rate = learning_rate_enc
         optimizer_enc = tf.train.AdamOptimizer(learning_rate_enc, beta1=0.99)
-        learning_rate_dec = tf.train.exponential_decay(
-            self.starting_learning_rate, self.global_step, self.decay_steps,
-            self.decay_rate, staircase=True)
-        optimizer_dec = tf.train.AdamOptimizer(learning_rate_enc, beta1=0.99)
-        grad_and_vars_dec = optimizer_dec.compute_gradients(self.cost, dec_vars)
-        train_op_dec = optimizer_dec.apply_gradients(grad_and_vars_dec)
-        train_ops = [train_op_dec]
+
+        dec_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator_network')
+        if len(dec_vars):
+            learning_rate_dec = tf.train.exponential_decay(
+                self.starting_learning_rate, self.global_step, self.decay_steps,
+                self.decay_rate, staircase=True)
+            optimizer_dec = tf.train.AdamOptimizer(learning_rate_enc, beta1=0.99)
+            grad_and_vars_dec = optimizer_dec.compute_gradients(self.cost, dec_vars)
+            train_op_dec = optimizer_dec.apply_gradients(grad_and_vars_dec)
+            train_ops.append(train_op_dec)
+
         enc_gv_collection = []
         for i in range(self.n_steps_enc):
             grad_and_vars_enc = optimizer_enc.compute_gradients(self.cost, enc_vars)
@@ -290,8 +301,6 @@ class VAE_tf(object):
             train_ops.append(optimizer_enc.apply_gradients(grad_and_vars_enc))
         train_op = tf.group(train_ops)
         self.optimizer = train_op
-        # TODO: add the accumulated gradients from the encoder
-        grad_and_vars = grad_and_vars_dec
 
         # # typical learning rate
         # learning_rate = tf.train.exponential_decay(
@@ -309,11 +318,15 @@ class VAE_tf(object):
                     "latent_loss", tf.reduce_mean(latent_loss)))
                 self.summaries.append(tf.summary.scalar(
                     "reconstruction_loss", tf.reduce_mean(reconstr_loss)))
-                self.summaries.append(tf.summary.scalar("learning_rate", learning_rate))
-            for gradient, variable in grad_and_vars:
-                variable_name = variable.name.replace(':', '_')
-                self.summaries.append(tf.summary.histogram("gradients/" + variable_name, l2_norm(gradient)))
-                self.summaries.append(tf.summary.histogram("variables/" + variable_name, l2_norm(variable)))
+                self.summaries.append(tf.summary.scalar("learning_rate_enc", learning_rate_enc))
+                if dec_vars:
+                    self.summaries.append(tf.summary.scalar("learning_rate_dec", learning_rate_dec))
+            # TODO: add the accumulated gradients from the encoder
+            if dec_vars:
+                for gradient, variable in grad_and_vars_dec:
+                    variable_name = variable.name.replace(':', '_')
+                    self.summaries.append(tf.summary.histogram("dec_gradients/" + variable_name, l2_norm(gradient)))
+                    self.summaries.append(tf.summary.histogram("dec_variables/" + variable_name, l2_norm(variable)))
 
     def partial_fit(self, X):
         opt, cost = self.sess.run(
@@ -444,8 +457,9 @@ class Encoder(nn.Module):
         self.softplus = nn.Softplus()
         # encoder Linear layers
         modules = []
-        modules.append(MLP(vocab_size, n_hidden_units))
-        for i in range(self.n_hidden_layers - 1):
+        modules.append(MLP(vocab_size, n_topics))
+        modules.append(MLP(n_topics, n_hidden_units))
+        for i in range(self.n_hidden_layers - 2):
             modules.append(MLP(n_hidden_units, n_hidden_units))
 
         self.enc_layers = nn.Sequential(*modules)

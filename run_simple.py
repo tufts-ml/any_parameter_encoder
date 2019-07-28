@@ -9,13 +9,13 @@ from pyro.infer.mcmc import MCMC, NUTS
 import pyro
 
 from datasets.load import load_toy_bars
-from models.lda_lognorm import VAE_pyro
+from models.lda_sym_with_scale import VAE_pyro
 from common import train_save_VAE, save_loglik_to_csv, save_reconstruction_array
-from visualization.reconstructions import plot_side_by_side_docs
+from visualization.reconstructions import plot_side_by_side_docs, plot_saved_samples
 from utils import softmax
 
 # where to write the results
-results_dir = 'experiments/vae_experiments/10x10_multiple_encoder_steps'
+results_dir = 'experiments/vae_experiments/10x10_first_layer_n_topics'
 results_file = 'results.csv'
 
 # global params
@@ -53,17 +53,17 @@ datasets[0] = data_tr[:1000]
 
 model_config = {
     # 'topic_init': 'resources/mdreviews_topics1.npy',
-    # 'topic_init': 'resources/topics_10x10.npy',
+    'topic_init': 'resources/topics_10x10.npy',
     # 'topic_init': 'resources/topics_100x100_18_topics.npy',
-    'topic_init': None,
-    'topic_trainable': True,
+    # 'topic_init': None,
+    'topic_trainable': False,
     'vocab_size': vocab_size,
     'n_topics': n_topics,
     'results_dir': results_dir,
     'results_file': results_file,
     'inference': 'vae',
     'model_name': 'lda_orig',
-    'enc_topic_init': None,
+    'enc_topic_init': False,
     'enc_topic_trainable': True,
     'scale_trainable': False,
     'n_hidden_layers': 5,
@@ -127,3 +127,14 @@ for data_name, data in zip(dataset_names, datasets):
         # except Exception as e:
         #     print(e)
         #     print(data_name, inference_name, " failed")
+
+for data_name, data in zip(dataset_names, datasets):
+    filenames = []
+    for inference in ['vae', 'svi']:
+        file = '_'.join([inference, data_name, str(model_config['n_hidden_layers']), str(model_config['n_hidden_units'])]) + '.npy'
+        filepath = os.path.join(os.getcwd(), results_dir, file)
+        if os.path.exists(filepath):
+            filenames.append(filepath)
+
+plot_name = os.path.join(results_dir, data_name + '_vae_reconstructions.pdf')
+plot_saved_samples(data[sample_idx], filenames, plot_name, vocab_size=vocab_size, intensity=10)
