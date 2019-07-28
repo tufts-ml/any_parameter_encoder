@@ -9,6 +9,7 @@ import pyro.distributions as dist
 
 import numpy as np
 import tensorflow as tf
+from functools import partial
 
 
 l2_norm = lambda t: tf.sqrt(tf.reduce_sum(tf.pow(t, 2)))
@@ -25,30 +26,43 @@ class VAE_tf(object):
             n_hidden_units=100,
             n_hidden_layers=2,
             n_topics=4,
+            model_name=None,
+            results_dir=None,
             vocab_size=9,
             topic_init=None,
-            topic_fixed=False,
-            recog_topic_fixed=False,
+            topic_trainable=True,
+            enc_topic_init=None,
+            enc_topic_trainable=True,
+            scale_trainable=False,
             transfer_fct=tf.nn.softplus,
             starting_learning_rate=0.002,
             decay_steps=1000,
             decay_rate=.9,
+            n_samples=1,
             batch_size=200,
             alpha=1,
-            tensorboard=False
+            n_steps_enc=1,
+            tensorboard=False,
+            **kwargs
     ):
         self.n_hidden_units = n_hidden_units
         self.n_hidden_layers = n_hidden_layers
         self.n_topics = n_topics
+        self.model_name = model_name
+        self.results_dir = results_dir
         self.vocab_size = vocab_size
         self.topic_init = topic_init
-        self.topic_fixed = topic_fixed
-        self.recog_topic_fixed = recog_topic_fixed
+        self.topic_trainable = topic_trainable
+        self.enc_topic_init = enc_topic_init
+        self.enc_topic_trainable = enc_topic_trainable
+        self.scale_trainable = scale_trainable
         self.transfer_fct = transfer_fct
         self.starting_learning_rate = starting_learning_rate
         self.decay_steps = decay_steps
         self.decay_rate = decay_rate
+        self.n_samples = n_samples
         self.batch_size = batch_size
+        self.n_steps_enc = n_steps_enc
         self.tensorboard = tensorboard
         self.global_step = tf.Variable(0, trainable=False, name='global_step')
         self.summaries = []
@@ -81,15 +95,17 @@ class VAE_tf(object):
         self.z_mean, self.z_log_sigma_sq = self._recognition_network(
             self.network_weights["weights_recog"], self.network_weights["biases_recog"]
         )
-
-        eps = tf.random_normal((1, self.n_topics), 0, 1, dtype=tf.float32)
-        self.z = tf.add(
-            self.z_mean, tf.multiply(tf.sqrt(tf.exp(self.z_log_sigma_sq)), eps)
+        eps = tf.random_normal((self.n_samples, self.n_topics), 0, 1, dtype=tf.float32)
+        z = tf.add(
+            tf.expand_dims(self.z_mean, axis=1), tf.multiply(tf.sqrt(tf.exp(tf.expand_dims(self.z_log_sigma_sq, axis=1))), eps)
         )
+        z = tf.multiply(self.scale, z)
+        self.z = tf.reduce_mean(z, axis=1)
         self.sigma = tf.exp(self.z_log_sigma_sq)
-        self.x_reconstr_mean = self._generator_network(
-            self.z, self.network_weights["weights_gener"]
-        )
+        # generator = partial(self._generator_network, self.network_weights['weights_gener'])
+        # self.x_reconstr_mean = tf.reduce_mean(tf.map_fn(generator, self.z), axis=1)
+        self.x_reconstr_means = self._generator_network(self.network_weights['weights_gener'], z)
+        self.x_reconstr_mean = tf.reduce_mean(self.x_reconstr_means, axis=1)
 
     def _initialize_weights(self):
         all_weights = dict()
@@ -100,7 +116,6 @@ class VAE_tf(object):
             }
 
             all_weights["biases_recog"] = {
-                "b1": tf.get_variable("b1", [self.n_hidden_units], initializer=tf.zeros_initializer()),
                 "out_mean": tf.get_variable("out_mean_b", [self.n_topics], initializer=tf.zeros_initializer()),
                 "out_log_sigma": tf.get_variable("out_log_sigma_b", [self.n_topics], initializer=tf.zeros_initializer()),
             }
@@ -108,35 +123,38 @@ class VAE_tf(object):
             # add more layers
             if self.n_hidden_layers > 1:
                 for i in range(2, self.n_hidden_layers + 1):
-                    all_weights["weights_recog"]["h{}".format(i)] = tf.get_variable(
-                        "h{}".format(i), [self.n_hidden_units, self.n_hidden_units])
-                    all_weights["biases_recog"]["b{}".format(i)] = tf.get_variable(
-                        "b{}".format(i), [self.n_hidden_units], initializer=tf.zeros_initializer())
+                    if not self.enc_topic_init:
+                        all_weights["weights_recog"]["h{}".format(i)] = tf.get_variable(
+                            "h{}".format(i), [self.n_hidden_units, self.n_hidden_units])
+                        all_weights["biases_recog"]["b{}".format(i)] = tf.get_variable(
+                            "b{}".format(i), [self.n_hidden_units], initializer=tf.zeros_initializer())
 
-            # initialize the first layer with the topics
-            if self.topic_init:
-                toy_bars = tf.convert_to_tensor(np.load(
-                    os.path.join(cwd, self.topic_init)))
-                if self.recog_topic_fixed:
-                    all_weights["weights_recog"].update(
-                        {"h1": tf.get_variable("h1", initializer=toy_bars, trainable=False)})
-                else:
-                    all_weights["weights_recog"].update(
-                        {"h1": tf.get_variable("h1", initializer=toy_bars, trainable=True)})
+            if self.enc_topic_init:
+                # if self.n_hidden_units != self.n_topics:
+                #     raise ValueError("If initializing encoder topics, must enforce n_hidden_units == n_topics.")
+                toy_bars = tf.transpose(tf.convert_to_tensor(np.load(
+                    os.path.join(cwd, self.topic_init))))
+                all_weights["weights_recog"].update({
+                    "h1": tf.get_variable(
+                        "h1", initializer=toy_bars, trainable=self.enc_topic_trainable)})
+                all_weights["weights_recog"].update({
+                    "b1": tf.get_variable("b1", [self.n_topics], initializer=tf.zeros_initializer()),
+                })
+            else:
+                all_weights["weights_recog"].update({
+                    "h1": tf.get_variable("h1", [self.vocab_size, self.n_hidden_units]),
+                    "b1": tf.get_variable("b1", [self.n_hidden_units], initializer=tf.zeros_initializer())})
+
+            self.scale = tf.Variable(tf.ones([]), name="scale", trainable=self.scale_trainable)
 
         # initialize the generative model
         with tf.variable_scope("generator_network"):
             if self.topic_init:
                 toy_bars = tf.convert_to_tensor(np.load(
                     os.path.join(cwd, self.topic_init)))
-                if self.topic_fixed:
-                    all_weights["weights_gener"] = {
-                        "g1": tf.get_variable(
-                            "g1", initializer=toy_bars, trainable=False)}
-                else:
-                    all_weights["weights_gener"] = {
-                        "g1": tf.get_variable(
-                            "g1", initializer=toy_bars, trainable=True)}
+                all_weights["weights_gener"] = {
+                    "g1": tf.get_variable(
+                        "g1", initializer=toy_bars, trainable=self.topic_trainable)}
             else:
                 all_weights["weights_gener"] = {
                     "g1": tf.get_variable(
@@ -180,52 +198,109 @@ class VAE_tf(object):
 
         return (z_mean, z_log_sigma_sq)
 
-    def _generator_network(self, z, weights):
+    def _generator_network(self, weights, z):
+        """
+
+        :param weights:
+        :param z: (batch, n_samples, n_topics)
+        :return:
+        """
         with tf.variable_scope("generator_network"):
             self.layer_do_0 = tf.nn.softmax(z)
+            topic_weights = tf.tile(tf.expand_dims(tf.nn.softmax(weights["g1"]), 0), [tf.shape(z)[0], 1, 1])
+            x_reconstr_means =tf.matmul(self.layer_do_0, topic_weights)  # (batch, n_samples, vocab_size)
+            # x_reconstr_mean = tf.reduce_mean(x_reconstr_means, axis=1)
 
-            x_reconstr_mean = tf.add(
-                tf.matmul(
-                    self.layer_do_0,
-                    tf.nn.softmax(weights["g1"]),
-                ),
-                0.0,
-            )
             if self.tensorboard:
                 self.summaries.append(tf.summary.histogram("weights", weights["g1"]))
                 self.summaries.append(tf.summary.histogram("z", self.layer_do_0))
 
-        return x_reconstr_mean
+        return x_reconstr_means
 
     def _create_loss_optimizer(self):
-        self.x_reconstr_mean += 1e-10
+        self.x_reconstr_means += 1e-10
         # The probability of the posterior of z under q
+        x_expanded = tf.tile(tf.expand_dims(self.x, 1), [1, self.n_samples, 1])
         reconstr_loss = -tf.reduce_sum(
-            self.x * tf.log(self.x_reconstr_mean), 1
+            x_expanded * tf.log(self.x_reconstr_means), axis=2
         )
         # KL Divergence
         latent_loss = 0.5 * (
-                tf.reduce_sum(tf.div(self.sigma, self.var2), 1)
-                + tf.reduce_sum(
-            tf.multiply(
-                tf.div((self.mu2 - self.z_mean), self.var2),
-                (self.mu2 - self.z_mean),
-            ),
-            1,
+            tf.reduce_sum(tf.div(self.sigma, self.var2), axis=1) +
+            tf.reduce_sum(
+                tf.multiply(
+                    tf.div((self.mu2 - self.z_mean), self.var2),
+                    (self.mu2 - self.z_mean)
+                ), axis=1,
+            )
+            - self.h_dim
+            + tf.reduce_sum(tf.log(self.var2), axis=1)
+            - tf.reduce_sum(self.z_log_sigma_sq, axis=1)
         )
-                - self.h_dim
-                + tf.reduce_sum(tf.log(self.var2), 1)
-                - tf.reduce_sum(self.z_log_sigma_sq, 1)
-        )
+        # # KL annealing
+        # self.cost = tf.reduce_mean(reconstr_loss) + tf.minimum(1.0, 1/50000. * tf.cast(self.global_step, tf.float32)) * tf.reduce_mean(latent_loss)
+        
+        # # standard training
         self.cost = tf.reduce_mean(reconstr_loss) + tf.reduce_mean(latent_loss)
+        
+        # beta-VAE
+        # self.cost = tf.reduce_mean(reconstr_loss) + 3 * tf.reduce_mean(latent_loss)
 
-        learning_rate = tf.train.exponential_decay(
+        # # diffferent learning rates for encoder and decoder
+        # enc_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='recognition_network')
+        # dec_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator_network')
+        # learning_rate_enc = tf.train.exponential_decay(
+        #     self.starting_learning_rate, self.global_step, self.decay_steps,
+        #     self.decay_rate, staircase=True)
+        # learning_rate = learning_rate_enc
+        # optimizer_enc = tf.train.AdamOptimizer(learning_rate_enc, beta1=0.99)
+        # learning_rate_dec = tf.train.exponential_decay(
+        #     self.starting_learning_rate / 100, self.global_step, self.decay_steps,
+        #     self.decay_rate, staircase=True)
+        # optimizer_dec = tf.train.AdamOptimizer(learning_rate_enc, beta1=0.99)
+        # grad_and_vars_enc = optimizer_enc.compute_gradients(self.cost, enc_vars)
+        # grad_and_vars_dec = optimizer_dec.compute_gradients(self.cost, dec_vars)
+        # grad_and_vars = grad_and_vars_enc + grad_and_vars_dec
+        # grads1 = [g for g, _ in grad_and_vars_enc]
+        # grads2 = [g for g, _ in grad_and_vars_dec]
+        # train_op1 = optimizer_enc.apply_gradients(zip(grads1, enc_vars))
+        # train_op2 = optimizer_dec.apply_gradients(zip(grads2, dec_vars))
+        # train_op = tf.group(train_op1, train_op2)
+        # self.optimizer = train_op
+
+        # diffferent number of steps for encoder and decoder
+        enc_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='recognition_network')
+        dec_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator_network')
+        learning_rate_enc = tf.train.exponential_decay(
             self.starting_learning_rate, self.global_step, self.decay_steps,
             self.decay_rate, staircase=True)
-        optimizer = tf.train.AdamOptimizer(learning_rate, beta1=0.99)
-        grad_and_vars = optimizer.compute_gradients(loss=self.cost)
-        # Passing global_step to minimize() will increment it at each step.
-        self.optimizer = optimizer.apply_gradients(grad_and_vars, global_step=self.global_step)
+        learning_rate = learning_rate_enc
+        optimizer_enc = tf.train.AdamOptimizer(learning_rate_enc, beta1=0.99)
+        learning_rate_dec = tf.train.exponential_decay(
+            self.starting_learning_rate, self.global_step, self.decay_steps,
+            self.decay_rate, staircase=True)
+        optimizer_dec = tf.train.AdamOptimizer(learning_rate_enc, beta1=0.99)
+        grad_and_vars_dec = optimizer_dec.compute_gradients(self.cost, dec_vars)
+        train_op_dec = optimizer_dec.apply_gradients(grad_and_vars_dec)
+        train_ops = [train_op_dec]
+        enc_gv_collection = []
+        for i in range(self.n_steps_enc):
+            grad_and_vars_enc = optimizer_enc.compute_gradients(self.cost, enc_vars)
+            enc_gv_collection.append(grad_and_vars_enc)
+            train_ops.append(optimizer_enc.apply_gradients(grad_and_vars_enc))
+        train_op = tf.group(train_ops)
+        self.optimizer = train_op
+        # TODO: add the accumulated gradients from the encoder
+        grad_and_vars = grad_and_vars_dec
+
+        # # typical learning rate
+        # learning_rate = tf.train.exponential_decay(
+        #     self.starting_learning_rate, self.global_step, self.decay_steps,
+        #     self.decay_rate, staircase=True)
+        # optimizer = tf.train.AdamOptimizer(learning_rate, beta1=0.99)
+        # grad_and_vars = optimizer.compute_gradients(loss=self.cost)
+        # # Passing global_step to minimize() will increment it at each step.
+        # self.optimizer = optimizer.apply_gradients(grad_and_vars, global_step=self.global_step)
 
         if self.tensorboard:
             with tf.name_scope("performance"):
@@ -302,9 +377,11 @@ class VAE_tf(object):
         return self.sess.run(self.x_reconstr_mean,
                              feed_dict={self.z: z_mu})
 
-    def save(self, results_dir):
-        os.system('mkdir -p ' + results_dir)
-        h5f = h5py.File(results_dir + '/lda_sym_with_scale_{}_{}.h5'.format(self.n_hidden_layers, self.n_hidden_units), 'w')
+    def save(self):
+        if not os.path.exists(self.results_dir):
+            os.system('mkdir -p ' + self.results_dir)
+        file_name = '_'.join([self.model_name, str(self.n_hidden_layers), str(self.n_hidden_units)]) + '.h5'
+        h5f = h5py.File(os.path.join(self.results_dir, file_name), 'w')
         for i in range(self.n_hidden_layers):
             weights = self.sess.graph.get_tensor_by_name('recognition_network/h{}:0'.format(i + 1)).eval(session=self.sess)
             biases = self.sess.graph.get_tensor_by_name('recognition_network/b{}:0'.format(i + 1)).eval(session=self.sess)
@@ -337,6 +414,10 @@ class VAE_tf(object):
         h5f.create_dataset("running_mean_out_log_sigma", data=running_mean_out_log_sigma)
         h5f.create_dataset("running_var_out_mean", data=running_var_out_mean)
         h5f.create_dataset("running_var_out_log_sigma", data=running_var_out_log_sigma)
+
+        # scale
+        scale = self.sess.graph.get_tensor_by_name('recognition_network/scale:0').eval(session=self.sess)
+        h5f.create_dataset("scale", data=scale)
 
         # topics
         topics = self.sess.graph.get_tensor_by_name('generator_network/g1:0').eval(session=self.sess)
@@ -372,6 +453,7 @@ class Encoder(nn.Module):
         self.fcsigma = nn.Linear(n_hidden_units, n_topics)
         self.bnmu = nn.BatchNorm1d(n_topics)
         self.bnsigma = nn.BatchNorm1d(n_topics)
+        self.scale = nn.Parameter(torch.ones([]))
 
     def forward(self, x):
         # define the forward computation on the image x
@@ -379,21 +461,18 @@ class Encoder(nn.Module):
         x = x.reshape(-1, self.vocab_size)
         # then return a mean vector and a (positive) square root covariance
         # each of size batch_size x n_topics
-        z_loc = self.bnmu(self.fcmu(self.enc_layers(x)))
+        z_loc = torch.mul(self.scale, self.bnmu(self.fcmu(self.enc_layers(x))))
         z_scale = torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x))))
         return z_loc, z_scale
 
 
 class Decoder(nn.Module):
-    def __init__(self, n_topics, vocab_size, topic_init, topic_fixed):
+    def __init__(self, n_topics, vocab_size, topic_init, topic_trainable):
         super(Decoder, self).__init__()
         if topic_init:
             # the topics are already in inverse_softmax form
             topics = np.load(topic_init)
-            if topic_fixed:
-                self.topics = torch.tensor(topics, requires_grad=False)
-            else:
-                self.topics = torch.tensor(topics)
+            self.topics = torch.tensor(topics, requires_grad=topic_trainable)
         else:
             self.topics = torch.nn.Parameter(torch.randn(n_topics, vocab_size))
         self.softmax = nn.Softmax(dim=1)
@@ -404,11 +483,14 @@ class Decoder(nn.Module):
 
 
 class VAE_pyro(nn.Module):
-    def __init__(self, n_hidden_units, n_hidden_layers, topic_init=None, topic_fixed=False, alpha=.1, vocab_size=9, n_topics=4, use_cuda=False):
+    def __init__(self, n_hidden_units=100, n_hidden_layers=2, model_name=None, results_dir=None, topic_init=None, topic_trainable=True,
+                 alpha=.1, vocab_size=9, n_topics=4, use_cuda=False, **kwargs):
         super(VAE_pyro, self).__init__()
+        print(n_hidden_units)
+        print(n_hidden_layers)
         # create the encoder and decoder networks
         self.encoder = Encoder(n_hidden_units, n_hidden_layers, n_topics=n_topics, vocab_size=vocab_size)
-        self.decoder = Decoder(n_topics, vocab_size, topic_init, topic_fixed)
+        self.decoder = Decoder(n_topics, vocab_size, topic_init, topic_trainable)
 
         if use_cuda:
             # calling cuda() here will put all the parameters of
@@ -416,16 +498,19 @@ class VAE_pyro(nn.Module):
             self.cuda()
         self.use_cuda = use_cuda
         self.n_topics = n_topics
-        self.alpha = alpha * np.ones((1, n_topics)).astype(np.float32)
-        self.z_loc = torch.from_numpy((np.log(self.alpha).T - np.mean(np.log(self.alpha), 1)).T)
+        alpha_vec = alpha * np.ones((1, n_topics)).astype(np.float32)
+        self.z_loc = torch.from_numpy((np.log(alpha_vec).T - np.mean(np.log(alpha_vec), 1)).T)
         self.z_scale = torch.from_numpy((
-            ((1.0 / self.alpha) * (1 - (2.0 / n_topics))).T +
-            (1.0 / (n_topics * n_topics)) * np.sum(1.0 / self.alpha, 1)
+            ((1.0 / alpha_vec) * (1 - (2.0 / n_topics))).T +
+            (1.0 / (n_topics * n_topics)) * np.sum(1.0 / alpha_vec, 1)
         ).T)
+        self.alpha = alpha * np.ones(n_topics).astype(np.float32)
 
         self.n_topics = n_topics
         self.n_hidden_layers = n_hidden_layers
         self.n_hidden_units = n_hidden_units
+        self.model_name = model_name
+        self.results_dir = results_dir
         self.topic_init = topic_init
 
     # define the model p(x|z)p(z)
@@ -447,7 +532,7 @@ class VAE_pyro(nn.Module):
         pyro.module("decoder", self.decoder)
         with pyro.plate("data", x.shape[0]):
             z = pyro.sample("latent",
-                            dist.Dirichlet(self.alpha).to_event(1))
+                            dist.Dirichlet(torch.from_numpy(self.alpha)))
             word_probs = self.decoder.forward(z)
             return pyro.sample("doc_words",
                         dist.Multinomial(probs=word_probs),
@@ -492,9 +577,10 @@ class VAE_pyro(nn.Module):
         word_probs = self.decoder(z_loc)
         return word_probs
 
-    def load(self, results_dir):
+    def load(self):
         state_dict = {}
-        h5f = h5py.File(results_dir + '/lda_sym_with_scale_{}_{}.h5'.format(self.n_hidden_layers, self.n_hidden_units), 'r')
+        file_name = '_'.join([self.model_name, str(self.n_hidden_layers), str(self.n_hidden_units)]) + '.h5'
+        h5f = h5py.File(os.path.join(self.results_dir, file_name), 'r')
         for i in range(self.n_hidden_layers):
             state_dict['encoder.enc_layers.{}.fc.weight'.format(i)] = torch.from_numpy(h5f['weights_{}'.format(i + 1)][()]).t()
             state_dict['encoder.enc_layers.{}.fc.bias'.format(i)] = torch.from_numpy(h5f['biases_{}'.format(i + 1)][()])
@@ -512,6 +598,8 @@ class VAE_pyro(nn.Module):
         state_dict['encoder.bnsigma.running_mean'] = torch.from_numpy(h5f['running_mean_out_log_sigma'][()])
         state_dict['encoder.bnmu.running_var'] = torch.from_numpy(h5f['running_var_out_mean'][()])
         state_dict['encoder.bnsigma.running_var'] = torch.from_numpy(h5f['running_var_out_log_sigma'][()])
+
+        state_dict['encoder.scale'] = torch.from_numpy(np.array(h5f['scale'][()]))
 
         if not self.topic_init:
             state_dict['decoder.topics'] = torch.from_numpy(h5f['topics'][()])
