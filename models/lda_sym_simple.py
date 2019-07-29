@@ -20,7 +20,7 @@ class VAE_tf(object):
     """
     See "Auto-Encoding Variational Bayes" by Kingma and Welling for more details.
 
-    Here, the first layer has n.num_topics hidden units. We test to see if the bottleneck up front proves to be a problem.
+    Here, the first layer has num_topics hidden units. We test to see if the bottleneck up front proves to be a problem.
     """
 
     def __init__(
@@ -135,8 +135,8 @@ class VAE_tf(object):
             if self.enc_topic_init:
                 # if self.n_hidden_units != self.n_topics:
                 #     raise ValueError("If initializing encoder topics, must enforce n_hidden_units == n_topics.")
-                toy_bars = tf.transpose(tf.convert_to_tensor(np.load(
-                    os.path.join(cwd, self.topic_init))))
+                toy_bars = tf.transpose(tf.nn.softmax(tf.convert_to_tensor(np.load(
+                    os.path.join(cwd, self.topic_init)))))
                 all_weights["weights_recog"].update({
                     "h1": tf.get_variable(
                         "h1", initializer=toy_bars, trainable=self.enc_topic_trainable)})
@@ -401,9 +401,9 @@ class VAE_tf(object):
                 running_mean = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm/moving_mean:0').eval(session=self.sess)
                 running_var = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm/moving_variance:0').eval(session=self.sess)
             else:
-                beta = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_1/beta:0').eval(session=self.sess)
-                running_mean = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_1/moving_mean:0').eval(session=self.sess)
-                running_var = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_1/moving_variance:0').eval(session=self.sess)
+                beta = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/beta:0'.format(i)).eval(session=self.sess)
+                running_mean = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/moving_mean:0'.format(i)).eval(session=self.sess)
+                running_var = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/moving_variance:0'.format(i)).eval(session=self.sess)
             h5f.create_dataset("weights_{}".format(i + 1) , data=weights)
             h5f.create_dataset("biases_{}".format(i + 1), data=biases)
             h5f.create_dataset("beta_{}".format(i + 1), data=beta)
@@ -415,15 +415,15 @@ class VAE_tf(object):
         weights_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/out_log_sigma:0').eval(session=self.sess)
         biases_out_mean = self.sess.graph.get_tensor_by_name('recognition_network/out_mean_b:0').eval(session=self.sess)
         biases_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/out_log_sigma_b:0').eval(session=self.sess)
-        beta_out_mean = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_2/beta:0').eval(session=self.sess)
-        beta_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_3/beta:0').eval(session=self.sess)
-        running_mean_out_mean = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_2/moving_mean:0').eval(
+        beta_out_mean = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/beta:0'.format(self.n_hidden_layers)).eval(session=self.sess)
+        beta_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/beta:0'.format(self.n_hidden_layers + 1)).eval(session=self.sess)
+        running_mean_out_mean = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/moving_mean:0'.format(self.n_hidden_layers)).eval(
             session=self.sess)
-        running_mean_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_3/moving_mean:0').eval(
+        running_mean_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/moving_mean:0'.format(self.n_hidden_layers + 1)).eval(
             session=self.sess)
-        running_var_out_mean = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_2/moving_variance:0').eval(
+        running_var_out_mean = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/moving_variance:0'.format(self.n_hidden_layers)).eval(
             session=self.sess)
-        running_var_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_3/moving_variance:0').eval(
+        running_var_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/moving_variance:0'.format(self.n_hidden_layers + 1)).eval(
             session=self.sess)
 
         h5f.create_dataset("weights_out_mean", data=weights_out_mean)
@@ -609,7 +609,10 @@ class VAE_pyro(nn.Module):
             state_dict['encoder.enc_layers.{}.fc.weight'.format(i)] = torch.from_numpy(h5f['weights_{}'.format(i + 1)][()]).t()
             state_dict['encoder.enc_layers.{}.fc.bias'.format(i)] = torch.from_numpy(h5f['biases_{}'.format(i + 1)][()])
             state_dict['encoder.enc_layers.{}.bn.bias'.format(i)] = torch.from_numpy(h5f['beta_{}'.format(i + 1)][()])
-            state_dict['encoder.enc_layers.{}.bn.weight'.format(i)] = torch.ones(self.n_topics)
+            if i == 0:
+                state_dict['encoder.enc_layers.{}.bn.weight'.format(i)] = torch.ones(self.n_topics)
+            else:
+                state_dict['encoder.enc_layers.{}.bn.weight'.format(i)] = torch.ones(self.n_hidden_units)
             state_dict['encoder.enc_layers.{}.bn.running_mean'.format(i)] = torch.from_numpy(h5f['running_mean_{}'.format(i + 1)][()])
             state_dict['encoder.enc_layers.{}.bn.running_var'.format(i)] = torch.from_numpy(h5f['running_var_{}'.format(i + 1)][()])
 
@@ -635,7 +638,3 @@ class VAE_pyro(nn.Module):
         h5f.close()
 
         return state_dict
-
-if __name__ == "__main__":
-    vae = VAE_tf()
-    print(tf.all_variables())
