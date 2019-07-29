@@ -608,10 +608,10 @@ class VAE_pyro(nn.Module):
         for i in range(self.n_hidden_layers):
             state_dict['encoder.enc_layers.{}.fc.weight'.format(i)] = torch.from_numpy(h5f['weights_{}'.format(i + 1)][()]).t()
             state_dict['encoder.enc_layers.{}.fc.bias'.format(i)] = torch.from_numpy(h5f['biases_{}'.format(i + 1)][()])
-            state_dict['encoder.enc_layers.{}.bn.bias'] = torch.from_numpy(h5f['beta_{}'.format(i + 1)][()])
-            state_dict['encoder.enc_layers.{}.bn.weight'] = torch.ones(self.n_topics)
-            state_dict['encoder.enc_layers.{}.bn.running_mean'] = torch.from_numpy(h5f['running_mean_{}'.format(i + 1)][()])
-            state_dict['encoder.enc_layers.{}.bn.running_var'] = torch.from_numpy(h5f['running_var_{}'.format(i + 1)][()])
+            state_dict['encoder.enc_layers.{}.bn.bias'.format(i)] = torch.from_numpy(h5f['beta_{}'.format(i + 1)][()])
+            state_dict['encoder.enc_layers.{}.bn.weight'.format(i)] = torch.ones(self.n_topics)
+            state_dict['encoder.enc_layers.{}.bn.running_mean'.format(i)] = torch.from_numpy(h5f['running_mean_{}'.format(i + 1)][()])
+            state_dict['encoder.enc_layers.{}.bn.running_var'.format(i)] = torch.from_numpy(h5f['running_var_{}'.format(i + 1)][()])
 
         state_dict['encoder.fcmu.weight'] = torch.from_numpy(h5f['weights_out_mean'][()]).t()
         state_dict['encoder.fcsigma.weight'] = torch.from_numpy(h5f['weights_out_log_sigma'][()]).t()
