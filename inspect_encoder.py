@@ -7,7 +7,7 @@ from visualization.reconstructions import plot_side_by_side_docs
 from datasets.load import load_toy_bars
 
 
-results_dir = 'experiments/vae_experiments/10x10_full9'
+results_dir = 'experiments/vae_experiments/10x10_enc_init_trainable_scale'
 file_name = 'lda_orig_100000_samples_5_100.h5'
 n_hidden_layers = 5
 h5f = h5py.File(os.path.join(results_dir, file_name), 'r')

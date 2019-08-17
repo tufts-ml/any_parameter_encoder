@@ -9,15 +9,14 @@ from pyro.infer.mcmc import MCMC, NUTS
 import pyro
 
 from datasets.load import load_toy_bars
-from models.lda_sym_simple import VAE_pyro
+from models.lda_lognorm import VAE_pyro
 from common import train_save_VAE, save_loglik_to_csv, save_reconstruction_array
-from visualization.reconstructions import plot_side_by_side_docs, plot_saved_samples
+from visualization.reconstructions import plot_side_by_side_docs
 from utils import softmax
 
 # where to write the results
-results_dir = 'experiments/vae_experiments/10x10_sym_scratch_decay'
+results_dir = 'experiments/vae_experiments/10x10_multiple_encoder_steps'
 results_file = 'results.csv'
-print(results_dir)
 
 # global params
 n_topics = 18
@@ -64,37 +63,36 @@ model_config = {
     'results_file': results_file,
     'inference': 'vae',
     'model_name': 'lda_orig',
-    'enc_topic_init': False,
-    'enc_topic_trainable': False,
-    'scale_trainable': True,
+    'enc_topic_init': None,
+    'enc_topic_trainable': True,
+    'scale_trainable': False,
     'n_hidden_layers': 5,
     'n_hidden_units': 100,
     'n_samples': 1,
     # 'decay_rate': .5,
     'decay_rate': .9,
-    # 'decay_steps': 100,
-    'decay_steps': 40,
+    'decay_steps': 1000,
     'starting_learning_rate': .01,
-    'n_steps_enc': 1
+    'n_steps_enc': 100
 }
 
 # for i in [1e4, 1e3, 1e2]:
 i = int(1e5)
 # data_tr_sample = data_tr[np.random.choice(int(1e5), i, replace=False)]
-# model_config['model_name'] = 'lda_orig_' + str(i) + '_samples'
+model_config['model_name'] = 'lda_orig_' + str(i) + '_samples'
 if not os.path.exists(results_dir):
     os.system('mkdir -p ' + results_dir)
 shutil.copy(os.path.abspath(__file__), os.path.join(results_dir, 'run_simple.py'))
 
 # train the VAE and save the weights
-train_save_VAE(data_tr, model_config, training_epochs=100, batch_size=200, hallucinations=False, tensorboard=True)
+train_save_VAE(data_tr, model_config, training_epochs=80, batch_size=200, hallucinations=False, tensorboard=True)
 # load the VAE into pyro for evaluation
 vae = VAE_pyro(**model_config)
 state_dict = vae.load()
 vae.load_state_dict(state_dict)
 topics = softmax(vae.decoder.topics.detach().numpy())
-np.save(os.path.join(results_dir, 'topics.npy'), topics)
-plot_side_by_side_docs(topics, os.path.join(results_dir, 'topics.pdf'))
+# np.save(os.path.join(results_dir, 'topics.npy'), topics)
+# plot_side_by_side_docs(topics, os.path.join(results_dir, 'topics.pdf'))
 for data_name, data in zip(dataset_names, datasets):
     data = torch.from_numpy(data.astype(np.float32))
     pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .1}, 'step_size': 10000, 'gamma': 0.95})
@@ -129,14 +127,3 @@ for data_name, data in zip(dataset_names, datasets):
         # except Exception as e:
         #     print(e)
         #     print(data_name, inference_name, " failed")
-
-for data_name, data in zip(dataset_names, datasets):
-    filenames = []
-    for inference in ['vae', 'svi']:
-        file = '_'.join([inference, model_config['model_name'], data_name, str(model_config['n_hidden_layers']), str(model_config['n_hidden_units'])]) + '.npy'
-        filepath = os.path.join(os.getcwd(), results_dir, file)
-        if os.path.exists(filepath):
-            filenames.append(filepath)
-
-    plot_name = os.path.join(results_dir, data_name + '_vae_reconstructions.pdf')
-    plot_saved_samples(data[sample_idx], filenames, plot_name, vocab_size=vocab_size, intensity=10)

@@ -20,7 +20,7 @@ def plot_side_by_side_docs(docs, name, ncols=10, intensity=10):
     plt.close()
 
 
-def plot_saved_samples(sample_docs, filenames, plot_name, vocab_size=100):
+def plot_saved_samples(sample_docs, filenames, plot_name, vocab_size=100, intensity=10):
     num_examples = len(sample_docs)
     image = [sample_docs]
     for file in filenames:
@@ -29,5 +29,5 @@ def plot_saved_samples(sample_docs, filenames, plot_name, vocab_size=100):
         image.append(reconstructions)
     num_rows = len(image)
     image = np.array(image).reshape(num_rows * num_examples, vocab_size)
-    plot_side_by_side_docs(image, plot_name, ncols=num_examples)
+    plot_side_by_side_docs(image, plot_name, ncols=num_examples, intensity=intensity)
 

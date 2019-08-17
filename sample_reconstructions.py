@@ -6,37 +6,40 @@ import numpy as np
 
 
 datadir = 'toy_bars_10x10'
-results_dir = 'experiments/vae_experiments/problem_toy_bars5'
+results_dir = 'experiments/vae_experiments/10x10_many_enc_steps'
 vocab_size = 100
 sample_idx = list(range(10))
-datasets = load_toy_bars(datadir)
-# dataset_names = ['train', 'valid', 'test', 'test_single', 'test_double', 'test_triple']
-
-data_tr = datasets[0]
-data_tr_single = data_tr[np.count_nonzero(data_tr, axis=1) <= 10]
-data_tr_double = data_tr[np.count_nonzero(data_tr, axis=1) > 10]
-datasets = [data_tr_single[:1000], data_tr_double[:1000]] + datasets[1:]
-dataset_names = ['train_single', 'train_double', 'valid', 'test', 'test_single', 'test_double', 'test_triple']
+datasets = load_toy_bars(datadir, VOCAB_SIZE=vocab_size)
+dataset_names = ['train', 'valid', 'test', 'test_single', 'test_double', 'test_triple']
+# data_tr = datasets[0]
+# data_tr_single = data_tr[np.count_nonzero(data_tr, axis=1) <= 10 * 10]
+# data_tr_double = data_tr[np.count_nonzero(data_tr, axis=1) > 10 * 10]
+# datasets = [data_tr_single[:1000], data_tr_double[:1000]] + datasets[1:]
+# dataset_names = ['train_single', 'train_double', 'valid', 'test', 'test_single', 'test_double', 'test_triple']
 n_hidden_units = 100
 n_hidden_layers = 5
-models = ['lda_orig']
-inferences = ['vae']
+# models = ['lda_orig_' + str(i) + '_samples' for i in [10000, 1000, 100]]
+models = ['lda_orig_' + str(100000) + '_samples']
+# models = ['lda_orig']
+inferences = ['vae', 'svi', 'mcmc']
 
 
 # n_hidden_units = 20
 # n_hidden_layers = 2
 # models = ['lda_orig', 'lda_scale', 'lda_orig_hallucinations', 'lda_scale_hallucinations']
 #
+
 for data_name, data in zip(dataset_names, datasets):
     filenames = []
     for model in models:
         for inference in inferences:
             file = '_'.join([inference, model, data_name, str(n_hidden_layers), str(n_hidden_units)]) + '.npy'
             filepath = os.path.join(os.getcwd(), results_dir, file)
-            filenames.append(filepath)
+            if os.path.exists(filepath):
+                filenames.append(filepath)
 
     plot_name = os.path.join(results_dir, data_name + '_vae_reconstructions.pdf')
-    plot_saved_samples(data[sample_idx], filenames, plot_name, vocab_size=vocab_size)
+    plot_saved_samples(data[sample_idx], filenames, plot_name, vocab_size=vocab_size, intensity=10)
 
 # for data_name, data in zip(dataset_names, datasets):
 #     filenames = [os.path.join(os.getcwd(), results_dir, 'vae_lda_scale_{}_5_20.npy'.format(data_name))  ]

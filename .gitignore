@@ -111,4 +111,10 @@ dump/*
 dump*/
 problem_toy_bars/*
 svi_baseline/*
-lda.gensim*
+lda*.gensim*
+*.npy
+datasets/toy_bars_100x100_48_topics/*
+datasets/toy_bars_10x10_noise/*
+datasets/toy_bars_10x10_small/*
+*.png
+mdreviews_data.txt
