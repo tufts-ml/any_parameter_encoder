@@ -43,12 +43,14 @@ def train(
             num_batches += 1
             # Keep track of the loss
             total_cost += cost
+            X, topics = unzip_X_and_topics(batch_xs)
 
             if np.isnan(total_cost):
-                X, topics = unzip_X_and_topics(batch_xs)
-                print(vae.sess.run(vae.z,
-                                   feed_dict={vae.x: X, vae.topics: topics, vae.keep_prob: 1.0}))
-                print(epoch, np.sum(X, 1).astype(np.int), batch_xs.shape)
+                z = vae.sess.run(vae.z,
+                                   feed_dict={vae.x: X, vae.topics: topics, vae.keep_prob: 1.0})
+                print(z)
+                print(z.shape)      
+                print(epoch, np.sum(X, 1).astype(np.int), X.shape)
                 print(cost)
                 print(
                     "Encountered NaN, stopping training. "
@@ -57,15 +59,8 @@ def train(
                 # return vae,emb
                 sys.exit()
 
-        if epoch < 15:
-            topics = softmax(vae.topic_prop(batch_xs))
-            plot_side_by_side_docs(topics, os.path.join(results_dir, 'topics_{}.pdf'.format(str(epoch).zfill(2))))
-            recreated_docs, _, _ = vae.recreate_input(batch_xs[:10])
-            plot_side_by_side_docs(np.concatenate([batch_xs[:10], recreated_docs]), os.path.join(results_dir, 'recreated_docs_{}.pdf'.format(str(epoch).zfill(2))))
         # Display logs per epoch step
         if epoch % display_step == 0:
-            # print(vae.sess.run(vae.layer_do_0,
-            #     feed_dict={vae.x: batch_xs, vae.keep_prob: 1.0}))
             print(
                 "Epoch: %04d" % (epoch + 1),
                 "cost={:.9f}".format(total_cost / num_batches),
@@ -75,7 +70,7 @@ def train(
         if tensorboard:
             merge = tf.summary.merge(vae.summaries)
             summary = vae.sess.run(merge,
-                                   feed_dict={vae.x: batch_xs, vae.keep_prob: 1.0})
+                                   feed_dict={vae.x: X, vae.topics: topics, vae.keep_prob: 1.0})
             train_writer.add_summary(summary, epoch)
 
     return vae

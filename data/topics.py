@@ -67,6 +67,12 @@ def permuted_toy_bars(m, seed):
             topics = remove_word_from_topic(topics, seed+i)
         else:
             topics = move_word_between_topics(topics, seed+i)
+    # deal with empty topics, if any:
+    topic_word_counts = np.sum(topics, axis=1)
+    for idx, c in enumerate(topic_word_counts):
+        if c == 0:
+            random_word = np.random.randint(100)
+            topics[idx][random_word] = 1
     return list(map(normalize1d, topics))
 
 

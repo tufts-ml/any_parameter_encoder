@@ -81,11 +81,11 @@ class VAE_tf(object):
         )
 
         # Create autoencoder network
+        self.sess = tf.InteractiveSession()
         self._create_network()
         self._create_loss_optimizer()
         init = tf.global_variables_initializer()
-        # self.sess = tf.InteractiveSession()
-        self.sess = tf.Session()
+        # self.sess = tf.Session()
         self.sess.run(init)
 
     def _create_network(self):
@@ -147,8 +147,9 @@ class VAE_tf(object):
                 x_and_topics = tf.reshape(tf.concat([
                     tf.expand_dims(self.x, 1), self.topics
                     ], axis=1), (-1, (1 + self.n_topics) * self.vocab_size))
-                layer = self.transfer_fct(
-                    tf.add(tf.matmul(x_and_topics, weights["h1"]), biases["b1"]))
+                layer = tf.contrib.layers.batch_norm(self.transfer_fct(
+                    tf.add(tf.matmul(x_and_topics, weights["h1"]), biases["b1"])))
+                # print("layer", layer.eval(session=self.sess))
             elif self.architecture == "template":
                 layer = tf.contrib.layers.batch_norm(self.transfer_fct(
                     tf.add(tf.matmul(self.x, tf.transpose(weights["h1"], perm=[0, 2, 1])), biases["b1"])))
@@ -160,14 +161,17 @@ class VAE_tf(object):
                     tf.add(tf.matmul(layer, weights["h{}".format(i)]),
                            biases["b{}".format(i)])
                 ))
+                # print("layer", layer.eval(session=self.sess))
             z_mean = tf.contrib.layers.batch_norm(
                 tf.add(tf.matmul(layer, weights["out_mean"]), biases["out_mean"])
             )
+            # print("z_mean", z_mean.eval(session=self.sess))
             z_log_sigma_sq = tf.contrib.layers.batch_norm(
                 tf.add(
                     tf.matmul(layer, weights["out_log_sigma"]), biases["out_log_sigma"]
                 )
             )
+            # print("z_log_sigma_sq", z_log_sigma_sq.eval(session=self.sess))
             if self.tensorboard:
                 for i in range(1, self.n_hidden_layers + 1):
                     self.summaries.append(tf.summary.histogram(
