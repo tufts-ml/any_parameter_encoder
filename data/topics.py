@@ -1,5 +1,7 @@
 import numpy as np
 from visualization.reconstructions import plot_side_by_side_docs
+from utils import normalize1d
+
 
 def toy_bars():
     topics = []
@@ -8,12 +10,12 @@ def toy_bars():
         start = 10 * i
         end = start + 10
         horizontal_topic[start: end] = 1
-        topics.append(horizontal_topic)
+        topics.append(normalize1d(horizontal_topic))
     for i in range(1, 10):
         vertical_topic = np.zeros(100,)
         word_indices = [i + (10 * j) for j in range(10)]
         vertical_topic[word_indices] = 1
-        topics.append(vertical_topic)
+        topics.append(normalize1d(vertical_topic))
     return topics
 
 def remove_word_from_topic(topics, seed):
@@ -59,7 +61,7 @@ def permuted_toy_bars(m, seed):
             topics = remove_word_from_topic(topics, seed+i)
         else:
             topics = move_word_between_topics(topics, seed+i)
-    return topics
+    return list(map(normalize1d, topics))
 
 
 def diagonal_bars():
@@ -73,7 +75,7 @@ def diagonal_bars():
             forward_diagonal[i, j] = 1
             i += 1
             j -= 1
-        topics.append(forward_diagonal.flatten())
+        topics.append(normalize1d(forward_diagonal.flatten()))
     for i in range(1, 10):
         backward_diagonal = np.zeros((10, 10))
         j = 0
@@ -81,7 +83,7 @@ def diagonal_bars():
             backward_diagonal[i, j] = 1
             i += 1
             j += 1
-        topics.append(backward_diagonal.flatten())
+        topics.append(normalize1d(backward_diagonal.flatten()))
     return topics
 
 if __name__ == "__main__":

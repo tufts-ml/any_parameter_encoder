@@ -2,6 +2,11 @@ import math
 import numpy as np
 
 
+
+def normalize1d(logits):
+    return [el/sum(logits) for el in logits]
+
+
 def normalize(x, axis):
     """ Normalize a 2D array
     """
