@@ -29,10 +29,6 @@ class VAE_tf(object):
             model_name=None,
             results_dir=None,
             vocab_size=9,
-            topic_init=None,
-            topic_trainable=True,
-            enc_topic_init=None,
-            enc_topic_trainable=True,
             scale_trainable=False,
             architecture="naive",
             transfer_fct=tf.nn.softplus,
@@ -149,7 +145,6 @@ class VAE_tf(object):
                     ], axis=1), (-1, (1 + self.n_topics) * self.vocab_size))
                 layer = tf.contrib.layers.batch_norm(self.transfer_fct(
                     tf.add(tf.matmul(x_and_topics, weights["h1"]), biases["b1"])))
-                # print("layer", layer.eval(session=self.sess))
             elif self.architecture == "template":
                 layer = tf.contrib.layers.batch_norm(self.transfer_fct(
                     tf.add(tf.matmul(self.x, tf.transpose(weights["h1"], perm=[0, 2, 1])), biases["b1"])))
@@ -161,17 +156,14 @@ class VAE_tf(object):
                     tf.add(tf.matmul(layer, weights["h{}".format(i)]),
                            biases["b{}".format(i)])
                 ))
-                # print("layer", layer.eval(session=self.sess))
             z_mean = tf.contrib.layers.batch_norm(
                 tf.add(tf.matmul(layer, weights["out_mean"]), biases["out_mean"])
             )
-            # print("z_mean", z_mean.eval(session=self.sess))
             z_log_sigma_sq = tf.contrib.layers.batch_norm(
                 tf.add(
                     tf.matmul(layer, weights["out_log_sigma"]), biases["out_log_sigma"]
                 )
             )
-            # print("z_log_sigma_sq", z_log_sigma_sq.eval(session=self.sess))
             if self.tensorboard:
                 for i in range(1, self.n_hidden_layers + 1):
                     self.summaries.append(tf.summary.histogram(
@@ -312,8 +304,6 @@ class VAE_tf(object):
 
     def partial_fit(self, X_and_topics):
         X, topics = unzip_X_and_topics(X_and_topics)
-        print(X)
-        print(topics)
         opt, cost = self.sess.run(
             (self.optimizer, self.cost),
             feed_dict={self.x: X, self.topics: topics, self.keep_prob: 0.75},
@@ -400,16 +390,17 @@ class VAE_tf(object):
         weights_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/out_log_sigma:0').eval(session=self.sess)
         biases_out_mean = self.sess.graph.get_tensor_by_name('recognition_network/out_mean_b:0').eval(session=self.sess)
         biases_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/out_log_sigma_b:0').eval(session=self.sess)
-        beta_out_mean = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm/beta:0').eval(session=self.sess)
-        beta_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_1/beta:0').eval(session=self.sess)
-        running_mean_out_mean = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm/moving_mean:0').eval(
+        beta_out_mean = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/beta:0'.format(self.n_hidden_layers)).eval(session=self.sess)
+        beta_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/beta:0'.format(self.n_hidden_layers + 1)).eval(session=self.sess)
+        running_mean_out_mean = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/moving_mean:0'.format(self.n_hidden_layers)).eval(
             session=self.sess)
-        running_mean_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_1/moving_mean:0').eval(
+        running_mean_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/moving_mean:0'.format(self.n_hidden_layers + 1)).eval(
             session=self.sess)
-        running_var_out_mean = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm/moving_variance:0').eval(
+        running_var_out_mean = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/moving_variance:0'.format(self.n_hidden_layers)).eval(
             session=self.sess)
-        running_var_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_1/moving_variance:0').eval(
+        running_var_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/moving_variance:0'.format(self.n_hidden_layers + 1)).eval(
             session=self.sess)
+
 
         h5f.create_dataset("weights_out_mean", data=weights_out_mean)
         h5f.create_dataset("weights_out_log_sigma", data=weights_out_log_sigma)
@@ -482,10 +473,8 @@ class Decoder(nn.Module):
 
 class VAE_pyro(nn.Module):
     def __init__(self, n_hidden_units=100, n_hidden_layers=2, model_name=None, results_dir=None,
-                 alpha=.1, vocab_size=9, n_topics=4, use_cuda=False, **kwargs):
+                 alpha=.1, vocab_size=9, n_topics=4, use_cuda=False, architecture='naive', **kwargs):
         super(VAE_pyro, self).__init__()
-        print(n_hidden_units)
-        print(n_hidden_layers)
 
         # create the encoder and decoder networks
         self.encoder = Encoder(n_hidden_units, n_hidden_layers, n_topics=n_topics, vocab_size=vocab_size)
@@ -510,7 +499,7 @@ class VAE_pyro(nn.Module):
         self.n_hidden_units = n_hidden_units
         self.model_name = model_name
         self.results_dir = results_dir
-        self.topic_init = topic_init
+        self.architecture = architecture
 
     # define the model p(x|z)p(z)
     def model(self, x, topics):
@@ -599,10 +588,6 @@ class VAE_pyro(nn.Module):
         state_dict['encoder.bnsigma.running_var'] = torch.from_numpy(h5f['running_var_out_log_sigma'][()])
 
         state_dict['encoder.scale'] = torch.from_numpy(np.array(h5f['scale'][()]))
-
-        if not self.topic_init:
-            state_dict['decoder.topics'] = torch.from_numpy(h5f['topics'][()])
-            state_dict['encoder.topics'] = torch.from_numpy(h5f['topics'][()])
 
         h5f.close()
 

@@ -14,10 +14,10 @@ from data.documents import generate_documents
 from models.lda_meta import VAE_pyro
 from common import train_save_VAE, save_loglik_to_csv, save_reconstruction_array
 from visualization.reconstructions import plot_side_by_side_docs, plot_saved_samples
-from utils import softmax
+from utils import softmax, unzip_X_and_topics
 
 # where to write the results
-results_dir = 'experiments/vae_experiments/10x10_sym_scratch_decay'
+results_dir = 'experiments/vae_experiments/debugging'
 results_file = 'results.csv'
 print(results_dir)
 
@@ -70,11 +70,10 @@ train_save_VAE(train, model_config, training_epochs=5, batch_size=200, hallucina
 vae = VAE_pyro(**model_config)
 state_dict = vae.load()
 vae.load_state_dict(state_dict)
-topics = softmax(vae.decoder.topics.detach().numpy())
-np.save(os.path.join(results_dir, 'topics.npy'), topics)
-plot_side_by_side_docs(topics, os.path.join(results_dir, 'topics.pdf'))
-for data_name, data in zip(dataset_names, datasets):
+for data_name, data_and_topics in zip(dataset_names, datasets):
+    data, topics = unzip_X_and_topics(data_and_topics)
     data = torch.from_numpy(data.astype(np.float32))
+    topics = torch.from_numpy(topics.astype(np.float32))
     pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .1}, 'step_size': 10000, 'gamma': 0.95})
     # pyro scheduler doesn't have any effect in the VAE case since we never take any optimization steps
     vae_svi = SVI(vae.model, vae.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=100, num_samples=100)
@@ -82,6 +81,7 @@ for data_name, data in zip(dataset_names, datasets):
     # mcmc = MCMC(NUTS(vae.model, adapt_step_size=True), num_samples=100, warmup_steps=50)
     # for inference_name, inference in zip(['vae', 'vae', 'vae', 'svi', 'svi', 'svi', 'mcmc'], [vae_svi, vae_svi, vae_svi, svi,  svi,  svi, mcmc]):
     for inference_name, inference in zip(['vae', 'svi'], [vae_svi, svi]):
+        print(inference_name)
     # for inference_name, inference in zip(['svi'], [svi]):
         # try:
         posterior = inference.run(data, topics)
