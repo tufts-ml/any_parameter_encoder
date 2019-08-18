@@ -4,7 +4,7 @@ import numpy as np
 
 
 def normalize1d(logits):
-    return [el/sum(logits) for el in logits]
+    return np.array([el/sum(logits) for el in logits])
 
 
 def normalize(x, axis):
@@ -39,3 +39,7 @@ def make_square(image):
         left_pad = pad_len / 2
         right_pad = pad_len / 2 + 1
     return np.pad(image, (left_pad, right_pad), 'constant', constant_values=(0, 0))
+
+def unzip_X_and_topics(X_and_topics):
+    X, topics = zip(*X_and_topics)
+    return np.array(X), np.array(topics)

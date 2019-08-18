@@ -3,19 +3,25 @@ from visualization.reconstructions import plot_side_by_side_docs
 from utils import normalize1d
 
 
-def toy_bars():
+def toy_bars(normalized=True):
     topics = []
     for i in range(1, 10):
         horizontal_topic = np.zeros(100,)
         start = 10 * i
         end = start + 10
         horizontal_topic[start: end] = 1
-        topics.append(normalize1d(horizontal_topic))
+        if normalized:
+            topics.append(normalize1d(horizontal_topic))
+        else:
+            topics.append(horizontal_topic)
     for i in range(1, 10):
         vertical_topic = np.zeros(100,)
         word_indices = [i + (10 * j) for j in range(10)]
         vertical_topic[word_indices] = 1
-        topics.append(normalize1d(vertical_topic))
+        if normalized:
+            topics.append(normalize1d(vertical_topic))
+        else:
+            topics.append(vertical_topic)
     return topics
 
 def remove_word_from_topic(topics, seed):
@@ -52,7 +58,7 @@ def move_word_between_topics(topics, seed):
 
 def permuted_toy_bars(m, seed):
     np.random.seed(seed)
-    topics = toy_bars()
+    topics = toy_bars(normalized=False)
     for i in range(m):
         action = np.random.randint(3)
         if action == 0:

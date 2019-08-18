@@ -6,14 +6,14 @@ import tensorflow as tf
 
 
 from datasets.create import draw_random_doc
-from utils import inverse_softmax, softmax
+from utils import inverse_softmax, softmax, unzip_X_and_topics
 from visualization.reconstructions import plot_side_by_side_docs
 
 
 def create_minibatch(data, batch_size):
     rng = np.random.RandomState(10)
-    shuffled_data = np.random.shuffle(data)
-    for start_idx in range(0, data.shape[0], batch_size):
+    np.random.shuffle(data)
+    for start_idx in range(0, len(data), batch_size):
         yield data[start_idx: start_idx + batch_size]
 
 
@@ -36,7 +36,7 @@ def train(
         total_cost = 0.0
         num_batches = 0
         # Loop over all batches
-        for batch_xs in create_minibatch(data.astype("float32"), batch_size):
+        for batch_xs in create_minibatch(data, batch_size):
             # Fit training using batch data
             cost = vae.partial_fit(batch_xs)
             # Keep track of the number of batches
@@ -45,9 +45,10 @@ def train(
             total_cost += cost
 
             if np.isnan(total_cost):
+                X, topics = unzip_X_and_topics(batch_xs)
                 print(vae.sess.run(vae.z,
-                                   feed_dict={vae.x: batch_xs, vae.keep_prob: 1.0}))
-                print(epoch, np.sum(batch_xs, 1).astype(np.int), batch_xs.shape)
+                                   feed_dict={vae.x: X, vae.topics: topics, vae.keep_prob: 1.0}))
+                print(epoch, np.sum(X, 1).astype(np.int), batch_xs.shape)
                 print(cost)
                 print(
                     "Encountered NaN, stopping training. "

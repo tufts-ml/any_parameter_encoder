@@ -17,9 +17,8 @@ def generate_documents(topics, num_docs, alpha=.05, seed=0):
         doc = np.zeros(100)
         for _ in range(num_words):
             z = np.random.choice(range(18), p=pi)
-            print(z)
             doc += np.random.multinomial(1, topics[z])
-        documents.append(doc)
+        documents.append(doc.astype(np.float32))
     return documents, doc_topic_dists
 
 
