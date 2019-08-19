@@ -28,6 +28,8 @@ def plot_saved_samples(sample_docs, filenames, plot_name, vocab_size=100, intens
         assert len(reconstructions) == len(sample_docs)
         image.append(reconstructions)
     num_rows = len(image)
+    print(num_examples, "num_examples")
+    print(num_rows, "num_rows")
     image = np.array(image).reshape(num_rows * num_examples, vocab_size)
     plot_side_by_side_docs(image, plot_name, ncols=num_examples, intensity=intensity)
 

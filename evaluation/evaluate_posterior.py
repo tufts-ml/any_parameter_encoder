@@ -37,7 +37,7 @@ def reconstruct_data_map(posterior_predictive_traces, inference, vae, x):
     return word_probs
 
 
-def reconstruct_data(posterior, vae):
+def reconstruct_data(posterior, vae, topics):
     """Generate data from traces
     """
     # encode image x
@@ -46,7 +46,7 @@ def reconstruct_data(posterior, vae):
     for tr in posterior.exec_traces:
         z_loc = tr.nodes['latent']['value']
         # decode the image (note we don't sample in image space)
-        reconstruction = vae.decoder(z_loc).detach().numpy()
+        reconstruction = vae.decoder(z_loc, topics).detach().numpy()
         reconstructions.append(reconstruction)
     return np.array(reconstructions)
     # we want each set of reconstructions to be a column

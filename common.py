@@ -28,9 +28,9 @@ def train_save_VAE(data, model_config, training_epochs=120, batch_size=200, tens
     tf.reset_default_graph()
 
 
-def save_loglik_to_csv(data, model, posterior, model_config, num_samples=10):
+def save_loglik_to_csv(data, topics, model, posterior, model_config, num_samples=10):
     posterior_predictive = TracePredictive(model, posterior, num_samples=num_samples)
-    posterior_predictive_traces = posterior_predictive.run(data)
+    posterior_predictive_traces = posterior_predictive.run(data, topics)
     # get the posterior predictive log likelihood
     posterior_predictive_density = evaluate_log_predictive_density(posterior_predictive_traces)
     posterior_predictive_density = float(posterior_predictive_density.detach().numpy())
@@ -47,9 +47,9 @@ def save_loglik_to_csv(data, model, posterior, model_config, num_samples=10):
         csv_writer.writerow(row)
 
 
-def save_reconstruction_array(vae, posterior, sample_idx, model_config):
+def save_reconstruction_array(vae, topics, posterior, sample_idx, model_config):
     # reconstruct the data
-    reconstructions = reconstruct_data(posterior, vae)
+    reconstructions = reconstruct_data(posterior, vae, topics)
     # save sample reconstructions
     averaged_reconstructions = np.mean(reconstructions[:, sample_idx], axis=0)
     results_dir = model_config['results_dir']

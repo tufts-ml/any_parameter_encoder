@@ -30,7 +30,7 @@ sample_idx = list(range(10))
 # toy bars data
 vocab_size = 100
 train_topics = [toy_bars()] + [permuted_toy_bars(m, 0) for m in range(1, 102, 10)]
-valid_topics = [permuted_toy_bars(m, 1) for m in range(1, 102, 10)]
+valid_topics = [permuted_toy_bars(m, 1) for m in range(1, 101, 10)]
 test_topics = [diagonal_bars()]
 train_documents, train_doc_topic_dists = generate_documents(toy_bars(), 1000, alpha=.01)
 valid_documents, valid_doc_topic_dists = generate_documents(toy_bars(), 10, alpha=.01)
@@ -39,7 +39,7 @@ test_documents, test_doc_topic_dists = generate_documents(toy_bars(), 100, alpha
 train = list(itertools.product(train_documents, train_topics))
 valid = list(itertools.product(valid_documents, valid_topics))
 test = list(itertools.product(test_documents, test_topics))
-datasets = [train, valid, test]
+datasets = [train[:100], valid, test]
 dataset_names = ['train', 'valid', 'test']
 
 model_config = {
@@ -100,15 +100,15 @@ for data_name, data_and_topics in zip(dataset_names, datasets):
             'results_dir': results_dir,
         })
         print(model_config)
-        save_reconstruction_array(vae, posterior, sample_idx, model_config)
+        save_reconstruction_array(vae, topics, posterior, sample_idx, model_config)
         for i in range(10):
             # saves a separate row to the csv
-            save_loglik_to_csv(data, vae.model, posterior, model_config, num_samples=10)
+            save_loglik_to_csv(data, topics, vae.model, posterior, model_config, num_samples=10)
         # except Exception as e:
         #     print(e)
         #     print(data_name, inference_name, " failed")
 
-for data_name, data in zip(dataset_names, datasets):
+for data_name, data in zip(dataset_names, [train_documents, valid_documents, test_documents]):
     filenames = []
     for inference in ['vae', 'svi']:
         file = '_'.join([inference, model_config['model_name'], data_name, str(model_config['n_hidden_layers']), str(model_config['n_hidden_units'])]) + '.npy'
@@ -117,4 +117,4 @@ for data_name, data in zip(dataset_names, datasets):
             filenames.append(filepath)
 
     plot_name = os.path.join(results_dir, data_name + '_vae_reconstructions.pdf')
-    plot_saved_samples(data[sample_idx], filenames, plot_name, vocab_size=vocab_size, intensity=10)
+    plot_saved_samples(np.array(data)[sample_idx], filenames, plot_name, vocab_size=vocab_size, intensity=10)

@@ -94,8 +94,10 @@ class VAE_tf(object):
         z = tf.add(
             tf.expand_dims(self.z_mean, axis=1), tf.multiply(tf.sqrt(tf.exp(tf.expand_dims(self.z_log_sigma_sq, axis=1))), eps)
         )
+        print("z", z)
         z = tf.multiply(self.scale, z)
         self.z = tf.reduce_mean(z, axis=1)
+        print("self.z", self.z)
         self.sigma = tf.exp(self.z_log_sigma_sq)
         # generator = partial(self._generator_network, self.network_weights['weights_gener'])
         # self.x_reconstr_mean = tf.reduce_mean(tf.map_fn(generator, self.z), axis=1)
@@ -188,9 +190,12 @@ class VAE_tf(object):
         :return:
         """
         with tf.variable_scope("generator_network"):
-            self.layer_do_0 = tf.nn.softmax(z)
+            self.layer_do_0 = tf.nn.softmax(z)  # (batch, n_samples, n_topics)
             topic_weights = self.topics
+            print("self.layer_do_0", self.layer_do_0)
+            print("topic_weights", topic_weights)
             x_reconstr_means =tf.matmul(self.layer_do_0, topic_weights)  # (batch, n_samples, vocab_size)
+            print("x_reconstr_means", x_reconstr_means)
             # x_reconstr_mean = tf.reduce_mean(x_reconstr_means, axis=1)
 
             if self.tensorboard:
@@ -434,6 +439,7 @@ class Encoder(nn.Module):
         super(Encoder, self).__init__()
         self.n_hidden_layers = n_hidden_layers
         self.vocab_size = vocab_size
+        self.n_topics = n_topics
         # setup the non-linearities
         self.softplus = nn.Softplus()
         # encoder Linear layers
@@ -453,7 +459,7 @@ class Encoder(nn.Module):
         # define the forward computation on the image x
         # first shape the mini-batch to have pixels in the rightmost dimension
         x = x.reshape(-1, self.vocab_size)
-        x_and_topics = torch.cat((x, topics.reshape(1, -1).repeat(x.size()[0], 1)), dim=1)
+        x_and_topics = torch.cat((x, topics.reshape(-1, self.n_topics * self.vocab_size)), dim=1)
         # then return a mean vector and a (positive) square root covariance
         # each of size batch_size x n_topics
         z_loc = torch.mul(self.scale, self.bnmu(self.fcmu(self.enc_layers(x_and_topics))))
@@ -467,8 +473,8 @@ class Decoder(nn.Module):
         self.softmax = nn.Softmax(dim=1)
 
     def forward(self, z, topics):
-        word_probs = torch.mm(self.softmax(z), self.softmax(topics))
-        return word_probs
+        word_probs = torch.bmm(self.softmax(z).unsqueeze(1), topics)
+        return torch.squeeze(word_probs, 1)
 
 
 class VAE_pyro(nn.Module):
