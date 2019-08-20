@@ -34,8 +34,8 @@ def save_elbo_vs_m(vae, documents, topics, ms, results_dir):
         writer = csv.writer(f, delimiter=',')
         writer.writerow(['docs', 'topics', 'elbo', 'm'])
         for doc_set, data in zip(['train', 'valid', 'test'], documents):
-            for topic_set, topics_set, m in zip(['train', 'valid', 'test'], topics, ms):
-                for topic in topics_set:
+            for topic_set, topics_set, m_set in zip(['train', 'valid', 'test'], topics, ms):
+                for topic, m in zip(topics_set, m_set):
                     elbo = vae.evaluate(list(itertools.product(data, [topic])))
                     writer.writerow([doc_set, topic_set, elbo, m])
 

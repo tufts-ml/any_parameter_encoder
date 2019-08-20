@@ -69,7 +69,7 @@ model_config = {
 
 if not os.path.exists(results_dir):
     os.system('mkdir -p ' + results_dir)
-shutil.copy(os.path.abspath(__file__), os.path.join(results_dir, 'run.py'))
+shutil.copy(os.path.abspath(__file__), os.path.join(results_dir, 'run_simple.py'))
 
 # train the VAE and save the weights
 vae = train_save_VAE(train, valid, model_config, training_epochs=150, batch_size=200, hallucinations=False, tensorboard=True)
