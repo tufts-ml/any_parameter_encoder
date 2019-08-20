@@ -2,6 +2,7 @@ import os
 import csv
 import numpy as np
 import tensorflow as tf
+import itertools
 
 from pyro.infer.abstract_infer import TracePredictive
 from evaluation.evaluate_posterior import evaluate_log_predictive_density
@@ -12,20 +13,32 @@ from models.lda_meta import VAE_tf, VAE_pyro
 from training.train_vae import train, train_with_hallucinations
 
 
-def train_save_VAE(data, model_config, training_epochs=120, batch_size=200, tensorboard=True, hallucinations=False):
+def train_save_VAE(train_data, valid_data, model_config, training_epochs=120, batch_size=200, tensorboard=True, hallucinations=False):
     vae = VAE_tf(tensorboard=tensorboard, **model_config)
     tensorboard_logs_dir = os.path.join(
         model_config['results_dir'], model_config['model_name'],
         'logs_{}_{}'.format(model_config['n_hidden_layers'], model_config['n_hidden_units']))
     if hallucinations:
-        vae = train_with_hallucinations(data, vae, model_config, training_epochs=training_epochs, batch_size=batch_size,
+        vae = train_with_hallucinations(train_data, valid_data, vae, model_config, training_epochs=training_epochs, batch_size=batch_size,
             tensorboard=tensorboard, tensorboard_logs_dir=tensorboard_logs_dir, results_dir=model_config['results_dir'])
     else:
-        vae = train(data, vae, training_epochs=training_epochs, tensorboard=tensorboard, batch_size=batch_size,
+        vae = train(train_data, valid_data, vae, training_epochs=training_epochs, tensorboard=tensorboard, batch_size=batch_size,
             tensorboard_logs_dir=tensorboard_logs_dir, results_dir=model_config['results_dir'])
-    vae.save()
-    vae.sess.close()
-    tf.reset_default_graph()
+    return vae
+
+
+def save_elbo_vs_m(vae, documents, topics, ms, results_dir):
+    train_documents, valid_documents, test_documents = documents
+    train_topics, valid_topics, test_topics = topics
+    with open(os.path.join(results_dir, 'elbo_vs_m.csv'), 'w') as f:
+        writer = csv.writer(f, delimiter=',')
+        writer.writerow(['docs', 'topics', 'elbo', 'm'])
+        for doc_set, data in zip(['train', 'valid', 'test'], documents):
+            for topic_set, topics_set, m in zip(['train', 'valid', 'test'], topics, ms):
+                for topic in topics_set:
+                    elbo = vae.evaluate(list(itertools.product(data, [topic])))
+                    writer.writerow([doc_set, topic_set, elbo, m])
+
 
 
 def save_loglik_to_csv(data, topics, model, posterior, model_config, num_samples=10):

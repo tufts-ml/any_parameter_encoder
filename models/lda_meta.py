@@ -132,6 +132,9 @@ class VAE_tf(object):
                         "h1", [(1 + self.n_topics) * self.vocab_size, self.n_hidden_units])})
             elif self.architecture == "template":
                 all_weights["weights_recog"].update({"h1": self.topics})
+            elif self.architecture == "standard":
+                all_weights["weights_recog"].update(
+                    {"h1": tf.get_variable("h1", [self.vocab_size, self.n_hidden_units])})
             else:
                 raise ValueError("architecture must be either 'naive' or 'template'")
 
@@ -150,6 +153,9 @@ class VAE_tf(object):
             elif self.architecture == "template":
                 layer = tf.contrib.layers.batch_norm(self.transfer_fct(
                     tf.add(tf.matmul(self.x, tf.transpose(weights["h1"], perm=[0, 2, 1])), biases["b1"])))
+            elif self.architecture == "standard":
+                layer = tf.contrib.layers.batch_norm(self.transfer_fct(
+                    tf.add(tf.matmul(self.x, weights["h1"]), biases["b1"])))
             else:
                 raise ValueError("architecture must be either 'naive' or 'template'")
 
@@ -277,7 +283,10 @@ class VAE_tf(object):
         for i in range(self.n_steps_enc):
             grad_and_vars_enc = optimizer_enc.compute_gradients(self.cost, enc_vars)
             enc_gv_collection.append(grad_and_vars_enc)
-            train_ops.append(optimizer_enc.apply_gradients(grad_and_vars_enc))
+            if i == self.n_steps_enc - 1:
+                train_ops.append(optimizer_enc.apply_gradients(grad_and_vars_enc, global_step=self.global_step))
+            else:
+                train_ops.append(optimizer_enc.apply_gradients(grad_and_vars_enc))
         train_op = tf.group(train_ops)
         self.optimizer = train_op
 
@@ -435,7 +444,7 @@ class MLP(nn.Module):
         return self.softplus(self.fc(x))
 
 class Encoder(nn.Module):
-    def __init__(self, n_hidden_units, n_hidden_layers, n_topics=4, vocab_size=9):
+    def __init__(self, n_hidden_units, n_hidden_layers, architecture, n_topics=4, vocab_size=9):
         super(Encoder, self).__init__()
         self.n_hidden_layers = n_hidden_layers
         self.vocab_size = vocab_size
@@ -444,7 +453,15 @@ class Encoder(nn.Module):
         self.softplus = nn.Softplus()
         # encoder Linear layers
         modules = []
-        modules.append(MLP((1 + n_topics) * vocab_size, n_hidden_units))
+        self.architecture = architecture
+        if architecture == 'naive':
+            modules.append(MLP((1 + n_topics) * vocab_size, n_hidden_units))
+        elif architecture == 'template':
+            raise NotImplementedError('template not yet implemented')
+        elif architecture == 'standard':
+            modules.append(MLP(vocab_size, n_hidden_units))
+        else:
+            raise ValueError('Invalid architecture')
         for i in range(self.n_hidden_layers - 1):
             modules.append(MLP(n_hidden_units, n_hidden_units))
 
@@ -459,11 +476,19 @@ class Encoder(nn.Module):
         # define the forward computation on the image x
         # first shape the mini-batch to have pixels in the rightmost dimension
         x = x.reshape(-1, self.vocab_size)
-        x_and_topics = torch.cat((x, topics.reshape(-1, self.n_topics * self.vocab_size)), dim=1)
-        # then return a mean vector and a (positive) square root covariance
-        # each of size batch_size x n_topics
-        z_loc = torch.mul(self.scale, self.bnmu(self.fcmu(self.enc_layers(x_and_topics))))
-        z_scale = torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics))))
+        if self.architecture == 'naive':
+            x_and_topics = torch.cat((x, topics.reshape(-1, self.n_topics * self.vocab_size)), dim=1)
+            # then return a mean vector and a (positive) square root covariance
+            # each of size batch_size x n_topics
+            z_loc = torch.mul(self.scale, self.bnmu(self.fcmu(self.enc_layers(x_and_topics))))
+            z_scale = torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics))))
+        elif self.architecture == 'template':
+            raise NotImplementedError('template not yet implemented')
+        elif self.architecture == 'standard':
+            z_loc = torch.mul(self.scale, self.bnmu(self.fcmu(self.enc_layers(x))))
+            z_scale = torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x))))
+        else:
+            raise ValueError('Invalid architecture')
         return z_loc, z_scale
 
 
@@ -483,7 +508,7 @@ class VAE_pyro(nn.Module):
         super(VAE_pyro, self).__init__()
 
         # create the encoder and decoder networks
-        self.encoder = Encoder(n_hidden_units, n_hidden_layers, n_topics=n_topics, vocab_size=vocab_size)
+        self.encoder = Encoder(n_hidden_units, n_hidden_layers, architecture, n_topics=n_topics, vocab_size=vocab_size)
         self.decoder = Decoder()
 
         if use_cuda:
