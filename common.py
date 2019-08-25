@@ -27,14 +27,12 @@ def train_save_VAE(train_data, valid_data, model_config, training_epochs=120, ba
     return vae
 
 
-def save_elbo_vs_m(vae, documents, topics, ms, results_dir):
-    train_documents, valid_documents, test_documents = documents
-    train_topics, valid_topics, test_topics = topics
+def save_elbo_vs_m(vae, documents, topics, ms, results_dir, names=['train', 'valid']):
     with open(os.path.join(results_dir, 'elbo_vs_m.csv'), 'w') as f:
         writer = csv.writer(f, delimiter=',')
         writer.writerow(['docs', 'topics', 'elbo', 'm'])
-        for doc_set, data in zip(['train', 'valid', 'test'], documents):
-            for topic_set, topics_set, m_set in zip(['train', 'valid', 'test'], topics, ms):
+        for doc_set, data in zip(names, documents):
+            for topic_set, topics_set, m_set in zip(names, topics, ms):
                 for topic, m in zip(topics_set, m_set):
                     elbo = vae.evaluate(list(itertools.product(data, [topic])))
                     writer.writerow([doc_set, topic_set, elbo, m])
