@@ -15,6 +15,7 @@ from data.documents import generate_documents
 from models.lda_meta import VAE_pyro
 from common import train_save_VAE, save_elbo_vs_m, save_loglik_to_csv, save_reconstruction_array
 from visualization.reconstructions import plot_side_by_side_docs, plot_saved_samples
+from visualization.posterior import plot_posterior
 from utils import softmax, unzip_X_and_topics
 
 # where to write the results
@@ -78,11 +79,11 @@ if not os.path.exists(results_dir):
 shutil.copy(os.path.abspath(__file__), os.path.join(results_dir, 'run_simple.py'))
 
 # train the VAE and save the weights
-vae = train_save_VAE(train, valid, model_config, training_epochs=150, batch_size=200, hallucinations=False, tensorboard=True)
-save_elbo_vs_m(vae, all_documents, all_topics, all_m, results_dir)
-vae.save()
-vae.sess.close()
-tf.reset_default_graph()
+# vae = train_save_VAE(train, valid, model_config, training_epochs=150, batch_size=200, hallucinations=False, tensorboard=True)
+# save_elbo_vs_m(vae, all_documents, all_topics, all_m, results_dir)
+# vae.save()
+# vae.sess.close()
+# tf.reset_default_graph()
 # load the VAE into pyro for evaluation
 vae = VAE_pyro(**model_config)
 state_dict = vae.load()
@@ -93,23 +94,12 @@ for data_name, data_and_topics in zip(dataset_names, datasets):
     topics = torch.from_numpy(topics.astype(np.float32))
     pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .1}, 'step_size': 10000, 'gamma': 0.95})
     # pyro scheduler doesn't have any effect in the VAE case since we never take any optimization steps
-    vae_svi = SVI(vae.model, vae.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=100, num_samples=100)
-    svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=TraceMeanField_ELBO(), num_steps=100, num_samples=100)
+    # vae_svi = SVI(vae.model, vae.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=100, num_samples=100)
+    # svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=TraceMeanField_ELBO(), num_steps=100, num_samples=100)
     mcmc = MCMC(NUTS(vae.model, adapt_step_size=True), num_samples=100, warmup_steps=50)
-    for inference_name, inference in zip(['vae', 'svi', 'mcmc'], [vae_svi, svi, mcmc]):
+    for inference_name, inference in zip(['mcmc'], [mcmc]):
         print(inference_name)
-    # for inference_name, inference in zip(['svi'], [svi]):
-        # try:
         posterior = inference.run(data, topics)
-        if inference_name == 'vae':
-            z_loc, z_scale = vae.encoder.forward(data, topics)
-            z_loc = z_loc.data.numpy()
-            z_scale = z_scale.data.numpy()
-        else:
-            z_loc = pyro.get_param_store().match('z_loc')['z_loc'].detach().numpy()
-            z_scale = pyro.get_param_store().match('z_scale')['z_scale'].detach().numpy()
-        np.save(os.path.join(results_dir, '{}_{}_z_loc.npy'.format(data_name, inference_name)), z_loc)
-        np.save(os.path.join(results_dir, '{}_{}_z_scale.npy'.format(data_name, inference_name)), z_scale)
         model_config.update({
             'data_name': data_name,
             'inference': inference_name,
@@ -120,9 +110,21 @@ for data_name, data_and_topics in zip(dataset_names, datasets):
         for i in range(10):
             # saves a separate row to the csv
             save_loglik_to_csv(data, topics, vae.model, posterior, model_config, num_samples=10)
-        # except Exception as e:
-        #     print(e)
-        #     print(data_name, inference_name, " failed")
+        # save the posteriors for later analysis
+        if inference_name == 'mcmc':
+            # [num_samples, num_docs, num_topics]
+            samples = [t.nodes['latent']['value'].detach().cpu().numpy() for t in posterior.exec_traces]
+            np.save(os.path.join(results_dir, '{}_{}_samples.npy'.format(data_name, inference_name)), np.array(samples))
+        else:
+            if inference_name == 'vae':
+                z_loc, z_scale = vae.encoder.forward(data, topics)
+                z_loc = z_loc.data.numpy()
+                z_scale = z_scale.data.numpy()
+            elif inference_name == 'svi':
+                z_loc = pyro.get_param_store().match('z_loc')['z_loc'].detach().numpy()
+                z_scale = pyro.get_param_store().match('z_scale')['z_scale'].detach().numpy()
+            np.save(os.path.join(results_dir, '{}_{}_z_loc.npy'.format(data_name, inference_name)), z_loc)
+            np.save(os.path.join(results_dir, '{}_{}_z_scale.npy'.format(data_name, inference_name)), z_scale)
 
 for data_name, data in zip(dataset_names, all_documents):
     filenames = []
@@ -134,3 +136,6 @@ for data_name, data in zip(dataset_names, all_documents):
 
     plot_name = os.path.join(results_dir, data_name + '_vae_reconstructions.pdf')
     plot_saved_samples(np.array(data)[sample_idx], filenames, plot_name, vocab_size=vocab_size, intensity=10)
+
+for i in range(10):
+    plot_posterior(results_dir, i, ['train', 'valid'], ['vae', 'svi', 'mcmc'])
