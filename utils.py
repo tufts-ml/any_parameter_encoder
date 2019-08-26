@@ -23,6 +23,10 @@ def softmax(x):
     return np.exp(x) / np.sum(np.exp(x), axis=1)[:,None]
 
 
+def softmax_1d(x):
+    return np.exp(x) / np.sum(np.exp(x))
+
+
 def inverse_softmax(x):
 	eps = 1e-10
 	return np.log(x + eps)
