@@ -6,12 +6,16 @@ from utils import softmax
 
 
 def plot_posterior(results_dir, sample_idx, data_names, inference_names):
-    fig, axes = plt.subplots(3, len(data_names), sharex=False, sharey=False, tight_layout=True, figsize=(12, len(data_names) * 4))
+    fig, axes = plt.subplots(3, len(data_names), sharex=False, sharey=False, tight_layout=True, figsize=(len(data_names) * 4, 12))
     for i, data in enumerate(data_names):
         for inference, color in zip(inference_names, ['red', 'green', 'purple']):
-            z_loc = np.load(os.path.join(results_dir, '{}_{}_z_loc.npy'.format(data, inference)))[sample_idx]
-            z_scale = np.load(os.path.join(results_dir, '{}_{}_z_scale.npy'.format(data, inference)))[sample_idx]
-            samples = softmax(np.random.multivariate_normal(z_loc, np.diag(z_scale), size=150))
+            if inference == "mcmc":
+                samples_unnormalized = np.load(os.path.join(results_dir, '{}_{}_samples.npy'.format(data, inference)))[:, sample_idx]
+                samples = softmax(samples_unnormalized)
+            else:
+                z_loc = np.load(os.path.join(results_dir, '{}_{}_z_loc.npy'.format(data, inference)))[sample_idx]
+                z_scale = np.load(os.path.join(results_dir, '{}_{}_z_scale.npy'.format(data, inference)))[sample_idx]
+                samples = softmax(np.random.multivariate_normal(z_loc, np.diag(z_scale), size=150))
             means = np.mean(samples, axis=0)
             top_2_idx = np.argpartition(means, -2)[-2:]
             bottom_2_idx = np.argpartition(means, 2)[:2]
@@ -32,5 +36,6 @@ def plot_posterior(results_dir, sample_idx, data_names, inference_names):
 
 
 if __name__ == "__main__":
-    for i in range(0, 10):
-        plot_posterior('experiments/vae_experiments/naive_reconstructions5/', i, ['train', 'valid'], ['vae', 'svi', 'mcmc'])
+    for i in [99, 100]:
+        plot_posterior('experiments/vae_experiments/debugging/', i,
+                       ['train', 'valid'], ['mcmc'])
