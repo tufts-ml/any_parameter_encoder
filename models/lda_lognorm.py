@@ -10,7 +10,7 @@ import pyro.distributions as dist
 import numpy as np
 import tensorflow as tf
 from functools import partial
-
+from utils import unzip_X_and_topics
 
 l2_norm = lambda t: tf.sqrt(tf.reduce_sum(tf.pow(t, 2)))
 cwd = os.getcwd()
@@ -43,6 +43,7 @@ class VAE_tf(object):
             alpha=1,
             n_steps_enc=1,
             tensorboard=False,
+            architecture=standard,
             **kwargs
     ):
         self.n_hidden_units = n_hidden_units
@@ -65,6 +66,7 @@ class VAE_tf(object):
         self.n_steps_enc = n_steps_enc
         self.tensorboard = tensorboard
         self.global_step = tf.Variable(0, trainable=False, name='global_step')
+        self.architecture = architecture
         self.summaries = []
         """----------------Inputs----------------"""
         self.x = tf.placeholder(tf.float32, [None, self.vocab_size], name='x')
@@ -163,14 +165,14 @@ class VAE_tf(object):
 
     def _recognition_network(self, weights, biases):
         with tf.variable_scope("recognition_network"):
-            layer = self.transfer_fct(
-                tf.add(tf.matmul(self.x, weights["h1"]), biases["b1"]))
+            layer = tf.contrib.layers.batch_norm(self.transfer_fct(
+                tf.add(tf.matmul(self.x, weights["h1"]), biases["b1"])))
 
             for i in range(2, self.n_hidden_layers + 1):
-                layer = self.transfer_fct(
+                layer = tf.contrib.layers.batch_norm(self.transfer_fct(
                     tf.add(tf.matmul(layer, weights["h{}".format(i)]),
                            biases["b{}".format(i)])
-                )
+                ))
             z_mean = tf.contrib.layers.batch_norm(
                 tf.add(tf.matmul(layer, weights["out_mean"]), biases["out_mean"])
             )
@@ -284,7 +286,7 @@ class VAE_tf(object):
         for i in range(self.n_steps_enc):
             grad_and_vars_enc = optimizer_enc.compute_gradients(self.cost, enc_vars)
             enc_gv_collection.append(grad_and_vars_enc)
-            train_ops.append(optimizer_enc.apply_gradients(grad_and_vars_enc))
+            train_ops.append(optimizer_enc.apply_gradients(grad_and_vars_enc, global_step=self.global_step))
         train_op = tf.group(train_ops)
         self.optimizer = train_op
         # TODO: add the accumulated gradients from the encoder
@@ -312,7 +314,8 @@ class VAE_tf(object):
                 self.summaries.append(tf.summary.histogram("gradients/" + variable_name, l2_norm(gradient)))
                 self.summaries.append(tf.summary.histogram("variables/" + variable_name, l2_norm(variable)))
 
-    def partial_fit(self, X):
+    def partial_fit(self, X_and_topics):
+        X, topics = unzip_X_and_topics(X_and_topics)
         opt, cost = self.sess.run(
             (self.optimizer, self.cost),
             feed_dict={self.x: X, self.keep_prob: 0.75},
@@ -347,7 +350,8 @@ class VAE_tf(object):
         )
         return cost
 
-    def topic_prop(self, X):
+    def topic_prop(self, X_and_topics):
+        X, topics = unzip_X_and_topics(X_and_topics)
         topic_word_proportions = self.sess.run(
             (self.network_weights["weights_gener"]["g1"]),
             feed_dict={self.x: X, self.keep_prob: 1.0}
@@ -390,15 +394,15 @@ class VAE_tf(object):
         weights_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/out_log_sigma:0').eval(session=self.sess)
         biases_out_mean = self.sess.graph.get_tensor_by_name('recognition_network/out_mean_b:0').eval(session=self.sess)
         biases_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/out_log_sigma_b:0').eval(session=self.sess)
-        beta_out_mean = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm/beta:0').eval(session=self.sess)
-        beta_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_1/beta:0').eval(session=self.sess)
-        running_mean_out_mean = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm/moving_mean:0').eval(
+        beta_out_mean = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/beta:0'.format(self.n_hidden_layers)).eval(session=self.sess)
+        beta_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/beta:0'.format(self.n_hidden_layers + 1)).eval(session=self.sess)
+        running_mean_out_mean = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/moving_mean:0'.format(self.n_hidden_layers)).eval(
             session=self.sess)
-        running_mean_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_1/moving_mean:0').eval(
+        running_mean_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/moving_mean:0'.format(self.n_hidden_layers + 1)).eval(
             session=self.sess)
-        running_var_out_mean = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm/moving_variance:0').eval(
+        running_var_out_mean = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/moving_variance:0'.format(self.n_hidden_layers)).eval(
             session=self.sess)
-        running_var_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_1/moving_variance:0').eval(
+        running_var_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/moving_variance:0'.format(self.n_hidden_layers + 1)).eval(
             session=self.sess)
 
         h5f.create_dataset("weights_out_mean", data=weights_out_mean)
@@ -452,7 +456,7 @@ class Encoder(nn.Module):
         self.bnsigma = nn.BatchNorm1d(n_topics)
         self.scale = nn.Parameter(torch.ones([]))
 
-    def forward(self, x):
+    def forward(self, x, topics):
         # define the forward computation on the image x
         # first shape the mini-batch to have pixels in the rightmost dimension
         x = x.reshape(-1, self.vocab_size)
@@ -474,7 +478,7 @@ class Decoder(nn.Module):
             self.topics = torch.nn.Parameter(torch.randn(n_topics, vocab_size))
         self.softmax = nn.Softmax(dim=1)
 
-    def forward(self, z):
+    def forward(self, z, topics):
         word_probs = torch.mm(self.softmax(z), self.softmax(self.topics))
         return word_probs
 
@@ -511,43 +515,43 @@ class VAE_pyro(nn.Module):
         self.topic_init = topic_init
 
     # define the model p(x|z)p(z)
-    def model(self, x):
+    def model(self, x, topics):
         # register PyTorch module `decoder` with Pyro
         pyro.module("decoder", self.decoder)
         with pyro.plate("data", x.shape[0]):
             z = pyro.sample("latent",
                             dist.Normal(self.z_loc, self.z_scale).to_event(1))
-            word_probs = self.decoder.forward(z)
+            word_probs = self.decoder.forward(z, topics)
             return pyro.sample("doc_words",
                         dist.Multinomial(probs=word_probs),
                         obs=x)
                         # obs=x.reshape(-1, VOCAB_SIZE))
 
     # define the model p(x|z)p(z)
-    def lda_model(self, x):
+    def lda_model(self, x, topics):
         # register PyTorch module `decoder` with Pyro
         pyro.module("decoder", self.decoder)
         with pyro.plate("data", x.shape[0]):
             z = pyro.sample("latent",
                             dist.Dirichlet(torch.from_numpy(self.alpha)))
-            word_probs = self.decoder.forward(z)
+            word_probs = self.decoder.forward(z, topics)
             return pyro.sample("doc_words",
                         dist.Multinomial(probs=word_probs),
                         obs=x)
 
 
-    def encoder_guide(self, x):
+    def encoder_guide(self, x, topics):
         # register PyTorch module `encoder` with Pyro
         pyro.module("encoder", self.encoder)
         with pyro.plate("data", x.shape[0]):
             # use the encoder to get the parameters used to define q(z|x)
-            z_loc, z_scale = self.encoder.forward(x)
+            z_loc, z_scale = self.encoder.forward(x, topics)
             # sample the latent code z
             pyro.sample("latent",
                         dist.Normal(z_loc, z_scale).to_event(1))
                         # dist.LogisticNormal(z_loc, z_scale).to_event(1))
 
-    def mean_field_guide(self, x):
+    def mean_field_guide(self, x, topics):
         with pyro.plate("data", x.shape[0]):
             # z_loc = pyro.param("z_loc", self.z_loc)
             # z_loc = pyro.param("z_loc", self.z_loc.repeat(x.shape[0], 1))
@@ -559,12 +563,12 @@ class VAE_pyro(nn.Module):
 
             pyro.sample("latent", dist.Normal(z_loc, z_scale).to_event(1))
 
-    def map_guide(self, x):
+    def map_guide(self, x, topics):
         with pyro.plate("data", x.shape[0]):
             z_loc = pyro.param("z_loc", self.z_loc)
             pyro.sample("latent", dist.Delta(z_loc).to_event(1))
 
-    def reconstruct_with_vae_map(self, x, sample_z=False):
+    def reconstruct_with_vae_map(self, x, topics, sample_z=False):
         # encode image x
         z_loc, z_scale = self.encoder(x)
         if sample_z:

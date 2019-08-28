@@ -26,7 +26,8 @@ def train(
     display_step=5,
     tensorboard=False,
     tensorboard_logs_dir=None,
-    results_dir=None
+    results_dir=None,
+    vae_meta=True
 ):
     if tensorboard:
         train_writer = tf.summary.FileWriter(
@@ -49,8 +50,12 @@ def train(
             X, topics = unzip_X_and_topics(batch_xs)
 
             if np.isnan(total_cost):
-                z = vae.sess.run(vae.z,
-                                   feed_dict={vae.x: X, vae.topics: topics, vae.keep_prob: 1.0})
+                if vae_meta:
+                    z = vae.sess.run(vae.z,
+                                     feed_dict={vae.x: X, vae.topics: topics, vae.keep_prob: 1.0})
+                else:
+                    z = vae.sess.run(vae.z,
+                                   feed_dict={vae.x: X, vae.keep_prob: 1.0})
                 print(z)
                 print(z.shape)      
                 print(epoch, np.sum(X, 1).astype(np.int), X.shape)
@@ -61,6 +66,9 @@ def train(
                 )
                 # return vae,emb
                 sys.exit()
+        if not vae_meta and epoch < 15:
+            topics = softmax(vae.topic_prop(batch_xs))
+            plot_side_by_side_docs(topics, os.path.join(results_dir, 'topics_{}.pdf'.format(str(epoch).zfill(2))))
 
         # Display logs per epoch step
         if epoch % display_step == 0:
@@ -70,12 +78,20 @@ def train(
             )
             if tensorboard:
                 merge = tf.summary.merge(vae.summaries)
-                summary = vae.sess.run(merge,
-                                        feed_dict={vae.x: X, vae.topics: topics, vae.keep_prob: 1.0})
+                if vae_meta:
+                    summary = vae.sess.run(merge,
+                                            feed_dict={vae.x: X, vae.topics: topics, vae.keep_prob: 1.0})
+                else:
+                    summary = vae.sess.run(merge,
+                                            feed_dict={vae.x: X, vae.keep_prob: 1.0})
                 train_writer.add_summary(summary, epoch)
                 X_val, topics_val = unzip_X_and_topics(valid_data)
-                valid_cost = vae.sess.run(vae.cost,
-                                        feed_dict={vae.x: X_val, vae.topics: topics_val, vae.keep_prob: 1.0})
+                if vae_meta:
+                    valid_cost = vae.sess.run(vae.cost,
+                                            feed_dict={vae.x: X_val, vae.topics: topics_val, vae.keep_prob: 1.0})
+                else:
+                    valid_cost = vae.sess.run(vae.cost,
+                                            feed_dict={vae.x: X_val, vae.keep_prob: 1.0})
                 valid_summary = tf.Summary(value=[tf.Summary.Value(tag="valid_loss", simple_value=valid_cost)])
                 valid_writer.add_summary(valid_summary, epoch)
 

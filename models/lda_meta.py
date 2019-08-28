@@ -77,11 +77,11 @@ class VAE_tf(object):
         )
 
         # Create autoencoder network
-        self.sess = tf.InteractiveSession()
+        # self.sess = tf.InteractiveSession()
         self._create_network()
         self._create_loss_optimizer()
         init = tf.global_variables_initializer()
-        # self.sess = tf.Session()
+        self.sess = tf.Session()
         self.sess.run(init)
 
     def _create_network(self):
@@ -94,10 +94,8 @@ class VAE_tf(object):
         z = tf.add(
             tf.expand_dims(self.z_mean, axis=1), tf.multiply(tf.sqrt(tf.exp(tf.expand_dims(self.z_log_sigma_sq, axis=1))), eps)
         )
-        print("z", z)
         z = tf.multiply(self.scale, z)
         self.z = tf.reduce_mean(z, axis=1)
-        print("self.z", self.z)
         self.sigma = tf.exp(self.z_log_sigma_sq)
         # generator = partial(self._generator_network, self.network_weights['weights_gener'])
         # self.x_reconstr_mean = tf.reduce_mean(tf.map_fn(generator, self.z), axis=1)
@@ -198,10 +196,7 @@ class VAE_tf(object):
         with tf.variable_scope("generator_network"):
             self.layer_do_0 = tf.nn.softmax(z)  # (batch, n_samples, n_topics)
             topic_weights = self.topics
-            print("self.layer_do_0", self.layer_do_0)
-            print("topic_weights", topic_weights)
             x_reconstr_means =tf.matmul(self.layer_do_0, topic_weights)  # (batch, n_samples, vocab_size)
-            print("x_reconstr_means", x_reconstr_means)
             # x_reconstr_mean = tf.reduce_mean(x_reconstr_means, axis=1)
 
             if self.tensorboard:
