@@ -26,8 +26,10 @@ def toy_bars(normalized=True):
 
 def remove_word_from_topic(topics, seed):
     np.random.seed(seed)
-    topic_idx = np.random.randint(len(topics))
-    candidate_words = np.argwhere(topics[topic_idx] == 1).flatten()
+    candidate_words = []
+    while len(candidate_words) == 0:
+        topic_idx = np.random.randint(len(topics))
+        candidate_words = np.argwhere(topics[topic_idx] == 1).flatten()
     idx_to_remove = np.random.choice(candidate_words)
     topics[topic_idx][idx_to_remove] = 0
     return topics
@@ -44,21 +46,22 @@ def add_word_to_topic(topics, seed):
 
 def move_word_between_topics(topics, seed):
     np.random.seed(seed)
+    candidate_words = []
     topic_from, topic_to = np.random.randint(len(topics), size=2)
-    while topic_from == topic_to:
+    while len(candidate_words) == 0 or topic_from == topic_to:
         topic_from, topic_to = np.random.randint(len(topics), size=2)
-    candidate_words = np.intersect1d(
-        np.argwhere(topics[topic_from] == 1).flatten(),
-        np.argwhere(topics[topic_to] == 0).flatten()
-    )
+        candidate_words = np.intersect1d(
+            np.argwhere(topics[topic_from] == 1).flatten(),
+            np.argwhere(topics[topic_to] == 0).flatten()
+        )
     idx_to_move = np.random.choice(candidate_words)
     topics[topic_from][idx_to_move] = 0
     topics[topic_to][idx_to_move] = 1
     return topics
 
-def permuted_toy_bars(m, seed):
+def permuted_toy_bars(topics, m, seed, normalized=False):
     np.random.seed(seed)
-    topics = toy_bars(normalized=False)
+    # topics = toy_bars(normalized=False)
     for i in range(m):
         action = np.random.randint(3)
         if action == 0:
@@ -73,7 +76,10 @@ def permuted_toy_bars(m, seed):
         if c == 0:
             random_word = np.random.randint(100)
             topics[idx][random_word] = 1
-    return list(map(normalize1d, topics))
+    if normalized:
+        return list(map(normalize1d, topics))
+    else:
+        return topics
 
 
 def diagonal_bars():
@@ -97,6 +103,17 @@ def diagonal_bars():
             j += 1
         topics.append(normalize1d(backward_diagonal.flatten()))
     return topics
+
+
+def get_random_topics(n, num_topics, vocab_size, alpha, seed):
+    all_topic_sets = []
+    for i in range(n):
+        topics = []
+        for k in range(num_topics):
+            topic = np.random.dirichlet([alpha] * vocab_size)
+            topics.append(topic)
+        all_topic_sets.append(topics)
+    return all_topic_sets
 
 if __name__ == "__main__":
     plot_side_by_side_docs(toy_bars(), name="toy_bars.png")

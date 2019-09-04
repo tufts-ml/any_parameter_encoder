@@ -4,7 +4,6 @@ import math
 import numpy as np
 import tensorflow as tf
 
-
 from datasets.create import draw_random_doc
 from utils import inverse_softmax, softmax, unzip_X_and_topics
 from visualization.reconstructions import plot_side_by_side_docs
@@ -69,6 +68,9 @@ def train(
         if not vae_meta and epoch < 15:
             topics = softmax(vae.topic_prop(batch_xs))
             plot_side_by_side_docs(topics, os.path.join(results_dir, 'topics_{}.pdf'.format(str(epoch).zfill(2))))
+            recreated_docs, _, _ = vae.recreate_input(batch_xs[:10])
+            X, topics = unzip_X_and_topics(batch_xs[:10])
+            plot_side_by_side_docs(np.concatenate([X, recreated_docs]), os.path.join(results_dir, 'recreated_docs_{}.pdf'.format(str(epoch).zfill(2))))
 
         # Display logs per epoch step
         if epoch % display_step == 0:
@@ -92,9 +94,11 @@ def train(
                 else:
                     valid_cost = vae.sess.run(vae.cost,
                                             feed_dict={vae.x: X_val, vae.keep_prob: 1.0})
+                print(valid_cost)
+                print('writing valid summary')
                 valid_summary = tf.Summary(value=[tf.Summary.Value(tag="valid_loss", simple_value=valid_cost)])
                 valid_writer.add_summary(valid_summary, epoch)
-
+                valid_writer.flush()
     return vae
 
 
