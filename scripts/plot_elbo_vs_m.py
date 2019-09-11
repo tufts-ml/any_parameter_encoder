@@ -15,7 +15,7 @@ if __name__ == "__main__":
     df.dropna(inplace=True, axis=0)
     df.elbo = df.elbo.astype(float)
     df.m = df.m.astype(float)
-    print(df.head())
     g = sns.FacetGrid(df, col='data')
     g.map(sns.lineplot,'m', 'elbo', 'inference')
+    plt.legend()
     plt.savefig(os.path.join(args.results_dir, 'elbo_vs_m.pdf'))
