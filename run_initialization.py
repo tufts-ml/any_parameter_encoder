@@ -94,7 +94,8 @@ vae_orig = train(train_data, valid_data, vae_orig, training_epochs=80, tensorboa
             tensorboard_logs_dir=tensorboard_logs_dir, results_dir=model_config['results_dir'], vae_meta=False)
 vae_orig.save()
 # save_elbo_vs_m(vae, all_documents, all_topics, all_m, results_dir)
-
+final_topics = softmax(vae_orig.topic_prop(train_data[:1]))
+print(final_topics.shape)
 
 # load the VAE into pyro for evaluation
 vae = VAE_pyro(**model_config)
@@ -103,6 +104,8 @@ vae.load_state_dict(state_dict)
 # for data_name, data_and_topics in zip(dataset_names, datasets):
 for data_name, data_and_topics in zip(['train', 'valid'], [train_data[:100], valid_data[:100]]):
     data, topics = unzip_X_and_topics(data_and_topics)
+    if model_config['architecture'] == 'naive':
+        topics = np.array([final_topics] * len(data))
     data = torch.from_numpy(data.astype(np.float32))
     topics = torch.from_numpy(topics.astype(np.float32))
     pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .1}, 'step_size': 10000, 'gamma': 0.95})

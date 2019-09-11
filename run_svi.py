@@ -8,6 +8,7 @@ import csv
 from pyro.optim import StepLR
 from pyro.infer import SVI, Trace_ELBO, TraceMeanField_ELBO
 from pyro.infer.mcmc import MCMC, NUTS
+from pyro.util import torch_isnan
 import pyro
 import tensorflow as tf
 import matplotlib.pyplot as plt
@@ -152,15 +153,19 @@ with open(os.path.join(results_dir, 'elbo_vs_m1.csv'), 'w') as f:
             vae_elbo = Trace_ELBO()
             svi_elbo = Trace_ELBO()
             vae_svi = SVI(vae.model, vae.encoder_guide, pyro_scheduler, loss=vae_elbo, num_steps=300, num_samples=100)
-            svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=svi_elbo, num_steps=400, num_samples=100)
             data_i = data[i * 100: (i + 1) * 100]
             topics_i = topics[i * 100: (i + 1) * 100]
             vae_posterior = vae_svi.run(data_i, topics_i)
             writer.writerow([data_name, 'vae', vae_svi.evaluate_loss(data_i, topics_i), m])
-            svi_posterior = svi.run(data_i, topics_i)
-            writer.writerow([data_name, 'svi', svi.evaluate_loss(data_i, topics_i), m])
-            print('vae m ', vae_svi.evaluate_loss(data_i, topics_i))
-            print('svi m ',  svi.evaluate_loss(data_i, topics_i))
+            svi_loss = np.nan
+            while torch_isnan(svi_loss):
+                svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=svi_elbo, num_steps=400, num_samples=100)
+                svi_posterior = svi.run(data_i, topics_i)
+                svi_loss = svi.evaluate_loss(data_i, topics_i)
+                pyro.clear_param_store()
+            writer.writerow([data_name, 'svi', svi_loss, m])
+            print('vae ', m, vae_svi.evaluate_loss(data_i, topics_i))
+            print('svi ', m, svi_loss)
             pyro.clear_param_store()
         #     model_config.update({
         #         'data_name': data_name,

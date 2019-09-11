@@ -19,12 +19,9 @@ from visualization.posterior import plot_posterior
 from utils import softmax, unzip_X_and_topics
 
 # where to write the results
-results_dir = 'experiments/vae_experiments/standard_scale1'
+results_dir = 'experiments/vae_experiments/naive_scale'
 results_file = 'results.csv'
 print(results_dir)
-if not os.path.exists(results_dir):
-    os.system('mkdir -p ' + results_dir)
-shutil.copy(os.path.abspath(__file__), os.path.join(results_dir, 'run_simple.py'))
 
 # global params
 n_topics = 18
@@ -34,33 +31,23 @@ sample_idx = list(range(10))
 
 # toy bars data
 vocab_size = 100
-train_topics = [permuted_toy_bars(m, m) for m in range(100, 1001, 100)]
-valid_topics = [toy_bars()] + [permuted_toy_bars(m, m + 2) for m in range(100, 1000, 100)]
-# test_topics = [diagonal_bars()]
-train_m = list(range(100, 1001, 100))
-valid_m = [0] + list(range(100, 1000, 100))
-test_m = [0] + list(range(100, 1000, 100))
-for m, topics in zip(train_m, train_topics):
-    plot_side_by_side_docs(topics, os.path.join(results_dir, 'train_topics_{}.pdf'.format(str(m).zfill(3))))
-for m, topics in zip(valid_m, valid_topics):
-    plot_side_by_side_docs(topics, os.path.join(results_dir, 'valid_topics_{}.pdf'.format(str(m).zfill(3))))
-# train_documents = []
-# train = []
-# for topics, m in zip(train_topics, train_m):
-#     plot_side_by_side_docs(topics, name="train_topics_{}.png".format(m))
-#     docs, _ = generate_documents(topics, 10, alpha=.01)
-#     train_documents.extend(docs)
-#     train.extend([(d, topics) for d in docs])
-train_documents, train_doc_topic_dists = generate_documents(toy_bars(), 1000, alpha=.01, seed=0)
-valid_documents, valid_doc_topic_dists = generate_documents(toy_bars(), 100, alpha=.01, seed=1)
+train_topics = [toy_bars()] + [permuted_toy_bars(m, m) for m in range(1, 91, 10)]
+valid_topics = [permuted_toy_bars(m, m + 1) for m in range(1, 101, 10)]
+test_topics = [diagonal_bars()] + [permuted_toy_bars(m, m + 2) for m in range(1, 91, 10)]
+train_m = [0] + list(range(1, 101, 10))
+valid_m = list(range(1, 111, 10))
+test_m = [162] + list(range(1, 101, 10))
+train_documents, train_doc_topic_dists = generate_documents(toy_bars(), 1000, alpha=.01)
+valid_documents, valid_doc_topic_dists = generate_documents(toy_bars(), 10, alpha=.01)
+test_documents, test_doc_topic_dists = generate_documents(toy_bars(), 10, alpha=.01)
 # TODO: perform correct queuing so full dataset doesn't need to be in memory
 train = list(itertools.product(train_documents, train_topics))
-valid = list(itertools.product(train_documents, valid_topics))
-test = list(itertools.product(valid_documents, valid_topics))
-all_documents = [train_documents[:100], valid_documents]
-all_topics = [train_topics, valid_topics]
-all_m = [train_m, valid_m]
-datasets = [train[:150], valid[:150], test[:150]]
+valid = list(itertools.product(valid_documents, valid_topics))
+test = list(itertools.product(test_documents, test_topics))
+all_documents = [train_documents[:10], valid_documents, test_documents]
+all_topics = [train_topics, valid_topics, test_topics]
+all_m = [train_m, valid_m, test_m]
+datasets = [train[:100], valid, test]
 dataset_names = ['train', 'valid', 'test']
 
 model_config = {
@@ -70,23 +57,27 @@ model_config = {
     'results_file': results_file,
     'inference': 'vae',
     'model_name': 'lda_meta',
-    'architecture': 'standard',
+    'architecture': 'naive',
     'scale_trainable': True,
-    'n_hidden_layers': 1,
+    'n_hidden_layers': 5,
     'n_hidden_units': 100,
     'n_samples': 1,
     'decay_rate': .9,
-    'decay_steps': 500,
+    'decay_steps': 100,
     'starting_learning_rate': .01,
     'n_steps_enc': 1
 }
 
+# if not os.path.exists(results_dir):
+#     os.system('mkdir -p ' + results_dir)
+# shutil.copy(os.path.abspath(__file__), os.path.join(results_dir, 'run_simple.py'))
+
 # train the VAE and save the weights
-vae = train_save_VAE(train, valid, model_config, training_epochs=150, batch_size=200, hallucinations=False, tensorboard=True)
-save_elbo_vs_m(vae, all_documents, all_topics, all_m, results_dir)
-vae.save()
-vae.sess.close()
-tf.reset_default_graph()
+# vae = train_save_VAE(train, valid, model_config, training_epochs=150, batch_size=200, hallucinations=False, tensorboard=True)
+# save_elbo_vs_m(vae, all_documents, all_topics, all_m, results_dir)
+# vae.save()
+# vae.sess.close()
+# tf.reset_default_graph()
 # load the VAE into pyro for evaluation
 vae = VAE_pyro(**model_config)
 state_dict = vae.load()
@@ -97,15 +88,14 @@ for data_name, data_and_topics in zip(dataset_names, datasets):
     topics = torch.from_numpy(topics.astype(np.float32))
     pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .1}, 'step_size': 10000, 'gamma': 0.95})
     # pyro scheduler doesn't have any effect in the VAE case since we never take any optimization steps
-    vae_svi = SVI(vae.model, vae.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=100, num_samples=100)
-    svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=100, num_samples=100)
+    # vae_svi = SVI(vae.model, vae.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=100, num_samples=100)
+    # svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=TraceMeanField_ELBO(), num_steps=100, num_samples=100)
     mcmc = MCMC(NUTS(vae.model, adapt_step_size=True), num_samples=100, warmup_steps=50)
-    for inference_name, inference in zip(['vae', 'svi', 'mcmc'], [vae_svi, svi, mcmc]):
+    # for inference_name, inference in zip(['vae', 'svi'], [vae_svi, svi]):
+    for inference_name, inference in zip(['mcmc'], [mcmc]):
         print(inference_name)
-        if inference_name == 'svi':
-            for i in range(5):
-                posterior = inference.run(data, topics)        
-        else:
+    # for inference_name, inference in zip(['svi'], [svi]):
+        # try:
         posterior = inference.run(data, topics)
         model_config.update({
             'data_name': data_name,
@@ -117,7 +107,9 @@ for data_name, data_and_topics in zip(dataset_names, datasets):
         for i in range(10):
             # saves a separate row to the csv
             save_loglik_to_csv(data, topics, vae.model, posterior, model_config, num_samples=10)
-        # save the posteriors for later analysis
+        # except Exception as e:
+        #     print(e)
+        #     print(data_name, inference_name, " failed")
         if inference_name == 'mcmc':
             # [num_samples, num_docs, num_topics]
             samples = [t.nodes['latent']['value'].detach().cpu().numpy() for t in posterior.exec_traces]
@@ -132,11 +124,9 @@ for data_name, data_and_topics in zip(dataset_names, datasets):
                 z_scale = pyro.get_param_store().match('z_scale')['z_scale'].detach().numpy()
             np.save(os.path.join(results_dir, '{}_{}_z_loc.npy'.format(data_name, inference_name)), z_loc)
             np.save(os.path.join(results_dir, '{}_{}_z_scale.npy'.format(data_name, inference_name)), z_scale)
-
-for data_name, data_and_topics in zip(dataset_names, datasets):
-    data, _ = unzip_X_and_topics(data_and_topics)
+for data_name, data in zip(dataset_names, [train_documents, valid_documents, test_documents]):
     filenames = []
-    for inference in ['vae', 'svi', 'mcmc']:
+    for inference in ['vae', 'svi']:
         file = '_'.join([inference, model_config['model_name'], data_name, str(model_config['n_hidden_layers']), str(model_config['n_hidden_units'])]) + '.npy'
         filepath = os.path.join(os.getcwd(), results_dir, file)
         if os.path.exists(filepath):
@@ -145,5 +135,5 @@ for data_name, data_and_topics in zip(dataset_names, datasets):
     plot_name = os.path.join(results_dir, data_name + '_vae_reconstructions.pdf')
     plot_saved_samples(np.array(data)[sample_idx], filenames, plot_name, vocab_size=vocab_size, intensity=10)
 
-for i in sample_idx:
-    plot_posterior(results_dir, i, ['train', 'valid', 'test'], ['vae', 'svi', 'mcmc'])
+for i in range(10):
+    plot_posterior(results_dir, i, ['train', 'valid'], ['vae', 'svi', 'mcmc'])
