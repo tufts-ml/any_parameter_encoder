@@ -43,7 +43,7 @@ class VAE_tf(object):
             alpha=1,
             n_steps_enc=1,
             tensorboard=False,
-            architecture=standard,
+            architecture='standard',
             **kwargs
     ):
         self.n_hidden_units = n_hidden_units
@@ -95,7 +95,7 @@ class VAE_tf(object):
         self.network_weights = self._initialize_weights()
 
         self.z_mean, self.z_log_sigma_sq = self._recognition_network(
-            self.network_weights["weights_recog"], self.network_weights["biases_recog"]
+            self.network_weights["weights_recog"], self.network_weights["biases_recog"], self.network_weights['weights_gener']
         )
         eps = tf.random_normal((self.n_samples, self.n_topics), 0, 1, dtype=tf.float32)
         z = tf.add(
@@ -130,19 +130,29 @@ class VAE_tf(object):
                         "h{}".format(i), [self.n_hidden_units, self.n_hidden_units])
                     all_weights["biases_recog"]["b{}".format(i)] = tf.get_variable(
                         "b{}".format(i), [self.n_hidden_units], initializer=tf.zeros_initializer())
-
-            if self.enc_topic_init:
-                if self.n_hidden_units != self.n_topics:
-                    raise ValueError("If initializing encoder topics, must enforce n_hidden_units == n_topics.")
-                toy_bars = tf.transpose(tf.convert_to_tensor(np.load(
-                    os.path.join(cwd, self.topic_init))))
+            if self.architecture == "naive":
                 all_weights["weights_recog"].update({
                     "h1": tf.get_variable(
-                        "h1", initializer=toy_bars, trainable=self.enc_topic_trainable)})
+                        "h1", [(1 + self.n_topics) * self.vocab_size, self.n_hidden_units])})
+            elif self.architecture == "template":
+                all_weights["weights_recog"].update({"h1": self.topics})
+            elif self.architecture == "standard":
+                all_weights["weights_recog"].update(
+                    {"h1": tf.get_variable("h1", [self.vocab_size, self.n_hidden_units])})
             else:
-                all_weights["weights_recog"].update({
-                    "h1": tf.get_variable(
-                        "h1", [self.vocab_size, self.n_hidden_units])})
+                raise ValueError("architecture must be either 'naive' or 'template'")
+            # if self.enc_topic_init:
+            #     if self.n_hidden_units != self.n_topics:
+            #         raise ValueError("If initializing encoder topics, must enforce n_hidden_units == n_topics.")
+            #     toy_bars = tf.transpose(tf.convert_to_tensor(np.load(
+            #         os.path.join(cwd, self.topic_init))))
+            #     all_weights["weights_recog"].update({
+            #         "h1": tf.get_variable(
+            #             "h1", initializer=toy_bars, trainable=self.enc_topic_trainable)})
+            # else:
+            #     all_weights["weights_recog"].update({
+            #         "h1": tf.get_variable(
+            #             "h1", [self.vocab_size, self.n_hidden_units])})
 
             self.scale = tf.Variable(tf.ones([]), name="scale", trainable=self.scale_trainable)
 
@@ -163,11 +173,23 @@ class VAE_tf(object):
 
         return all_weights
 
-    def _recognition_network(self, weights, biases):
+    def _recognition_network(self, weights, biases, weights_gener):
         with tf.variable_scope("recognition_network"):
-            layer = tf.contrib.layers.batch_norm(self.transfer_fct(
-                tf.add(tf.matmul(self.x, weights["h1"]), biases["b1"])))
-
+            if self.architecture == "naive":
+                x_and_topics = tf.reshape(tf.concat([
+                    tf.expand_dims(self.x, 1),
+                    tf.tile(tf.expand_dims(tf.nn.softmax(weights_gener["g1"]), 0), [tf.shape(self.x)[0], 1, 1]
+                )], axis=1), (-1, (1 + self.n_topics) * self.vocab_size))
+                layer = tf.contrib.layers.batch_norm(self.transfer_fct(
+                    tf.add(tf.matmul(x_and_topics, weights["h1"]), biases["b1"])))
+            elif self.architecture == "template":
+                layer = tf.contrib.layers.batch_norm(self.transfer_fct(
+                    tf.add(tf.matmul(self.x, tf.transpose(weights["h1"], perm=[0, 2, 1])), biases["b1"])))
+            elif self.architecture == "standard":
+                layer = tf.contrib.layers.batch_norm(self.transfer_fct(
+                    tf.add(tf.matmul(self.x, weights["h1"]), biases["b1"])))
+            else:
+                raise ValueError("architecture must be either 'naive' or 'template'")
             for i in range(2, self.n_hidden_layers + 1):
                 layer = tf.contrib.layers.batch_norm(self.transfer_fct(
                     tf.add(tf.matmul(layer, weights["h{}".format(i)]),
@@ -322,7 +344,8 @@ class VAE_tf(object):
         )
         return cost
 
-    def recreate_input(self, X):
+    def recreate_input(self, X_and_topics):
+        X, topics = unzip_X_and_topics(X_and_topics)
         output, z_mean, z = self.sess.run(
             (self.x_reconstr_mean, self.z_mean, self.z),
             feed_dict={self.x: X, self.keep_prob: 1.0}
@@ -437,15 +460,24 @@ class MLP(nn.Module):
         return self.softplus(self.fc(x))
 
 class Encoder(nn.Module):
-    def __init__(self, n_hidden_units, n_hidden_layers, n_topics=4, vocab_size=9):
+    def __init__(self, n_hidden_units, n_hidden_layers, architecture, n_topics=4, vocab_size=9):
         super(Encoder, self).__init__()
         self.n_hidden_layers = n_hidden_layers
         self.vocab_size = vocab_size
         # setup the non-linearities
         self.softplus = nn.Softplus()
+        self.architecture = architecture
+        self.n_topics = n_topics
         # encoder Linear layers
         modules = []
-        modules.append(MLP(vocab_size, n_hidden_units))
+        if architecture == 'naive':
+            modules.append(MLP((1 + n_topics) * vocab_size, n_hidden_units))
+        elif architecture == 'template':
+            raise NotImplementedError('template not yet implemented')
+        elif architecture == 'standard':
+            modules.append(MLP(vocab_size, n_hidden_units))
+        else:
+            raise ValueError('Invalid architecture')
         for i in range(self.n_hidden_layers - 1):
             modules.append(MLP(n_hidden_units, n_hidden_units))
 
@@ -460,10 +492,19 @@ class Encoder(nn.Module):
         # define the forward computation on the image x
         # first shape the mini-batch to have pixels in the rightmost dimension
         x = x.reshape(-1, self.vocab_size)
-        # then return a mean vector and a (positive) square root covariance
-        # each of size batch_size x n_topics
-        z_loc = torch.mul(self.scale, self.bnmu(self.fcmu(self.enc_layers(x))))
-        z_scale = torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x))))
+        if self.architecture == 'naive':
+            x_and_topics = torch.cat((x, topics.reshape(-1, self.n_topics * self.vocab_size)), dim=1)
+            # then return a mean vector and a (positive) square root covariance
+            # each of size batch_size x n_topics
+            z_loc = torch.mul(self.scale, self.bnmu(self.fcmu(self.enc_layers(x_and_topics))))
+            z_scale = torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics))))
+        elif self.architecture == 'template':
+            raise NotImplementedError('template not yet implemented')
+        elif self.architecture == 'standard':
+            z_loc = torch.mul(self.scale, self.bnmu(self.fcmu(self.enc_layers(x))))
+            z_scale = torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x))))
+        else:
+            raise ValueError('Invalid architecture')
         return z_loc, z_scale
 
 
@@ -485,12 +526,12 @@ class Decoder(nn.Module):
 
 class VAE_pyro(nn.Module):
     def __init__(self, n_hidden_units=100, n_hidden_layers=2, model_name=None, results_dir=None, topic_init=None, topic_trainable=True,
-                 alpha=.1, vocab_size=9, n_topics=4, use_cuda=False, **kwargs):
+                 alpha=.1, vocab_size=9, n_topics=4, architecture='naive', use_cuda=False, **kwargs):
         super(VAE_pyro, self).__init__()
         print(n_hidden_units)
         print(n_hidden_layers)
         # create the encoder and decoder networks
-        self.encoder = Encoder(n_hidden_units, n_hidden_layers, n_topics=n_topics, vocab_size=vocab_size)
+        self.encoder = Encoder(n_hidden_units, n_hidden_layers, architecture, n_topics=n_topics, vocab_size=vocab_size)
         self.decoder = Decoder(n_topics, vocab_size, topic_init, topic_trainable)
 
         if use_cuda:
@@ -506,6 +547,7 @@ class VAE_pyro(nn.Module):
             (1.0 / (n_topics * n_topics)) * np.sum(1.0 / alpha_vec, 1)
         ).T)
         self.alpha = alpha * np.ones(n_topics).astype(np.float32)
+        self.architecture = architecture
 
         self.n_topics = n_topics
         self.n_hidden_layers = n_hidden_layers
