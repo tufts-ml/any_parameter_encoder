@@ -9,7 +9,7 @@ from utils import inverse_softmax, softmax, unzip_X_and_topics
 from visualization.reconstructions import plot_side_by_side_docs
 
 
-def create_minibatch(data, batch_size):
+def create_minibatch(data, batch_size, shuffle=True):
     rng = np.random.RandomState(10)
     np.random.shuffle(data)
     for start_idx in range(0, len(data), batch_size):
@@ -26,7 +26,8 @@ def train(
     tensorboard=False,
     tensorboard_logs_dir=None,
     results_dir=None,
-    vae_meta=True
+    vae_meta=True,
+    shuffle=True
 ):
     if tensorboard:
         train_writer = tf.summary.FileWriter(
@@ -39,7 +40,7 @@ def train(
         total_cost = 0.0
         num_batches = 0
         # Loop over all batches
-        for batch_xs in create_minibatch(train_data, batch_size):
+        for batch_xs in create_minibatch(train_data, batch_size, shuffle=shuffle):
             # Fit training using batch data
             cost = vae.partial_fit(batch_xs)
             # Keep track of the number of batches

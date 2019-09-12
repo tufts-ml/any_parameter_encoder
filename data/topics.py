@@ -129,14 +129,20 @@ if __name__ == "__main__":
     #     bars = permuted_toy_bars(i, seed=0)
     #     plot_side_by_side_docs(bars, name="bars{}.png".format(i))
     # plot_side_by_side_docs(diagonal_bars(), name="diagonal_bars.png")
-    n_topics = 4
-    vocab_size = 16
+    n_topics = 10
+    vocab_size = 100
     # betas = .5 * np.ones((n_topics, vocab_size))
     betas = []
     for i in range(n_topics):
         beta = np.ones(vocab_size)
-        popular_words = [idx for idx in range(vocab_size) if idx % n_topics == i]
-        beta[popular_words] = 10
+        dim = math.sqrt(vocab_size)
+        if i < dim:
+            popular_words = [idx for idx in range(vocab_size) if idx % dim == i]
+        else:
+            popular_words = [idx for idx in range(vocab_size) if int(idx / dim) == i - dim]
+        random_additions = list(np.random.choice(range(vocab_size), 20))
+        beta[popular_words] = 200
+        beta[random_additions] = 50
         betas.append(normalize1d(beta))
     test_topics = generate_topics(n=5, betas=betas, seed=0)
     for i, topics in enumerate(test_topics):
