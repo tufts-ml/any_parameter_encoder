@@ -129,7 +129,9 @@ class VAE_tf(object):
                     "h1": tf.get_variable(
                         "h1", [(1 + self.n_topics) * self.vocab_size, self.n_hidden_units])})
             elif self.architecture == "template":
-                all_weights["weights_recog"].update({"h1": self.topics})
+                all_weights["weights_recog"].update({
+                    "h1": tf.get_variable(
+                        "h1", [self.n_topics, self.n_hidden_units])})
             elif self.architecture == "standard":
                 all_weights["weights_recog"].update(
                     {"h1": tf.get_variable("h1", [self.vocab_size, self.n_hidden_units])})
@@ -149,8 +151,9 @@ class VAE_tf(object):
                 layer = tf.contrib.layers.batch_norm(self.transfer_fct(
                     tf.add(tf.matmul(x_and_topics, weights["h1"]), biases["b1"])))
             elif self.architecture == "template":
+                layer = tf.einsum("ab,abc->ac", self.x, tf.transpose(self.topics, perm=[0, 2, 1]))
                 layer = tf.contrib.layers.batch_norm(self.transfer_fct(
-                    tf.add(tf.matmul(self.x, tf.transpose(weights["h1"], perm=[0, 2, 1])), biases["b1"])))
+                    tf.add(tf.matmul(layer, weights["h1"]), biases["b1"])))
             elif self.architecture == "standard":
                 layer = tf.contrib.layers.batch_norm(self.transfer_fct(
                     tf.add(tf.matmul(self.x, weights["h1"]), biases["b1"])))
@@ -452,7 +455,7 @@ class Encoder(nn.Module):
         if architecture == 'naive':
             modules.append(MLP((1 + n_topics) * vocab_size, n_hidden_units))
         elif architecture == 'template':
-            raise NotImplementedError('template not yet implemented')
+            modules.append(MLP(n_topics, n_hidden_units))
         elif architecture == 'standard':
             modules.append(MLP(vocab_size, n_hidden_units))
         else:
@@ -478,7 +481,9 @@ class Encoder(nn.Module):
             z_loc = torch.mul(self.scale, self.bnmu(self.fcmu(self.enc_layers(x_and_topics))))
             z_scale = torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics))))
         elif self.architecture == 'template':
-            raise NotImplementedError('template not yet implemented')
+            x_and_topics = torch.einsum("ab,abc->ac", (x, torch.transpose(topics, 1, 2)))
+            z_loc = torch.mul(self.scale, self.bnmu(self.fcmu(self.enc_layers(x_and_topics))))
+            z_scale = torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics))))
         elif self.architecture == 'standard':
             z_loc = torch.mul(self.scale, self.bnmu(self.fcmu(self.enc_layers(x))))
             z_scale = torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x))))
