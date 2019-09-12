@@ -1,7 +1,15 @@
 import numpy as np
+import math
 from visualization.reconstructions import plot_side_by_side_docs
 from utils import normalize1d
 
+
+def generate_topics(n, betas, seed):
+    np.random.seed(seed)
+    topics = []
+    for beta in betas:
+        topics.append(np.random.dirichlet(beta, size=n))
+    return np.transpose(np.array(topics), [1, 0, 2])
 
 def toy_bars(normalized=True):
     topics = []
@@ -116,8 +124,20 @@ def get_random_topics(n, num_topics, vocab_size, alpha, seed):
     return all_topic_sets
 
 if __name__ == "__main__":
-    plot_side_by_side_docs(toy_bars(), name="toy_bars.png")
-    for i in range(10, 100, 10):
-        bars = permuted_toy_bars(i, seed=0)
-        plot_side_by_side_docs(bars, name="bars{}.png".format(i))
-    plot_side_by_side_docs(diagonal_bars(), name="diagonal_bars.png")
+    # plot_side_by_side_docs(toy_bars(), name="toy_bars.png")
+    # for i in range(10, 100, 10):
+    #     bars = permuted_toy_bars(i, seed=0)
+    #     plot_side_by_side_docs(bars, name="bars{}.png".format(i))
+    # plot_side_by_side_docs(diagonal_bars(), name="diagonal_bars.png")
+    n_topics = 4
+    vocab_size = 16
+    # betas = .5 * np.ones((n_topics, vocab_size))
+    betas = []
+    for i in range(n_topics):
+        beta = np.ones(vocab_size)
+        popular_words = [idx for idx in range(vocab_size) if idx % n_topics == i]
+        beta[popular_words] = 10
+        betas.append(normalize1d(beta))
+    test_topics = generate_topics(n=5, betas=betas, seed=0)
+    for i, topics in enumerate(test_topics):
+        plot_side_by_side_docs(topics, name="test_topics{}.png".format(i))

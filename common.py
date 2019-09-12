@@ -38,6 +38,13 @@ def train_save_VAE(train_data, valid_data, model_config, training_epochs=120, ba
     tf.reset_default_graph()
 
 
+def save_speed_to_csv(model_config, clock_time):
+    with open(os.path.join(model_config['results_dir'], 'clock_times.csv'), 'a') as f:
+        row = [model_config['data_name'], model_config['inference'], clock_time]
+        csv_writer = csv.writer(f)
+        csv_writer.writerow(row)
+
+
 def save_elbo_vs_m(vae, documents, topics, ms, results_dir, names=['train', 'valid']):
     with open(os.path.join(results_dir, 'elbo_vs_m.csv'), 'w') as f:
         writer = csv.writer(f, delimiter=',')
