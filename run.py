@@ -57,11 +57,12 @@ betas = []
 test_betas = []
 for i in range(n_topics):
     beta = np.ones(vocab_size)
-    if i < math.sqrt(vocab_size):
-        popular_words = [idx for idx in range(vocab_size) if idx % n_topics == i]
+    dim = math.sqrt(vocab_size)
+    if i < dim:
+        popular_words = [idx for idx in range(vocab_size) if idx % dim == i]
     else:
-        popular_words = [idx for idx in range(vocab_size) if idx / n_topics == i]
-    beta[popular_words] = 10
+        popular_words = [idx for idx in range(vocab_size) if int(idx / dim) == i - dim]
+    beta[popular_words] = 100
     betas.append(normalize1d(beta))
     test_betas.append(normalize1d(beta + 1))
 train_topics = generate_topics(n=20, betas=betas, seed=0)
