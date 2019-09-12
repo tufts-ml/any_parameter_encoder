@@ -22,7 +22,7 @@ from training.train_vae import train, train_with_hallucinations
 from utils import unzip_X_and_topics
 
 
-def train_save_VAE(train_data, valid_data, model_config, training_epochs=120, batch_size=200, tensorboard=True, hallucinations=False, shuffle=True):
+def train_save_VAE(train_data, valid_data, model_config, training_epochs=120, batch_size=200, tensorboard=True, hallucinations=False, shuffle=True, display_step=5):
     vae = VAE_tf(tensorboard=tensorboard, **model_config)
     tensorboard_logs_dir = os.path.join(
         model_config['results_dir'], model_config['model_name'],
@@ -32,7 +32,7 @@ def train_save_VAE(train_data, valid_data, model_config, training_epochs=120, ba
             tensorboard=tensorboard, tensorboard_logs_dir=tensorboard_logs_dir, results_dir=model_config['results_dir'])
     else:
         vae = train(train_data, valid_data, vae, training_epochs=training_epochs, tensorboard=tensorboard, batch_size=batch_size,
-            tensorboard_logs_dir=tensorboard_logs_dir, results_dir=model_config['results_dir'])
+            tensorboard_logs_dir=tensorboard_logs_dir, results_dir=model_config['results_dir'], display_step=display_step)
     vae.save()
     vae.sess.close()
     tf.reset_default_graph()

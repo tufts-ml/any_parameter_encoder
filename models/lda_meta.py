@@ -15,6 +15,30 @@ from utils import unzip_X_and_topics
 l2_norm = lambda t: tf.sqrt(tf.reduce_sum(tf.pow(t, 2)))
 cwd = os.getcwd()
 
+def linear_warmup_and_cooldown(starting_learning_rate, global_step, decay_steps, decay_rate):
+    """
+    Arguments:
+        starting_learning_rate is the max learning rate
+        decay_steps is the number of steps before we switch from warm up to cool down
+        decay_rate is the rate we decay during cooldown
+    """
+    if global_step < decay_steps:
+        return global_step / decay_steps * starting_learning_rate
+    return starting_learning_rate * (1 - (global_step - decay_steps) * decay_rate)
+    # return tf.cond(
+    #     tf.math.less(global_step, decay_steps),
+    #     true_fn=tf.math.scalar_mul(starting_learning_rate, tf.math.divide(global_step, decay_steps)),
+    #     false_fn=tf.math.scalar_mul(
+    #         starting_learning_rate,
+    #         tf.math.subtract(1,
+    #             tf.math.scalar_mul(
+    #                 decay_rate,
+    #                 tf.to_float(global_step - decay_steps)
+    #             )
+    #         )
+    #     )
+    # )
+
 
 class VAE_tf(object):
     """
@@ -40,6 +64,7 @@ class VAE_tf(object):
             alpha=1,
             n_steps_enc=1,
             tensorboard=False,
+            custom_lr=False,
             **kwargs
     ):
         self.n_hidden_units = n_hidden_units
@@ -58,7 +83,12 @@ class VAE_tf(object):
         self.batch_size = batch_size
         self.n_steps_enc = n_steps_enc
         self.tensorboard = tensorboard
-        self.global_step = tf.Variable(0, trainable=False, name='global_step')
+        self.custom_lr = custom_lr
+        if self.custom_lr:
+            self.global_step = 0
+            # self.global_step = tf.Variable(0, trainable=False, name='global_step')
+        else:
+            self.global_step = tf.Variable(0, trainable=False, name='global_step')
         self.summaries = []
         """----------------Inputs----------------"""
         self.x = tf.placeholder(tf.float32, [None, self.vocab_size], name='x')
@@ -262,10 +292,15 @@ class VAE_tf(object):
         train_ops = []
 
         enc_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='recognition_network')
-        learning_rate_enc = tf.train.exponential_decay(
+        if self.custom_lr:
+            learning_rate_enc = linear_warmup_and_cooldown(self.starting_learning_rate, self.global_step, self.decay_steps, self.decay_rate)
+            self.global_step += 1
+            # tf.assign_add(self.global_step, 1, name='increment')
+            optimizer_enc = tf.train.AdamOptimizer(learning_rate_enc, beta1=0.99)
+        else:
+            learning_rate_enc = tf.train.exponential_decay(
             self.starting_learning_rate, self.global_step, self.decay_steps,
             self.decay_rate, staircase=True)
-        optimizer_enc = tf.train.AdamOptimizer(learning_rate_enc, beta1=0.99)
 
         dec_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator_network')
         if len(dec_vars):
@@ -281,7 +316,7 @@ class VAE_tf(object):
         for i in range(self.n_steps_enc):
             grad_and_vars_enc = optimizer_enc.compute_gradients(self.cost, enc_vars)
             enc_gv_collection.append(grad_and_vars_enc)
-            if i == self.n_steps_enc - 1:
+            if i == self.n_steps_enc - 1 and not self.custom_lr:
                 train_ops.append(optimizer_enc.apply_gradients(grad_and_vars_enc, global_step=self.global_step))
             else:
                 train_ops.append(optimizer_enc.apply_gradients(grad_and_vars_enc))

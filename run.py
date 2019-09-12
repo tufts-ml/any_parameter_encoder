@@ -22,7 +22,7 @@ from visualization.posterior import plot_posterior
 from utils import softmax, unzip_X_and_topics, normalize1d
 
 # where to write the results
-results_dir = 'experiments/template'
+results_dir = 'experiments/naive_200_new_lr1'
 results_file = 'results.csv'
 print(results_dir)
 if not os.path.exists(results_dir):
@@ -41,15 +41,16 @@ model_config = {
     'results_file': results_file,
     'inference': 'vae',
     'model_name': 'lda_meta',
-    'architecture': 'template',
+    'architecture': 'naive',
     'scale_trainable': True,
     'n_hidden_layers': 5,
     'n_hidden_units': 100,
     'n_samples': 1,
-    'decay_rate': .9,
-    'decay_steps': 100,
+    'decay_rate': .001,
+    'decay_steps': 1000,
     'starting_learning_rate': .01,
-    'n_steps_enc': 1
+    'n_steps_enc': 1,
+    'custom_lr': True
 }
 
 # toy bars data
@@ -71,9 +72,9 @@ else:
         beta[popular_words] = 100
         betas.append(normalize1d(beta))
         test_betas.append(normalize1d(beta + 1))
-    train_topics = generate_topics(n=2000, betas=betas, seed=0)
-    valid_topics = generate_topics(n=20, betas=betas, seed=1)
-    test_topics = generate_topics(n=20, betas=test_betas, seed=0)
+    train_topics = generate_topics(n=200, betas=betas, seed=0)
+    valid_topics = generate_topics(n=5, betas=betas, seed=1)
+    test_topics = generate_topics(n=5, betas=test_betas, seed=0)
 
     # for i, topics in enumerate(train_topics):
     #     plot_side_by_side_docs(topics, os.path.join(results_dir, 'train_topics_{}.pdf'.format(str(i).zfill(3))))
@@ -82,7 +83,7 @@ else:
     for i, topics in enumerate(test_topics):
         plot_side_by_side_docs(topics, os.path.join(results_dir, 'test_topics_{}.pdf'.format(str(i).zfill(3))))
 
-    documents, doc_topic_dists = generate_documents(train_topics[0], 1000, alpha=.01, seed=0)
+    documents, doc_topic_dists = generate_documents(train_topics[0], 50, alpha=.01, seed=0)
 
     np.save(os.path.join(results_dir, 'train_topics.npy'), train_topics)
     np.save(os.path.join(results_dir, 'valid_topics.npy'), valid_topics)
@@ -98,7 +99,7 @@ datasets = [train[:150], valid[:150], test[:150]]
 dataset_names = ['train', 'valid', 'test']
 
 # train the VAE and save the weights
-vae = train_save_VAE(train, valid, model_config, training_epochs=150, batch_size=200, hallucinations=False, tensorboard=True, shuffle=True)
+vae = train_save_VAE(train, valid, model_config, training_epochs=60, batch_size=200, hallucinations=False, tensorboard=True, shuffle=True, display_step=1)
 # load the VAE into pyro for evaluation
 vae = VAE_pyro(**model_config)
 state_dict = vae.load()
