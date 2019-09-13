@@ -65,6 +65,7 @@ class VAE_tf(object):
             n_steps_enc=1,
             tensorboard=False,
             custom_lr=False,
+            use_dropout=False,
             **kwargs
     ):
         self.n_hidden_units = n_hidden_units
@@ -84,6 +85,7 @@ class VAE_tf(object):
         self.n_steps_enc = n_steps_enc
         self.tensorboard = tensorboard
         self.custom_lr = custom_lr
+        self.use_dropout = use_dropout
         if self.custom_lr:
             self.global_step = 0
             # self.global_step = tf.Variable(0, trainable=False, name='global_step')
@@ -191,10 +193,14 @@ class VAE_tf(object):
                 raise ValueError("architecture must be either 'naive' or 'template'")
 
             for i in range(2, self.n_hidden_layers + 1):
-                layer = tf.contrib.layers.batch_norm(self.transfer_fct(
+                layer = self.transfer_fct(
                     tf.add(tf.matmul(layer, weights["h{}".format(i)]),
                            biases["b{}".format(i)])
-                ))
+                )
+                if self.use_dropout:
+                    layer = tf.contrib.layers.batch_norm(tf.nn.dropout(layer, self.keep_prob))
+                else:
+                    layer = tf.contrib.layers.batch_norm(layer)
             z_mean = tf.contrib.layers.batch_norm(
                 tf.add(tf.matmul(layer, weights["out_mean"]), biases["out_mean"])
             )
@@ -296,11 +302,11 @@ class VAE_tf(object):
             learning_rate_enc = linear_warmup_and_cooldown(self.starting_learning_rate, self.global_step, self.decay_steps, self.decay_rate)
             self.global_step += 1
             # tf.assign_add(self.global_step, 1, name='increment')
-            optimizer_enc = tf.train.AdamOptimizer(learning_rate_enc, beta1=0.99)
         else:
             learning_rate_enc = tf.train.exponential_decay(
             self.starting_learning_rate, self.global_step, self.decay_steps,
             self.decay_rate, staircase=True)
+        optimizer_enc = tf.train.AdamOptimizer(learning_rate_enc, beta1=0.99)
 
         dec_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator_network')
         if len(dec_vars):
