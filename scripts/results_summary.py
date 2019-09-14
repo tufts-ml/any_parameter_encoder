@@ -10,6 +10,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Results summary')
     parser.add_argument('results_dir', type=str, help='Experiment Directory')
     parser.add_argument('--normalized', help='Experiment Directory', action='store_true')
+    parser.add_argument('--full_data', help='Experiment Directory', action='store_true')
     args = parser.parse_args()
 
     print(args.results_dir)
@@ -22,7 +23,13 @@ if __name__ == "__main__":
             documents_file = os.path.join('experiments', 'documents.npy')
         documents = np.load(documents_file)
         # valid = np.load(os.path.join(results_dir, 'valid_documents.npy'))
-        datasets = [documents * 200, documents * 5, documents * 5]
+        if args.full_data:
+            datasets = [documents * 200, documents * 5, documents * 5]
+        else:
+            datasets = [
+                documents[0] * 200 + documents[1] * 100,
+                documents[:60] * 5,
+                documents[:60] * 5]
         df = normalize_posterior_predictive(df, datasets, dataset_names)
         df.to_csv(os.path.join(args.results_dir, 'results_normalized.csv'), header=False, index=False)
     print(df.groupby(['dataset', 'inference']).posterior_predictive_density.agg(
