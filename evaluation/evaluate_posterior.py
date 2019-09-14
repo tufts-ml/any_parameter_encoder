@@ -1,3 +1,4 @@
+import os
 import math
 import numpy as np
 import torch
@@ -53,3 +54,37 @@ def reconstruct_data(posterior, vae, topics):
     # reconstructions = zip(*reconstructions)
     # return np.array(reconstructions).reshape((-1, VOCAB_SIZE))
 
+
+def kl_enc_svi(results_dir, data_names=['train', 'valid', 'test']):
+    all_kl_q_p = []
+    all_kl_p_q = []
+    for data_name in data_names:
+        svi_loc = np.load(os.path.join(results_dir, '{}_{}_z_loc.npy'.format(data_name, 'svi')))
+        svi_scale = np.load(os.path.join(results_dir, '{}_{}_z_scale.npy'.format(data_name, 'svi')))
+        vae_loc = np.load(os.path.join(results_dir, '{}_{}_z_loc.npy'.format(data_name, 'vae')))
+        vae_scale = np.load(os.path.join(results_dir, '{}_{}_z_scale.npy'.format(data_name, 'vae')))
+        kl_divs_q_p = map(kl_mult_gauss, vae_loc, vae_scale, svi_loc, svi_scale)
+        kl_divs_p_q = map(kl_mult_gauss, svi_loc, svi_scale, vae_loc, vae_scale)
+        print("KL(q||p)", data_name, np.mean(kl_divs_q_p), np.std(kl_divs_q_p))
+        print("KL(p||q)", data_name, np.mean(kl_divs_p_q), np.std(kl_divs_p_q))
+        all_kl_q_p.append(kl_divs_q_p)
+        all_kl_p_q.append(kl_divs_p_q)
+    return all_kl_q_p, all_kl_p_q
+
+
+def kl_mult_gauss(q_mu, q_sigma, p_mu, p_sigma):
+    """Compare two multivariate normal (or log normal) distributions """
+    dim = len(q_mu)
+    kl = 0.5 * (
+            np.sum(np.divide(q_sigma, p_sigma)) +
+            np.sum(
+                np.multiply(
+                    np.divide((q_mu - p_mu), p_sigma),
+                    (q_mu - p_mu)
+                ),
+            )
+            - dim
+            + np.sum(np.log(p_sigma))
+            - np.sum(np.log(q_sigma))
+        )
+    return kl
