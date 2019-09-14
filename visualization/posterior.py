@@ -45,6 +45,8 @@ def plot_posterior(results_dir, sample_idx, data_names, inference_names, seed=0)
             bottom_2_idx = np.argpartition(means, 2)[:2]
             axes[0][i].scatter(samples[:, top_2_idx[-1]], samples[:, top_2_idx[0]], label=inference, alpha=.2, color=color)
             axes[0][i].set_title("Top two " + data)
+            axes[0][1].set_ylim(0, 1)
+            axes[0][1].set_xlim(0, 1)
             if inference == 'vae':
                 bottom_ax = axes[1][i]
             elif inference in ['svi', 'mcmc']:
