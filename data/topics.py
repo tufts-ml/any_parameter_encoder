@@ -35,7 +35,7 @@ def toy_bars(normalized=True):
 def remove_word_from_topic(topics, seed):
     np.random.seed(seed)
     candidate_words = []
-    while len(candidate_words) == 0:
+    while len(candidate_words) <= 1:
         topic_idx = np.random.randint(len(topics))
         candidate_words = np.argwhere(topics[topic_idx] == 1).flatten()
     idx_to_remove = np.random.choice(candidate_words)
@@ -123,27 +123,38 @@ def get_random_topics(n, num_topics, vocab_size, alpha, seed):
         all_topic_sets.append(topics)
     return all_topic_sets
 
+def change_weights(topics):
+    """ topics is a single set of topics, unnormalized"""
+    new_topics = []
+    for topic in topics:
+        alphas = [t * 1000 + 1 for t in topic]
+        new_topic = np.random.dirichlet(normalize1d(alphas), size=1)[0]
+        new_topics.append(new_topic)
+    return new_topics
+
 if __name__ == "__main__":
-    # plot_side_by_side_docs(toy_bars(), name="toy_bars.png")
-    # for i in range(10, 100, 10):
-    #     bars = permuted_toy_bars(i, seed=0)
+    toy_bar_topics = toy_bars(normalized=False)
+    # plot_side_by_side_docs(toy_bars(normalized=True), name="toy_bars.png")
+    # for i in range(30, 300, 30):
+    #     bars = np.array(change_weights(permuted_toy_bars(toy_bar_topics, i, seed=i)))
     #     plot_side_by_side_docs(bars, name="bars{}.png".format(i))
     # plot_side_by_side_docs(diagonal_bars(), name="diagonal_bars.png")
-    n_topics = 10
-    vocab_size = 100
-    # betas = .5 * np.ones((n_topics, vocab_size))
-    betas = []
-    for i in range(n_topics):
-        beta = np.ones(vocab_size)
-        dim = math.sqrt(vocab_size)
-        if i < dim:
-            popular_words = [idx for idx in range(vocab_size) if idx % dim == i]
-        else:
-            popular_words = [idx for idx in range(vocab_size) if int(idx / dim) == i - dim]
-        random_additions = list(np.random.choice(range(vocab_size), 20))
-        beta[popular_words] = 200
-        beta[random_additions] = 50
-        betas.append(normalize1d(beta))
-    test_topics = generate_topics(n=5, betas=betas, seed=0)
-    for i, topics in enumerate(test_topics):
-        plot_side_by_side_docs(topics, name="test_topics{}.png".format(i))
+    # n_topics = 10
+    # vocab_size = 100
+    # # betas = .5 * np.ones((n_topics, vocab_size))
+    # betas = []
+    # for i in range(n_topics):
+    #     beta = np.ones(vocab_size)
+    #     dim = math.sqrt(vocab_size)
+    #     if i < dim:
+    #         popular_words = [idx for idx in range(vocab_size) if idx % dim == i]
+    #     else:
+    #         popular_words = [idx for idx in range(vocab_size) if int(idx / dim) == i - dim]
+    #     random_additions = list(np.random.choice(range(vocab_size), 20))
+    #     beta[popular_words] = 200
+    #     beta[random_additions] = 50
+    #     betas.append(normalize1d(beta))
+    # print(betas)
+    # test_topics = generate_topics(n=5, betas=betas, seed=0)
+    # for i, topics in enumerate(test_topics):
+    #     plot_side_by_side_docs(topics, name="test_topics{}.png".format(i))
