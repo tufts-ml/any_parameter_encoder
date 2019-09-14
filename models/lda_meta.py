@@ -586,7 +586,6 @@ class Encoder(nn.Module):
         self.fcsigma = nn.Linear(n_hidden_units, n_topics)
         self.bnmu = nn.BatchNorm1d(n_topics)
         self.bnsigma = nn.BatchNorm1d(n_topics)
-        self.scale = nn.Parameter(torch.ones([]))
 
     def forward(self, x, topics):
         # define the forward computation on the image x
@@ -596,20 +595,20 @@ class Encoder(nn.Module):
             x_and_topics = torch.cat((x, topics.reshape(-1, self.n_topics * self.vocab_size)), dim=1)
             # then return a mean vector and a (positive) square root covariance
             # each of size batch_size x n_topics
-            z_loc = torch.mul(self.scale, self.bnmu(self.fcmu(self.enc_layers(x_and_topics))))
+            z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
             z_scale = torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics))))
         elif self.architecture == 'template':
             x_and_topics = torch.einsum("ab,abc->ac", (x, torch.transpose(topics, 1, 2)))
-            z_loc = torch.mul(self.scale, self.bnmu(self.fcmu(self.enc_layers(x_and_topics))))
+            z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
             z_scale = torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics))))
         elif self.architecture == 'standard':
-            z_loc = torch.mul(self.scale, self.bnmu(self.fcmu(self.enc_layers(x))))
+            z_loc = self.bnmu(self.fcmu(self.enc_layers(x)))
             z_scale = torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x))))
         elif self.architecture == 'naive_separated':
             x_and_topics = torch.cat((x, topics.reshape(-1, self.n_topics * self.vocab_size)), dim=1)
             # then return a mean vector and a (positive) square root covariance
             # each of size batch_size x n_topics
-            z_loc = torch.mul(self.scale, self.bnmu(self.fcmu(self.enc_layers_mu(x_and_topics))))
+            z_loc = self.bnmu(self.fcmu(self.enc_layers_mu(x_and_topics)))
             z_scale = torch.exp(self.bnsigma(self.fcsigma(self.enc_layers_sigma(x_and_topics))))
         else:
             raise ValueError('Invalid architecture')
@@ -619,9 +618,11 @@ class Encoder(nn.Module):
 class Decoder(nn.Module):
     def __init__(self):
         super(Decoder, self).__init__()
+        self.scale = nn.Parameter(torch.ones([]))
         self.softmax = nn.Softmax(dim=1)
 
     def forward(self, z, topics):
+        z = torch.mul(self.scale, z)
         word_probs = torch.bmm(self.softmax(z).unsqueeze(1), topics)
         return torch.squeeze(word_probs, 1)
 
@@ -634,7 +635,6 @@ class VAE_pyro(nn.Module):
         # create the encoder and decoder networks
         self.encoder = Encoder(n_hidden_units, n_hidden_layers, architecture, n_topics=n_topics, vocab_size=vocab_size)
         self.decoder = Decoder()
-
         if use_cuda:
             # calling cuda() here will put all the parameters of
             # the encoder and decoder networks into gpu memory
@@ -755,7 +755,7 @@ class VAE_pyro(nn.Module):
         state_dict['encoder.bnmu.running_var'] = torch.from_numpy(h5f['running_var_out_mean'][()])
         state_dict['encoder.bnsigma.running_var'] = torch.from_numpy(h5f['running_var_out_log_sigma'][()])
 
-        state_dict['encoder.scale'] = torch.from_numpy(np.array(h5f['scale'][()]))
+        state_dict['decoder.scale'] = torch.from_numpy(np.array(h5f['scale'][()]))
 
         h5f.close()
 
