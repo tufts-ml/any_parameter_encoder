@@ -67,6 +67,7 @@ class VAE_tf(object):
             custom_lr=False,
             use_dropout=False,
             use_adamw = False,
+            scale_type='sample',
             **kwargs
     ):
         self.n_hidden_units = n_hidden_units
@@ -88,6 +89,7 @@ class VAE_tf(object):
         self.custom_lr = custom_lr
         self.use_dropout = use_dropout
         self.use_adamw = use_adamw
+        self.scale_type = scale_type
         if self.custom_lr:
             self.global_step = 0
             # self.global_step = tf.Variable(0, trainable=False, name='global_step')
@@ -125,10 +127,13 @@ class VAE_tf(object):
             self.network_weights["weights_recog"], self.network_weights["biases_recog"],
         )
         eps = tf.random_normal((self.n_samples, self.n_topics), 0, 1, dtype=tf.float32)
+        if self.scale_type == 'mean':
+            self.z_mean = tf.multiply(self.scale, self.z_mean)
         z = tf.add(
             tf.expand_dims(self.z_mean, axis=1), tf.multiply(tf.sqrt(tf.exp(tf.expand_dims(self.z_log_sigma_sq, axis=1))), eps)
         )
-        z = tf.multiply(self.scale, z)
+        if self.scale_type == 'sample':
+            z = tf.multiply(self.scale, z)
         self.z = tf.reduce_mean(z, axis=1)
         self.sigma = tf.exp(self.z_log_sigma_sq)
         # generator = partial(self._generator_network, self.network_weights['weights_gener'])
@@ -556,7 +561,7 @@ class MLP(nn.Module):
         return self.bn(self.softplus(self.fc(x)))
 
 class Encoder(nn.Module):
-    def __init__(self, n_hidden_units, n_hidden_layers, architecture, n_topics=4, vocab_size=9):
+    def __init__(self, n_hidden_units, n_hidden_layers, architecture, n_topics=4, vocab_size=9, use_scale=False):
         super(Encoder, self).__init__()
         self.n_hidden_layers = n_hidden_layers
         self.vocab_size = vocab_size
@@ -586,6 +591,9 @@ class Encoder(nn.Module):
         self.fcsigma = nn.Linear(n_hidden_units, n_topics)
         self.bnmu = nn.BatchNorm1d(n_topics)
         self.bnsigma = nn.BatchNorm1d(n_topics)
+        self.use_scale = use_scale
+        if self.use_scale:
+            self.scale = nn.Parameter(torch.ones([]))
 
     def forward(self, x, topics):
         # define the forward computation on the image x
@@ -612,29 +620,39 @@ class Encoder(nn.Module):
             z_scale = torch.exp(self.bnsigma(self.fcsigma(self.enc_layers_sigma(x_and_topics))))
         else:
             raise ValueError('Invalid architecture')
+        if self.use_scale:
+            z_loc = torch.mul(self.scale, z_loc)
         return z_loc, z_scale
 
 
 class Decoder(nn.Module):
-    def __init__(self):
+    def __init__(self, use_scale=True):
         super(Decoder, self).__init__()
-        self.scale = nn.Parameter(torch.ones([]))
+        self.use_scale = use_scale
+        if self.use_scale:
+            self.scale = nn.Parameter(torch.ones([]))
         self.softmax = nn.Softmax(dim=1)
 
     def forward(self, z, topics):
-        z = torch.mul(self.scale, z)
+        if self.use_scale:
+            z = torch.mul(self.scale, z)
         word_probs = torch.bmm(self.softmax(z).unsqueeze(1), topics)
         return torch.squeeze(word_probs, 1)
 
 
 class VAE_pyro(nn.Module):
     def __init__(self, n_hidden_units=100, n_hidden_layers=2, model_name=None, results_dir=None,
-                 alpha=.1, vocab_size=9, n_topics=4, use_cuda=False, architecture='naive', **kwargs):
+                 alpha=.1, vocab_size=9, n_topics=4, use_cuda=False, architecture='naive', scale_type='sample', **kwargs):
         super(VAE_pyro, self).__init__()
 
         # create the encoder and decoder networks
-        self.encoder = Encoder(n_hidden_units, n_hidden_layers, architecture, n_topics=n_topics, vocab_size=vocab_size)
-        self.decoder = Decoder()
+        self.scale_type = scale_type
+        if self.scale_type == 'sample':
+            self.encoder = Encoder(n_hidden_units, n_hidden_layers, architecture, n_topics=n_topics, vocab_size=vocab_size, use_scale=False)
+            self.decoder = Decoder(use_scale=True)
+        elif self.scale_type == 'mean':
+            self.encoder = Encoder(n_hidden_units, n_hidden_layers, architecture, n_topics=n_topics, vocab_size=vocab_size, use_scale=True)
+            self.decoder = Decoder(use_scale=False)
         if use_cuda:
             # calling cuda() here will put all the parameters of
             # the encoder and decoder networks into gpu memory
@@ -755,8 +773,10 @@ class VAE_pyro(nn.Module):
         state_dict['encoder.bnmu.running_var'] = torch.from_numpy(h5f['running_var_out_mean'][()])
         state_dict['encoder.bnsigma.running_var'] = torch.from_numpy(h5f['running_var_out_log_sigma'][()])
 
-        state_dict['decoder.scale'] = torch.from_numpy(np.array(h5f['scale'][()]))
-
+        if self.scale_type == 'sample':
+            state_dict['decoder.scale'] = torch.from_numpy(np.array(h5f['scale'][()]))
+        elif self.scale_type == 'mean':
+            state_dict['encoder.scale'] = torch.from_numpy(np.array(h5f['scale'][()]))
         h5f.close()
 
         return state_dict

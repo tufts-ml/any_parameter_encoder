@@ -17,7 +17,7 @@ import tensorflow as tf
 from data.topics import toy_bars, permuted_toy_bars, diagonal_bars, generate_topics
 from data.documents import generate_documents
 from models.lda_meta import VAE_pyro
-from common import train_save_VAE, save_speed_to_csv, save_loglik_to_csv
+from common import train_save_VAE, save_speed_to_csv, save_loglik_to_csv, save_reconstruction_array
 from visualization.reconstructions import plot_side_by_side_docs, plot_saved_samples
 from visualization.posterior import plot_posterior
 from utils import softmax, unzip_X_and_topics, normalize1d
@@ -27,6 +27,7 @@ parser.add_argument('results_dir', type=str, help='directory of results')
 parser.add_argument('--train', help='train the model in tf', action='store_true')
 parser.add_argument('--evaluate', help='evaluate posteriors in pyro', action='store_true')
 parser.add_argument('--run_mcmc', help='run mcmc', action='store_true')
+parser.add_argument('--use_cached', help='run mcmc', action='store_true')
 args = parser.parse_args()
 
 # where to write the results
@@ -41,6 +42,8 @@ shutil.copy(os.path.abspath(__file__), os.path.join(results_dir, 'run_simple.py'
 n_topics = 20
 vocab_size = 100
 sample_idx = list(range(10))
+# epochs = 1
+epochs = 1000
 
 model_config = {
     'vocab_size': vocab_size,
@@ -51,23 +54,27 @@ model_config = {
     'model_name': 'lda_meta',
     'architecture': 'naive',
     'scale_trainable': True,
-    'n_hidden_layers': 2,
+    'n_hidden_layers': 1,
     'n_hidden_units': 100,
     'n_samples': 100,
-    'decay_rate': .5,
-    'decay_steps': 200,
-    'starting_learning_rate': .005,
+    'decay_rate': .9,
+    'decay_steps': 1000,
+    'starting_learning_rate': .01,
     'n_steps_enc': 1,
-    'custom_lr': False
+    'custom_lr': False,
+    'use_dropout': True,
+    'use_adamw': False,
+    'alpha': .01,
+    'scale_type': 'mean'
 }
 
 # toy bars data
-if os.path.exists(os.path.join(results_dir, 'train_topics.npy')):
+if args.use_cached and os.path.exists(os.path.join(results_dir, 'train_topics.npy')):
     train_topics = np.load(os.path.join(results_dir, 'train_topics.npy'))
     valid_topics = np.load(os.path.join(results_dir, 'valid_topics.npy'))
     test_topics = np.load(os.path.join(results_dir, 'test_topics.npy'))
     documents = np.load(os.path.join(results_dir, 'documents.npy'))
-elif os.path.exists(os.path.join('experiments', 'train_topics.npy')):
+elif args.use_cached and os.path.exists(os.path.join('experiments', 'train_topics.npy')):
     train_topics = np.load(os.path.join('experiments', 'train_topics.npy'))
     valid_topics = np.load(os.path.join('experiments', 'valid_topics.npy'))
     test_topics = np.load(os.path.join('experiments', 'test_topics.npy'))
@@ -82,15 +89,15 @@ else:
             popular_words = [idx for idx in range(vocab_size) if idx % dim == i]
         else:
             popular_words = [idx for idx in range(vocab_size) if int(idx / dim) == i - dim]
-        beta[popular_words] = 100
+        beta[popular_words] = 1000
         betas.append(normalize1d(beta))
         test_betas.append(normalize1d(beta + 1))
-    train_topics = generate_topics(n=200, betas=betas, seed=0)
+    train_topics = generate_topics(n=5, betas=betas, seed=0)
     valid_topics = generate_topics(n=5, betas=betas, seed=1)
-    test_topics = generate_topics(n=5, betas=test_betas, seed=0)
+    test_topics = generate_topics(n=5, betas=betas, seed=0)
 
-    # for i, topics in enumerate(train_topics):
-    #     plot_side_by_side_docs(topics, os.path.join(results_dir, 'train_topics_{}.pdf'.format(str(i).zfill(3))))
+    for i, topics in enumerate(train_topics):
+        plot_side_by_side_docs(topics, os.path.join(results_dir, 'train_topics_{}.pdf'.format(str(i).zfill(3))))
     for i, topics in enumerate(valid_topics):
         plot_side_by_side_docs(topics, os.path.join(results_dir, 'valid_topics_{}.pdf'.format(str(i).zfill(3))))
     for i, topics in enumerate(test_topics):
@@ -106,7 +113,7 @@ else:
 # TODO: perform correct queuing so full dataset doesn't need to be in memory
 train = list(itertools.product(documents, train_topics))
 valid = list(itertools.product(documents, valid_topics))
-test = list(itertools.product(documents, valid_topics))
+test = list(itertools.product(documents, test_topics))
 # TODO: fix to evaluate on same number of topics
 datasets = [train[:300], valid[:300], test[:300]]
 # datasets = [train, valid, test]
@@ -114,12 +121,16 @@ dataset_names = ['train', 'valid', 'test']
 
 # train the VAE and save the weights
 if args.train:
-    vae = train_save_VAE(train, valid, model_config, training_epochs=15, batch_size=200, hallucinations=False, tensorboard=True, shuffle=True, display_step=1)
+    vae = train_save_VAE(train, valid, model_config, training_epochs=epochs, batch_size=800, hallucinations=False, tensorboard=True, shuffle=True, display_step=1)
 # load the VAE into pyro for evaluation
 if args.evaluate:
     vae = VAE_pyro(**model_config)
     state_dict = vae.load()
     vae.load_state_dict(state_dict)
+    if model_config['scale_type'] == 'mean':
+        print(vae.encoder.scale)
+    elif model_config['scale_type'] == 'sample':
+        print(vae.decoder.scale)
     for data_name, data_and_topics in zip(dataset_names, datasets):
         data, topics = unzip_X_and_topics(data_and_topics)
         data = torch.from_numpy(data.astype(np.float32))
@@ -146,6 +157,8 @@ if args.evaluate:
             posterior = inference.run(data, topics)
             end = time.time()
             save_speed_to_csv(model_config, end - start)
+
+            save_reconstruction_array(vae, topics, posterior, sample_idx, model_config)
 
             # save the estimated posterior predictive log likelihood
             for i in range(10):
@@ -175,4 +188,21 @@ if args.evaluate:
             inference_names = ['vae', 'svi', 'mcmc']
         else:
             inference_names = ['vae', 'svi']
-        plot_posterior(results_dir, i, dataset_names, inference_names)
+        if model_config['scale_type'] == 'sample':
+            scale = vae.decoder.scale
+        else:
+            scale = 1
+        plot_posterior(results_dir, i, dataset_names, inference_names, scale=scale)
+
+    # plot the reconstructions
+    for data_name, data_and_topics in zip(dataset_names, datasets):
+        data, _ = unzip_X_and_topics(data_and_topics)
+        filenames = []
+        for inference in ['vae', 'svi', 'mcmc']:
+            file = '_'.join([inference, model_config['model_name'], data_name, str(model_config['n_hidden_layers']), str(model_config['n_hidden_units'])]) + '.npy'
+            filepath = os.path.join(os.getcwd(), results_dir, file)
+            if os.path.exists(filepath):
+                filenames.append(filepath)
+
+        plot_name = os.path.join(results_dir, data_name + '_vae_reconstructions.pdf')
+        plot_saved_samples(np.array(data)[sample_idx], filenames, plot_name, vocab_size=vocab_size, intensity=10)
