@@ -31,22 +31,29 @@ def plot_posterior_dense(results_dir, sample_indices, data_name, inference_names
 def plot_posterior(results_dir, sample_idx, data_names, inference_names, scale=1, seed=0):
     np.random.seed(seed)
     fig, axes = plt.subplots(3, len(data_names), sharex=False, sharey=False, tight_layout=True, figsize=(len(data_names) * 4, 12))
+    top_2_idx = None
+    bottom_2_idx = None
     for i, data in enumerate(data_names):
         for inference, color in zip(inference_names, ['red', 'green', 'purple']):
             if inference == "mcmc":
                 samples_unnormalized = np.load(os.path.join(results_dir, '{}_{}_samples.npy'.format(data, inference)))[:, sample_idx]
-                samples = softmax(samples_unnormalized)
+                samples = softmax(scale * samples_unnormalized)
             else:
                 z_loc = np.load(os.path.join(results_dir, '{}_{}_z_loc.npy'.format(data, inference)))[sample_idx]
                 z_scale = np.load(os.path.join(results_dir, '{}_{}_z_scale.npy'.format(data, inference)))[sample_idx]
                 samples = softmax(scale * np.random.multivariate_normal(z_loc, np.diag(z_scale), size=150))
             means = np.mean(samples, axis=0)
+            # if top_2_idx is None:
+            #     top_2_idx = np.argpartition(means, -2)[-2:]
+            # if bottom_2_idx is None:
+            #     bottom_2_idx = np.argpartition(means, 2)[:2]
+
             top_2_idx = np.argpartition(means, -2)[-2:]
             bottom_2_idx = np.argpartition(means, 2)[:2]
             axes[0][i].scatter(samples[:, top_2_idx[-1]], samples[:, top_2_idx[0]], label=inference, alpha=.2, color=color)
             axes[0][i].set_title("Top two " + data)
-            axes[0][1].set_ylim(0, 1)
-            axes[0][1].set_xlim(0, 1)
+            axes[0][i].set_ylim(0, 1)
+            axes[0][i].set_xlim(0, 1)
             if inference == 'vae':
                 bottom_ax = axes[1][i]
             elif inference in ['svi', 'mcmc']:
@@ -55,8 +62,8 @@ def plot_posterior(results_dir, sample_idx, data_names, inference_names, scale=1
             second_smallest_weights = samples[:, bottom_2_idx[1]]
             bottom_ax.scatter(smallest_weights, second_smallest_weights, label=inference, alpha=.2, color=color)
             bottom_ax.set_title("Bottom two " + data)
-            bottom_ax.set_xlim(min(0, smallest_weights.min() * .9), smallest_weights.max() * 1.1)
-            bottom_ax.set_ylim(min(0, smallest_weights.max() * .9), second_smallest_weights.max() * 1.1)
+            # bottom_ax.set_xlim(min(0, smallest_weights.min() * .9), smallest_weights.max() * 1.1)
+            # bottom_ax.set_ylim(min(0, smallest_weights.max() * .9), second_smallest_weights.max() * 1.1)
     axes[0][0].legend()
     plt.savefig(os.path.join(results_dir, 'posteriors_{}.png'.format(sample_idx)))
 
