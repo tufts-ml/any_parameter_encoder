@@ -20,11 +20,13 @@ def normalize(x, axis):
 
 def softmax(x):
     """Note: x should be a 2D array"""
-    return np.exp(x) / np.sum(np.exp(x), axis=1)[:,None]
+    e_x = np.exp(x - np.expand_dims(np.max(x, axis=1), axis=1))
+    return e_x / np.sum(e_x, axis=1)[:, None]
 
 
 def softmax_1d(x):
-    return np.exp(x) / np.sum(np.exp(x))
+    e_x = np.exp(x - np.max(x))
+    return e_x / e_x.sum()
 
 
 def inverse_softmax(x):
