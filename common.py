@@ -13,14 +13,18 @@ from pyro.util import torch_isnan
 import pyro
 import tensorflow as tf
 import torch
+from scipy.stats import multivariate_normal, norm
+
 from evaluation.evaluate_posterior import evaluate_log_predictive_density
 from evaluation.evaluate_posterior import reconstruct_data
 from visualization.reconstructions import plot_side_by_side_docs
 
 from models.lda_meta import VAE_tf, VAE_pyro
 from training.train_vae import train, train_with_hallucinations
-from utils import unzip_X_and_topics
+from utils import unzip_X_and_topics, softmax
 
+
+MIN_LOG_PROB = -9999999999
 
 def train_save_VAE(train_data, valid_data, model_config, training_epochs=120, batch_size=200, tensorboard=True, hallucinations=False, shuffle=True, display_step=5):
     vae = VAE_tf(tensorboard=tensorboard, **model_config)
@@ -85,6 +89,48 @@ def get_elbo_vs_m(vae, dataset_names, datasets, results_dir, distances):
                 pyro.clear_param_store()
 
 
+def get_elbo_csv(vae, results_dir, n=300):
+    dataset_names = ['train', 'valid', 'test']
+    train_topics = np.load(os.path.join(results_dir, 'train_topics.npy'))
+    valid_topics = np.load(os.path.join(results_dir, 'valid_topics.npy'))
+    test_topics = np.load(os.path.join(results_dir, 'test_topics.npy'))
+    documents = np.load(os.path.join(results_dir, 'documents.npy'))
+    train = list(itertools.product(train_topics, documents))[:n]
+    valid = list(itertools.product(valid_topics, documents))[:n]
+    test = list(itertools.product(test_topics, documents))[:n]
+    datasets = [train, valid, test]
+    assert len(train) == len(valid) == len(test) == n, 'One of the splits is less than n'
+    num_docs = len(documents)
+    assert n % num_docs == 0, 'Must use a multiple of num_docs'
+    num_topics = n / len(documents)
+    with open(os.path.join(results_dir, 'elbos.csv'), 'w') as f:
+        writer = csv.writer(f, delimiter=',')
+        writer.writerow(['Dataset', 'Topic index', 'SVI ELBO', 'VAE encoder ELBO'])
+        for data_name, topics_and_data in zip(dataset_names, datasets):
+            topics, data = unzip_X_and_topics(topics_and_data)
+            data = torch.from_numpy(data.astype(np.float32))
+            topics = torch.from_numpy(topics.astype(np.float32))
+            pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .1}, 'step_size': 10000, 'gamma': 0.95})
+            print(data.shape)
+            print(topics.shape)
+            for i in range(num_topics):
+                data_i = data[i * num_docs: (i + 1) * num_docs]
+                topics_i = topics[i * num_docs: (i + 1) * num_docs]
+                vae_elbo = Trace_ELBO()
+                vae_svi = SVI(vae.model, vae.encoder_guide, pyro_scheduler, loss=vae_elbo, num_steps=0, num_samples=100)
+
+                vae_posterior = vae_svi.run(data_i, topics_i)
+                vae_loss = vae_svi.evaluate_loss(data_i, topics_i)
+                svi_loss = np.nan
+                while torch_isnan(svi_loss):
+                    svi_elbo = Trace_ELBO()
+                    svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=svi_elbo, num_steps=400, num_samples=100)
+                    svi_posterior = svi.run(data_i, topics_i)
+                    svi_loss = svi.evaluate_loss(data_i, topics_i)
+                    pyro.clear_param_store()
+                writer.writerow([data_name, i, svi_loss, vae_loss])
+                pyro.clear_param_store()
+
 
 def save_loglik_to_csv(data, topics, model, posterior, model_config, num_samples=10):
     posterior_predictive = TracePredictive(model, posterior, num_samples=num_samples)
@@ -105,6 +151,49 @@ def save_loglik_to_csv(data, topics, model, posterior, model_config, num_samples
         csv_writer.writerow(row)
 
 
+def save_kl_to_csv(results_dir, data_name):
+    """ Compare SVI and VAE encoder to MCMC """
+    with open(os.path.join(results_dir, 'kl_div.csv'), 'a') as f:
+        writer = csv.writer(f, delimiter=',')
+        writer.writerow(['data', 'inference', 'kl'])
+        mcmc_samples = np.load(os.path.join(results_dir, '{}_{}_samples.npy'.format(data_name, 'mcmc')))
+        mcmc_log_prob_sums = np.load(os.path.join(results_dir, '{}_{}_log_prob_sums.npy'.format(data_name, 'mcmc')))
+        for inference_name in ['vae', 'svi']:
+            z_loc = np.load(os.path.join(results_dir, '{}_{}_z_loc.npy'.format(data_name, inference_name)))
+            z_scale = np.load(os.path.join(results_dir, '{}_{}_z_scale.npy'.format(data_name, inference_name)))
+            num_samples = 0
+            total = 0
+            for sample_unnorm, log_prob_sum in zip(mcmc_samples, mcmc_log_prob_sums):
+                log_qx = log_prob_sum
+                log_px = 0
+                for i, datapoint in enumerate(sample_unnorm):
+                    # print(datapoint)
+                    # TODO: fix nans here
+                    # print(len(datapoint))
+                    # print(len(z_loc[i]))
+                    # print(len(z_scale[i]))
+                    print([(d, l, s) for d, l, s in zip(datapoint, z_loc[i], z_scale[i])])
+                    pxs = [norm.ppf(d, loc=l, scale=s) for d, l, s in zip(datapoint, z_loc[i], z_scale[i])]
+                    pxs = [0 if np.isnan(px) else px for px in pxs]
+                    print(len(pxs))
+                    print(pxs)
+                    log_px = np.sum([np.log(px) if px != 0 else MIN_LOG_PROB for px in pxs])
+                    # diag_scale = z_scale[i] ** 2
+                    # if np.any(diag_scale == 0):
+                    #     print('a scale value is zero for {}'.format(inference_name))
+                    #     diag_scale = diag_scale + 1e-10
+                    # px = multivariate_normal.pdf(datapoint, mean=z_loc[i], cov=np.diag(diag_scale))
+                    # if px != 0:
+                    #     log_px += np.log(px)
+                    # else:
+                    #     log_px += MIN_LOG_PROB
+                total += log_qx - log_px
+                num_samples += 1
+            # this is the forward KL, which is zero-avoiding
+            kl_qp = total / num_samples
+            writer.writerow([data_name, inference_name, kl_qp])
+
+
 def save_reconstruction_array(vae, topics, posterior, sample_idx, model_config):
     # reconstruct the data
     reconstructions = reconstruct_data(posterior, vae, topics)
@@ -120,3 +209,6 @@ def save_reconstruction_array(vae, topics, posterior, sample_idx, model_config):
         results_dir, '_'.join([inference, model_name, data_name, str(n_hidden_layers), str(n_hidden_units)])) + '.npy'
     np.save(file, averaged_reconstructions)
 
+
+if __name__ == "__main__":
+    save_kl_to_csv(None, 'train', {'scale_type': 'sample', 'results_dir': 'experiments/naive_sample2'})
