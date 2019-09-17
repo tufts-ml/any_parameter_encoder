@@ -7,6 +7,7 @@ import numpy as np
 import math
 import torch
 import argparse
+import matplotlib.pyplot as plt
 
 from pyro.optim import StepLR
 from pyro.infer import SVI, Trace_ELBO, TraceMeanField_ELBO
@@ -16,14 +17,17 @@ import tensorflow as tf
 
 from data.topics import toy_bars, permuted_toy_bars, diagonal_bars, generate_topics
 from data.documents import generate_documents
-from models.lda_meta import VAE_pyro
-from common import train_save_VAE, save_speed_to_csv, save_loglik_to_csv, save_reconstruction_array
+from models.lda_meta import VAE_pyro, VAE_tf
+from common import train_save_VAE, save_speed_to_csv, save_loglik_to_csv, save_reconstruction_array, save_kl_to_csv, get_elbo_csv
 from visualization.reconstructions import plot_side_by_side_docs, plot_saved_samples
 from visualization.posterior import plot_posterior
+from visualization.ranking import plot_svi_vs_vae_elbo
 from utils import softmax, unzip_X_and_topics, normalize1d
+from training.train_vae import find_lr
 
 parser = argparse.ArgumentParser(description='Results summary')
 parser.add_argument('results_dir', type=str, help='directory of results')
+parser.add_argument('--find_lr', help='find best learning rate', action='store_true')
 parser.add_argument('--train', help='train the model in tf', action='store_true')
 parser.add_argument('--evaluate', help='evaluate posteriors in pyro', action='store_true')
 parser.add_argument('--run_mcmc', help='run mcmc', action='store_true')
@@ -42,8 +46,6 @@ shutil.copy(os.path.abspath(__file__), os.path.join(results_dir, 'run_simple.py'
 n_topics = 20
 vocab_size = 100
 sample_idx = list(range(10))
-# epochs = 1
-epochs = 1000
 
 model_config = {
     'vocab_size': vocab_size,
@@ -65,7 +67,9 @@ model_config = {
     'use_dropout': True,
     'use_adamw': False,
     'alpha': .01,
-    'scale_type': 'mean'
+    'scale_type': 'mean',
+    'tot_epochs': 200,
+    'batch_size': 1000,
 }
 
 # toy bars data
@@ -92,11 +96,11 @@ else:
         beta[popular_words] = 1000
         betas.append(normalize1d(beta))
         test_betas.append(normalize1d(beta + 1))
-    train_topics = generate_topics(n=5, betas=betas, seed=0)
+    train_topics = generate_topics(n=20000, betas=betas, seed=0)
     valid_topics = generate_topics(n=5, betas=betas, seed=1)
-    test_topics = generate_topics(n=5, betas=betas, seed=0)
+    test_topics = generate_topics(n=5, betas=betas, seed=2)
 
-    for i, topics in enumerate(train_topics):
+    for i, topics in zip(range(10), train_topics):
         plot_side_by_side_docs(topics, os.path.join(results_dir, 'train_topics_{}.pdf'.format(str(i).zfill(3))))
     for i, topics in enumerate(valid_topics):
         plot_side_by_side_docs(topics, os.path.join(results_dir, 'valid_topics_{}.pdf'.format(str(i).zfill(3))))
@@ -118,10 +122,21 @@ test = list(itertools.product(documents, test_topics))
 datasets = [train[:300], valid[:300], test[:300]]
 # datasets = [train, valid, test]
 dataset_names = ['train', 'valid', 'test']
+model_config['num_batches'] = math.ceil(len(train) / model_config['batch_size'])
 
 # train the VAE and save the weights
+if args.find_lr:
+    vae = VAE_tf(test_lr=True, **model_config)
+    log_lrs, losses = find_lr(vae, train, batch_size=model_config['batch_size'], final_value=1e2)
+    print(log_lrs)
+    print(losses)
+    plt.plot(log_lrs[10:-5],losses[10:-5])
+    plt.savefig(os.path.join(results_dir, 'learning_rates.png'))
 if args.train:
-    vae = train_save_VAE(train, valid, model_config, training_epochs=epochs, batch_size=800, hallucinations=False, tensorboard=True, shuffle=True, display_step=1)
+    vae = train_save_VAE(
+        train, valid, model_config,
+        training_epochs=model_config['tot_epochs'], batch_size=model_config['batch_size'],
+        hallucinations=False, tensorboard=True, shuffle=True, display_step=1)
 # load the VAE into pyro for evaluation
 if args.evaluate:
     vae = VAE_pyro(**model_config)
@@ -131,6 +146,10 @@ if args.evaluate:
         print(vae.encoder.scale)
     elif model_config['scale_type'] == 'sample':
         print(vae.decoder.scale)
+
+    get_elbo_csv(vae, results_dir)
+    plot_svi_vs_vae_elbo(results_dir)
+
     for data_name, data_and_topics in zip(dataset_names, datasets):
         data, topics = unzip_X_and_topics(data_and_topics)
         data = torch.from_numpy(data.astype(np.float32))
@@ -139,7 +158,7 @@ if args.evaluate:
         # Note: pyro scheduler doesn't have any effect in the VAE case since we never take any optimization steps
         vae_svi = SVI(vae.model, vae.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=0, num_samples=100)
         svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=400, num_samples=100)
-        mcmc = MCMC(NUTS(vae.model, adapt_step_size=True), num_samples=100, warmup_steps=50)
+        mcmc = MCMC(NUTS(vae.model, adapt_step_size=True), num_samples=100, warmup_steps=100)
         if args.run_mcmc:
             inference_methods = [vae_svi, svi, mcmc]
         else:
@@ -170,6 +189,8 @@ if args.evaluate:
                 # [num_samples, num_docs, num_topics]
                 samples = [t.nodes['latent']['value'].detach().cpu().numpy() for t in posterior.exec_traces]
                 np.save(os.path.join(results_dir, '{}_{}_samples.npy'.format(data_name, inference_name)), np.array(samples))
+                log_prob_sums = [t.log_prob_sum() for t in posterior.exec_traces]
+                np.save(os.path.join(results_dir, '{}_{}_log_prob_sums.npy'.format(data_name, inference_name)), np.array(log_prob_sums))
             else:
                 if inference_name == 'vae':
                     z_loc, z_scale = vae.encoder.forward(data, topics)
@@ -182,6 +203,11 @@ if args.evaluate:
                 np.save(os.path.join(results_dir, '{}_{}_z_scale.npy'.format(data_name, inference_name)), z_scale)
 
             pyro.clear_param_store()
+
+        # save kl between MCMC and the others
+        # if args.run_mcmc:
+        #     save_kl_to_csv(results_dir, data_name)
+
     # plot the posteriors
     for i in sample_idx:
         if args.run_mcmc:
@@ -189,7 +215,7 @@ if args.evaluate:
         else:
             inference_names = ['vae', 'svi']
         if model_config['scale_type'] == 'sample':
-            scale = vae.decoder.scale
+            scale = vae.decoder.scale.data.numpy()
         else:
             scale = 1
         plot_posterior(results_dir, i, dataset_names, inference_names, scale=scale)
