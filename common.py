@@ -89,20 +89,21 @@ def get_elbo_vs_m(vae, dataset_names, datasets, results_dir, distances):
                 pyro.clear_param_store()
 
 
-def get_elbo_csv(vae, results_dir, n=300):
+def get_elbo_csv(vae, results_dir):
     dataset_names = ['train', 'valid', 'test']
     train_topics = np.load(os.path.join(results_dir, 'train_topics.npy'))
     valid_topics = np.load(os.path.join(results_dir, 'valid_topics.npy'))
     test_topics = np.load(os.path.join(results_dir, 'test_topics.npy'))
+    num_topics_by_data = {}
+    num_topics_by_data['train'] = len(train_topics)
+    num_topics_by_data['valid'] = len(valid_topics)
+    num_topics_by_data['test'] = len(test_topics)
     documents = np.load(os.path.join(results_dir, 'documents.npy'))
-    train = list(itertools.product(train_topics, documents))[:n]
-    valid = list(itertools.product(valid_topics, documents))[:n]
-    test = list(itertools.product(test_topics, documents))[:n]
+    train = list(itertools.product(train_topics, documents))
+    valid = list(itertools.product(valid_topics, documents))
+    test = list(itertools.product(test_topics, documents))
     datasets = [train, valid, test]
-    assert len(train) == len(valid) == len(test) == n, 'One of the splits is less than n'
     num_docs = len(documents)
-    assert n % num_docs == 0, 'Must use a multiple of num_docs'
-    num_topics = n / len(documents)
     with open(os.path.join(results_dir, 'elbos.csv'), 'w') as f:
         writer = csv.writer(f, delimiter=',')
         writer.writerow(['Dataset', 'Topic index', 'SVI ELBO', 'VAE encoder ELBO'])
@@ -111,8 +112,8 @@ def get_elbo_csv(vae, results_dir, n=300):
             data = torch.from_numpy(data.astype(np.float32))
             topics = torch.from_numpy(topics.astype(np.float32))
             pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .1}, 'step_size': 10000, 'gamma': 0.95})
-            print(data.shape)
-            print(topics.shape)
+            num_topics = num_topics_by_data[data_name]
+
             for i in range(num_topics):
                 data_i = data[i * num_docs: (i + 1) * num_docs]
                 topics_i = topics[i * num_docs: (i + 1) * num_docs]
