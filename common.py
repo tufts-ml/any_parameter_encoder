@@ -37,6 +37,10 @@ def train_save_VAE(train_data, valid_data, model_config, training_epochs=120, ba
     else:
         vae = train(train_data, valid_data, vae, training_epochs=training_epochs, tensorboard=tensorboard, batch_size=batch_size,
             tensorboard_logs_dir=tensorboard_logs_dir, results_dir=model_config['results_dir'], display_step=display_step)
+    for data_name, batch_xs in zip(['train', 'valid'], [train_data[:10], valid_data[:10]]):
+        recreated_docs, _, _ = vae.recreate_input(batch_xs)
+        X, topics = unzip_X_and_topics(batch_xs)
+        plot_side_by_side_docs(np.concatenate([X, recreated_docs]), os.path.join(model_config['results_dir'], 'recreated_docs_{}.pdf'.format(str(data_name).zfill(2))))
     vae.save()
     vae.sess.close()
     tf.reset_default_graph()
@@ -89,7 +93,7 @@ def get_elbo_vs_m(vae, dataset_names, datasets, results_dir, distances):
                 pyro.clear_param_store()
 
 
-def get_elbo_csv(vae, results_dir):
+def get_elbo_csv(vae, results_dir, restart=True):
     dataset_names = ['train', 'valid', 'test']
     try:
         train_topics = np.load(os.path.join(results_dir, 'train_topics.npy'))
@@ -129,7 +133,14 @@ def get_elbo_csv(vae, results_dir):
                 vae_posterior = vae_svi.run(data_i, topics_i)
                 vae_loss = -vae_svi.evaluate_loss(data_i, topics_i)
                 svi_loss = np.nan
-                while torch_isnan(svi_loss):
+                if restart:
+                    while torch_isnan(svi_loss):
+                        svi_elbo = Trace_ELBO()
+                        svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=svi_elbo, num_steps=400, num_samples=100)
+                        svi_posterior = svi.run(data_i, topics_i)
+                        svi_loss = -svi.evaluate_loss(data_i, topics_i)
+                        pyro.clear_param_store()
+                else:
                     svi_elbo = Trace_ELBO()
                     svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=svi_elbo, num_steps=400, num_samples=100)
                     svi_posterior = svi.run(data_i, topics_i)
