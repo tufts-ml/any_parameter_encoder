@@ -20,7 +20,7 @@ from data.documents import generate_documents
 from models.lda_meta import VAE_pyro, VAE_tf
 from common import train_save_VAE, save_speed_to_csv, save_loglik_to_csv, save_reconstruction_array, save_kl_to_csv, get_elbo_csv
 from visualization.reconstructions import plot_side_by_side_docs, plot_saved_samples
-from visualization.posterior import plot_posterior
+from visualization.posterior import plot_posterior, plot_posterior_v2
 from visualization.ranking import plot_svi_vs_vae_elbo
 from utils import softmax, unzip_X_and_topics, normalize1d
 from training.train_vae import find_lr
@@ -28,6 +28,7 @@ from training.train_vae import find_lr
 parser = argparse.ArgumentParser(description='Results summary')
 parser.add_argument('results_dir', type=str, help='directory of results')
 parser.add_argument('--find_lr', help='find best learning rate', action='store_true')
+parser.add_argument('--evaluate_svi_convergence', help='run SVI to see if it converges', action='store_true')
 parser.add_argument('--train', help='train the model in tf', action='store_true')
 parser.add_argument('--evaluate', help='evaluate posteriors in pyro', action='store_true')
 parser.add_argument('--run_mcmc', help='run mcmc', action='store_true')
@@ -54,22 +55,23 @@ model_config = {
     'results_file': results_file,
     'inference': 'vae',
     'model_name': 'lda_meta',
-    'architecture': 'naive',
+    'architecture': 'standard',
     'scale_trainable': True,
-    'n_hidden_layers': 1,
+    'n_hidden_layers': 5,
     'n_hidden_units': 100,
-    'n_samples': 100,
+    'n_samples': 1,
     'decay_rate': .9,
-    'decay_steps': 1000,
-    'starting_learning_rate': .01,
+    'decay_steps': 5000,
+    'starting_learning_rate': 0.5,
     'n_steps_enc': 1,
     'custom_lr': False,
     'use_dropout': True,
     'use_adamw': False,
     'alpha': .01,
     'scale_type': 'mean',
-    'tot_epochs': 200,
-    'batch_size': 1000,
+    'tot_epochs': 400,
+    'batch_size': 50,
+    'seed': 0
 }
 
 # toy bars data
@@ -94,11 +96,16 @@ else:
         else:
             popular_words = [idx for idx in range(vocab_size) if int(idx / dim) == i - dim]
         beta[popular_words] = 1000
-        betas.append(normalize1d(beta))
+        beta = normalize1d(beta)
+        beta[popular_words] *= 5
+        betas.append(beta)
         test_betas.append(normalize1d(beta + 1))
-    train_topics = generate_topics(n=20000, betas=betas, seed=0)
+    train_topics = generate_topics(n=1, betas=betas, seed=0)
     valid_topics = generate_topics(n=5, betas=betas, seed=1)
     test_topics = generate_topics(n=5, betas=betas, seed=2)
+    # train_topics = [toy_bars()]
+    # valid_topics = [toy_bars()]
+    # test_topics = [toy_bars()]
 
     for i, topics in zip(range(10), train_topics):
         plot_side_by_side_docs(topics, os.path.join(results_dir, 'train_topics_{}.pdf'.format(str(i).zfill(3))))
@@ -107,7 +114,7 @@ else:
     for i, topics in enumerate(test_topics):
         plot_side_by_side_docs(topics, os.path.join(results_dir, 'test_topics_{}.pdf'.format(str(i).zfill(3))))
 
-    documents, doc_topic_dists = generate_documents(train_topics[0], 50, alpha=.01, seed=0)
+    documents, doc_topic_dists = generate_documents(train_topics[0], 500, alpha=.01, seed=0)
 
     np.save(os.path.join(results_dir, 'train_topics.npy'), train_topics)
     np.save(os.path.join(results_dir, 'valid_topics.npy'), valid_topics)
@@ -132,6 +139,22 @@ if args.find_lr:
     print(losses)
     plt.plot(log_lrs[10:-5],losses[10:-5])
     plt.savefig(os.path.join(results_dir, 'learning_rates.png'))
+if args.evaluate_svi_convergence:
+    vae = VAE_pyro(**model_config)
+    num_steps = 600
+    pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .1}, 'step_size': 1000, 'gamma': 0.95})
+    svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=num_steps, num_samples=100)
+    data, topics = unzip_X_and_topics(train[:300])
+    data = torch.from_numpy(data.astype(np.float32))
+    topics = torch.from_numpy(topics.astype(np.float32))
+    losses = []
+    for i in range(num_steps):
+        loss = svi.step(data, topics)
+        losses.append(loss)
+    print(losses)
+    plt.plot(range(num_steps), losses)
+    plt.savefig('svi_convergence.png')
+
 if args.train:
     vae = train_save_VAE(
         train, valid, model_config,
@@ -157,7 +180,7 @@ if args.evaluate:
         pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .1}, 'step_size': 10000, 'gamma': 0.95})
         # Note: pyro scheduler doesn't have any effect in the VAE case since we never take any optimization steps
         vae_svi = SVI(vae.model, vae.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=0, num_samples=100)
-        svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=400, num_samples=100)
+        svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=600, num_samples=100)
         mcmc = MCMC(NUTS(vae.model, adapt_step_size=True), num_samples=100, warmup_steps=100)
         if args.run_mcmc:
             inference_methods = [vae_svi, svi, mcmc]
@@ -219,6 +242,7 @@ if args.evaluate:
         else:
             scale = 1
         plot_posterior(results_dir, i, dataset_names, inference_names, scale=scale)
+    plot_posterior_v2(results_dir, list(range(0, 30, 5)), ['train', 'valid', 'test'], inference_names, scale)
 
     # plot the reconstructions
     for data_name, data_and_topics in zip(dataset_names, datasets):
