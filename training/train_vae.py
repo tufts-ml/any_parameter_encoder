@@ -136,3 +136,41 @@ def train_with_hallucinations(data, vae, model_config, alpha=.01, num_samples=10
     vae = train(np.concatenate([data, fake_data]), vae, training_epochs=100, tensorboard=tensorboard, batch_size=batch_size,
                 tensorboard_logs_dir=tensorboard_logs_dir, results_dir=results_dir)
     return vae
+
+
+def find_lr(vae, data, batch_size, init_value=1e-8, final_value=10., beta=0.98):
+    num = float(len(data)) / batch_size - 1
+    print(len(data))
+    print(batch_size)
+    print(num)
+    mult = (float(final_value) / init_value) ** (1/num)
+    print('mult', mult)
+    lr = init_value
+    avg_loss = 0.
+    best_loss = 0.
+    batch_num = 0
+    losses = []
+    log_lrs = []
+    for batch in create_minibatch(data, batch_size):
+        batch_num += 1
+        #As before, get the loss for this mini-batch of inputs/outputs
+        loss = vae.evaluate(batch)
+        print(loss)
+        #Compute the smoothed loss
+        avg_loss = beta * avg_loss + (1-beta) * loss
+        smoothed_loss = avg_loss / (1 - beta**batch_num)
+        #Stop if the loss is exploding
+        if batch_num > 1 and smoothed_loss > 4 * best_loss:
+            return log_lrs, losses
+        #Record the best loss
+        if smoothed_loss < best_loss or batch_num==1:
+            best_loss = smoothed_loss
+        #Store the values
+        losses.append(smoothed_loss)
+        log_lrs.append(math.log10(lr))
+        #Do the SGD step
+        vae.partial_fit(batch, learning_rate=lr)
+        #Update the lr for the next step
+        lr *= mult
+        print('new lr', lr)
+    return log_lrs, losses

@@ -25,19 +25,45 @@ def linear_warmup_and_cooldown(starting_learning_rate, global_step, decay_steps,
     if global_step < decay_steps:
         return global_step / decay_steps * starting_learning_rate
     return starting_learning_rate * (1 - (global_step - decay_steps) * decay_rate)
-    # return tf.cond(
-    #     tf.math.less(global_step, decay_steps),
-    #     true_fn=tf.math.scalar_mul(starting_learning_rate, tf.math.divide(global_step, decay_steps)),
-    #     false_fn=tf.math.scalar_mul(
-    #         starting_learning_rate,
-    #         tf.math.subtract(1,
-    #             tf.math.scalar_mul(
-    #                 decay_rate,
-    #                 tf.to_float(global_step - decay_steps)
-    #             )
-    #         )
-    #     )
+
+def one_cycle_policy(lr_max, global_step, tot_epochs, num_batches, 
+                     momentum_min=0.85, momentum_max=0.95, pct_start=0.3, div_factor=25,
+                     final_div=1e4):
+    # n = num_batches * tot_epochs
+    # a1 = int(n * pct_start)
+    # a2 = n - a1
+    # lr_min = tf.cond(
+    #     tf.math.less_equal(global_step, a1),
+    #     lambda: lr_max / div_factor,
+    #     lambda: lr_max / (div_factor * final_div)
     # )
+    # momentum = tf.cond(
+    #     tf.math.less_equal(global_step, a1),
+    #     lambda: momentum_max - tf.math.multiply(momentum_max - momentum_min, tf.cast(tf.math.divide(global_step, a1), tf.float32)),
+    #     lambda: momentum_min + tf.math.multiply(momentum_max - momentum_min, tf.cast(tf.math.divide(global_step,  a2), tf.float32))
+    # )
+    # lr = tf.cond(
+    #     tf.math.less_equal(global_step, a1),
+    #     lambda: lr_min + tf.math.multiply(lr_max - lr_min, tf.cast(tf.math.divide(global_step, a2), tf.float32)),
+    #     lambda: lr_max - tf.math.multiply(lr_max - lr_min, tf.cast(tf.math.divide(global_step, a1), tf.float32)),
+    # )
+    # print('learning_rate', lr)
+    # print('momentum', momentum)
+    # return tf.cast(lr, tf.float32), tf.cast(momentum, tf.float32)
+    n = num_batches * tot_epochs
+    a1 = int(n * pct_start)
+    a2 = n - a1
+    if global_step < a1:
+        lr_min = lr_max / div_factor
+        learning_rate = lr_min + (lr_max - lr_min) * global_step / a1
+        momentum = momentum_max - (momentum_max - momentum_min) * global_step / a1
+    else:
+        lr_min = lr_max / (div_factor * final_div)
+        learning_rate = lr_max - (lr_max - lr_min) * global_step / a2
+        momentum = momentum_min + (momentum_max - momentum_min) * global_step / a2
+    print('learning_rate', learning_rate)
+    print('momentum', momentum)
+    return tf.cast(learning_rate, tf.float32), tf.cast(momentum, tf.float32)
 
 
 class VAE_tf(object):
@@ -68,6 +94,10 @@ class VAE_tf(object):
             use_dropout=False,
             use_adamw = False,
             scale_type='sample',
+            test_lr=False,
+            tot_epochs=None,
+            num_batches=None,
+            seed=0,
             **kwargs
     ):
         self.n_hidden_units = n_hidden_units
@@ -90,6 +120,12 @@ class VAE_tf(object):
         self.use_dropout = use_dropout
         self.use_adamw = use_adamw
         self.scale_type = scale_type
+        # only used for one-cycle policy
+        self.test_lr = test_lr
+        self.momentum = None
+        self.tot_epochs = tot_epochs
+        self.num_batches = num_batches
+        tf.random.set_random_seed(seed)
         if self.custom_lr:
             self.global_step = 0
             # self.global_step = tf.Variable(0, trainable=False, name='global_step')
@@ -100,6 +136,8 @@ class VAE_tf(object):
         self.x = tf.placeholder(tf.float32, [None, self.vocab_size], name='x')
         self.topics = tf.placeholder(tf.float32, [None, self.n_topics, self.vocab_size], name='topics')
         self.keep_prob = tf.placeholder(tf.float32, name='keep_prob')
+        if self.test_lr:
+            self.lr = tf.placeholder(tf.float32, name='learning_rate')
 
         """-------Constructing Laplace Approximation to Dirichlet Prior--------------"""
         self.h_dim = float(self.n_topics)
@@ -343,8 +381,11 @@ class VAE_tf(object):
         train_ops = []
 
         enc_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='recognition_network')
-        if self.custom_lr:
-            learning_rate_enc = linear_warmup_and_cooldown(self.starting_learning_rate, self.global_step, self.decay_steps, self.decay_rate)
+        if self.test_lr:
+            learning_rate_enc = self.lr
+        elif self.custom_lr:
+            learning_rate_enc, momentum = one_cycle_policy(self.starting_learning_rate, self.global_step, self.tot_epochs, self.num_batches)
+            self.momentum = momentum
             self.global_step += 1
             # tf.assign_add(self.global_step, 1, name='increment')
         else:
@@ -355,13 +396,19 @@ class VAE_tf(object):
             weight_decay = .2
             optimizer_enc = tf.contrib.opt.AdamWOptimizer(weight_decay, learning_rate_enc)
         else:
-            optimizer_enc = tf.train.AdamOptimizer(learning_rate_enc, beta1=0.99)
+            optimizer_enc = tf.train.AdamOptimizer(learning_rate_enc, beta1=self.momentum if self.momentum is not None else 0.99)
 
         dec_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator_network')
         if len(dec_vars):
-            learning_rate_dec = tf.train.exponential_decay(
-                self.starting_learning_rate, self.global_step, self.decay_steps,
-                self.decay_rate, staircase=True)
+            if self.test_lr:
+                learning_rate_dec = self.lr
+            elif self.custom_lr:
+                learning_rate_dec = one_cycle_policy(self.starting_learning_rate, self.global_step)
+                self.global_step += 1
+            else:
+                learning_rate_dec = tf.train.exponential_decay(
+                    self.starting_learning_rate, self.global_step, self.decay_steps,
+                    self.decay_rate, staircase=True)
             if self.use_adamw:
                 weight_decay = .2
                 optimizer_dec = tf.contrib.opt.AdamWOptimizer(weight_decay, learning_rate_dec)
@@ -399,6 +446,8 @@ class VAE_tf(object):
                 self.summaries.append(tf.summary.scalar(
                     "reconstruction_loss", tf.reduce_mean(reconstr_loss)))
                 self.summaries.append(tf.summary.scalar("learning_rate_enc", learning_rate_enc))
+                if self.momentum is not None:
+                    self.summaries.append(tf.summary.scalar("momentum_enc", self.momentum))
                 if dec_vars:
                     self.summaries.append(tf.summary.scalar("learning_rate_dec", learning_rate_dec))
             # TODO: add the accumulated gradients from the encoder
@@ -408,12 +457,18 @@ class VAE_tf(object):
                     self.summaries.append(tf.summary.histogram("dec_gradients/" + variable_name, l2_norm(gradient)))
                     self.summaries.append(tf.summary.histogram("dec_variables/" + variable_name, l2_norm(variable)))
 
-    def partial_fit(self, X_and_topics):
+    def partial_fit(self, X_and_topics, learning_rate=None):
         X, topics = unzip_X_and_topics(X_and_topics)
-        opt, cost = self.sess.run(
+        if self.test_lr:
+            opt, cost = self.sess.run(
             (self.optimizer, self.cost),
-            feed_dict={self.x: X, self.topics: topics, self.keep_prob: 0.75},
+            feed_dict={self.x: X, self.topics: topics, self.keep_prob: 0.75, self.lr: learning_rate},
         )
+        else:
+            opt, cost = self.sess.run(
+                (self.optimizer, self.cost),
+                feed_dict={self.x: X, self.topics: topics, self.keep_prob: 0.75},
+            )
         return cost
 
     def recreate_input(self, X_and_topics):
