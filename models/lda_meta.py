@@ -98,6 +98,7 @@ class VAE_tf(object):
             tot_epochs=None,
             num_batches=None,
             seed=0,
+            skip_connections=False,
             **kwargs
     ):
         self.n_hidden_units = n_hidden_units
@@ -126,6 +127,7 @@ class VAE_tf(object):
         self.tot_epochs = tot_epochs
         self.num_batches = num_batches
         tf.random.set_random_seed(seed)
+        self.skip_connections = skip_connections
         if self.custom_lr:
             self.global_step = 0
             # self.global_step = tf.Variable(0, trainable=False, name='global_step')
@@ -259,10 +261,16 @@ class VAE_tf(object):
                 raise ValueError("architecture must be either 'naive' or 'template'")
 
             for i in range(2, self.n_hidden_layers + 1):
-                layer = self.transfer_fct(
-                    tf.add(tf.matmul(layer, weights["h{}".format(i)]),
-                           biases["b{}".format(i)])
-                )
+                if self.skip_connections and i % 2 == 0:
+                    layer = layer + self.transfer_fct(
+                        tf.add(tf.matmul(layer, weights["h{}".format(i)]),
+                            biases["b{}".format(i)])
+                    )
+                else:
+                    layer = self.transfer_fct(
+                        tf.add(tf.matmul(layer, weights["h{}".format(i)]),
+                            biases["b{}".format(i)])
+                    )
                 if self.use_dropout:
                     layer = tf.contrib.layers.batch_norm(tf.nn.dropout(layer, self.keep_prob))
                 else:
@@ -615,14 +623,19 @@ class MLP(nn.Module):
     def forward(self, x):
         return self.bn(self.softplus(self.fc(x)))
 
+class MLP_with_skip(MLP):
+    def forward(self, x):
+        return self.bn(x + self.softplus(self.fc(x)))
+
 class Encoder(nn.Module):
-    def __init__(self, n_hidden_units, n_hidden_layers, architecture, n_topics=4, vocab_size=9, use_scale=False):
+    def __init__(self, n_hidden_units, n_hidden_layers, architecture, n_topics=4, vocab_size=9, use_scale=False, skip_connections=False):
         super(Encoder, self).__init__()
         self.n_hidden_layers = n_hidden_layers
         self.vocab_size = vocab_size
         self.n_topics = n_topics
         # setup the non-linearities
         self.softplus = nn.Softplus()
+        self.skip_connections = skip_connections
         # encoder Linear layers
         modules = []
         self.architecture = architecture
@@ -635,7 +648,10 @@ class Encoder(nn.Module):
         else:
             raise ValueError('Invalid architecture')
         for i in range(self.n_hidden_layers - 1):
-            modules.append(MLP(n_hidden_units, n_hidden_units))
+            if self.skip_connections and i % 2 == 0:
+                modules.append(MLP_with_skip(n_hidden_units, n_hidden_units))
+            else:
+                modules.append(MLP(n_hidden_units, n_hidden_units))
 
         if architecture == 'naive_separated':
             self.enc_layers_mu = nn.Sequential(*modules)
@@ -681,7 +697,7 @@ class Encoder(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, use_scale=True):
+    def __init__(self, use_scale=False):
         super(Decoder, self).__init__()
         self.use_scale = use_scale
         if self.use_scale:
@@ -697,16 +713,16 @@ class Decoder(nn.Module):
 
 class VAE_pyro(nn.Module):
     def __init__(self, n_hidden_units=100, n_hidden_layers=2, model_name=None, results_dir=None,
-                 alpha=.1, vocab_size=9, n_topics=4, use_cuda=False, architecture='naive', scale_type='sample', **kwargs):
+                 alpha=.1, vocab_size=9, n_topics=4, use_cuda=False, architecture='naive', scale_type='sample', skip_connections=False, **kwargs):
         super(VAE_pyro, self).__init__()
 
         # create the encoder and decoder networks
         self.scale_type = scale_type
         if self.scale_type == 'sample':
-            self.encoder = Encoder(n_hidden_units, n_hidden_layers, architecture, n_topics=n_topics, vocab_size=vocab_size, use_scale=False)
+            self.encoder = Encoder(n_hidden_units, n_hidden_layers, architecture, n_topics=n_topics, vocab_size=vocab_size, use_scale=False, skip_connections=skip_connections)
             self.decoder = Decoder(use_scale=True)
         elif self.scale_type == 'mean':
-            self.encoder = Encoder(n_hidden_units, n_hidden_layers, architecture, n_topics=n_topics, vocab_size=vocab_size, use_scale=True)
+            self.encoder = Encoder(n_hidden_units, n_hidden_layers, architecture, n_topics=n_topics, vocab_size=vocab_size, use_scale=True, skip_connections=skip_connections)
             self.decoder = Decoder(use_scale=False)
         if use_cuda:
             # calling cuda() here will put all the parameters of
