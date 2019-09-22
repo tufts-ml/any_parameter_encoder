@@ -34,7 +34,7 @@ def plot_posterior(results_dir, sample_idx, data_names, inference_names, scale=1
     top_2_idx = None
     bottom_2_idx = None
     for i, data in enumerate(data_names):
-        for inference, color in zip(inference_names, ['red', 'green', 'purple']):
+        for inference, color in zip(reversed(inference_names), reversed(['red', 'green', 'purple'])):
             if inference == "mcmc":
                 samples_unnormalized = np.load(os.path.join(results_dir, '{}_{}_samples.npy'.format(data, inference)))[:, sample_idx]
                 samples = softmax(scale * samples_unnormalized)
@@ -43,24 +43,24 @@ def plot_posterior(results_dir, sample_idx, data_names, inference_names, scale=1
                 z_scale = np.load(os.path.join(results_dir, '{}_{}_z_scale.npy'.format(data, inference)))[sample_idx]
                 samples = softmax(scale * np.random.multivariate_normal(z_loc, np.diag(z_scale), size=150))
             means = np.mean(samples, axis=0)
-            if top_2_idx is None:
-                top_2_idx = np.argpartition(means, -2)[-2:]
-            else:
-                alt_top_2_idx = np.argpartition(means, -2)[-2:]
-                if not np.array_equal(alt_top_2_idx, top_2_idx):
-                    if data == 'train':
-                        print(alt_top_2_idx)
-                        print(top_2_idx)
-            if bottom_2_idx is None:
-                bottom_2_idx = np.argpartition(means, 2)[:2]
-            else:
-                alt_bottom_2_idx = np.argpartition(means, -2)[-2:]
-                # if not np.array_equal(alt_bottom_2_idx, bottom_2_idx):
-                #     print(alt_bottom_2_idx)
-                #     print(bottom_2_idx)
+            # if top_2_idx is None:
+            #     top_2_idx = np.argpartition(means, -2)[-2:]
+            # else:
+            #     alt_top_2_idx = np.argpartition(means, -2)[-2:]
+            #     if not np.array_equal(alt_top_2_idx, top_2_idx):
+            #         if data == 'train':
+            #             print(alt_top_2_idx)
+            #             print(top_2_idx)
+            # if bottom_2_idx is None:
+            #     bottom_2_idx = np.argpartition(means, 2)[:2]
+            # else:
+            #     alt_bottom_2_idx = np.argpartition(means, -2)[-2:]
+            #     # if not np.array_equal(alt_bottom_2_idx, bottom_2_idx):
+            #     #     print(alt_bottom_2_idx)
+            #     #     print(bottom_2_idx)
 
-            # top_2_idx = np.argpartition(means, -2)[-2:]
-            # bottom_2_idx = np.argpartition(means, 2)[:2]
+            top_2_idx = np.argpartition(means, -2)[-2:]
+            bottom_2_idx = np.argpartition(means, 2)[:2]
             axes[0][i].scatter(samples[:, top_2_idx[-1]], samples[:, top_2_idx[0]], label=inference, alpha=.2, color=color)
             axes[0][i].set_title("Top two " + data)
             axes[0][i].set_ylim(0, 1)
@@ -79,7 +79,7 @@ def plot_posterior(results_dir, sample_idx, data_names, inference_names, scale=1
     plt.savefig(os.path.join(results_dir, 'posteriors_{}.png'.format(sample_idx)))
 
 
-def plot_posterior_v2(results_dir, sample_indices, data_names, inference_names, scale=1, seed=0):
+def plot_posterior_v2(results_dir, sample_indices, data_names, inference_names, scale=1, scale_type='mean', seed=0):
     """ Rows are data examples. Columns are different slices of the posterior. """
     np.random.seed(seed)
     fig, axes = plt.subplots(3, len(data_names), sharex=False, sharey=False, tight_layout=True, figsize=(len(data_names) * 4, 12))
@@ -92,11 +92,17 @@ def plot_posterior_v2(results_dir, sample_indices, data_names, inference_names, 
             for inference in inference_names:
                 if inference == "mcmc":
                     samples_unnormalized = np.load(os.path.join(results_dir, '{}_{}_samples.npy'.format(data, inference)))[:, sample_idx]
-                    samples = softmax(scale * samples_unnormalized)
+                    if scale_type == 'sample':
+                        samples = softmax(scale * samples_unnormalized)
+                    elif scale_type == 'mean':
+                        samples = softmax(samples_unnormalized)
                 else:
                     z_loc = np.load(os.path.join(results_dir, '{}_{}_z_loc.npy'.format(data, inference)))[sample_idx]
                     z_scale = np.load(os.path.join(results_dir, '{}_{}_z_scale.npy'.format(data, inference)))[sample_idx]
-                    samples = softmax(scale * np.random.multivariate_normal(z_loc, np.diag(z_scale), size=150))
+                    if scale_type == 'sample':
+                        samples = softmax(scale * np.random.multivariate_normal(z_loc, np.diag(z_scale), size=150))
+                    elif scale_type == 'mean':
+                        samples = softmax(np.random.multivariate_normal(z_loc, np.diag(z_scale), size=150))
                 samples_by_inference[inference] = samples
                 means = np.mean(samples, axis=0)
                 top_2_idx = np.argpartition(means, -2)[-2:]
@@ -114,7 +120,7 @@ def plot_posterior_v2(results_dir, sample_indices, data_names, inference_names, 
 
 
 if __name__ == "__main__":
-    # for i in range(10):
-    #     plot_posterior('experiments/vae_experiments/naive_scale1/', i,
-    #                    ['train', 'valid', 'test'], ['vae', 'svi', 'mcmc'])
-    plot_posterior_v2('experiments/naive_mean4/', [3, 4, 5], ['train', 'valid', 'test'], ['vae', 'svi', 'mcmc'])
+    for i in range(10):
+        plot_posterior('experiments/vae_experiments/naive_scale1/', i,
+                       ['train', 'valid', 'test'], ['vae', 'svi', 'mcmc'])
+    # plot_posterior_v2('experiments/naive_20k1/', list(range(0, 30, 5)), ['train', 'valid', 'test'], ['vae', 'svi', 'mcmc'], scale=2)
