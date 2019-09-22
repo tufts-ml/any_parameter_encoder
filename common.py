@@ -91,14 +91,20 @@ def get_elbo_vs_m(vae, dataset_names, datasets, results_dir, distances):
 
 def get_elbo_csv(vae, results_dir):
     dataset_names = ['train', 'valid', 'test']
-    train_topics = np.load(os.path.join(results_dir, 'train_topics.npy'))
-    valid_topics = np.load(os.path.join(results_dir, 'valid_topics.npy'))
-    test_topics = np.load(os.path.join(results_dir, 'test_topics.npy'))
+    try:
+        train_topics = np.load(os.path.join(results_dir, 'train_topics.npy'))
+        valid_topics = np.load(os.path.join(results_dir, 'valid_topics.npy'))
+        test_topics = np.load(os.path.join(results_dir, 'test_topics.npy'))
+        documents = np.load(os.path.join(results_dir, 'documents.npy'))
+    except:
+        train_topics = np.load(os.path.join('experiments', 'train_topics.npy'))
+        valid_topics = np.load(os.path.join('experiments', 'valid_topics.npy'))
+        test_topics = np.load(os.path.join('experiments', 'test_topics.npy'))
+        documents = np.load(os.path.join('experiments', 'documents.npy'))
     num_topics_by_data = {}
     num_topics_by_data['train'] = len(train_topics)
     num_topics_by_data['valid'] = len(valid_topics)
     num_topics_by_data['test'] = len(test_topics)
-    documents = np.load(os.path.join(results_dir, 'documents.npy'))
     train = list(itertools.product(train_topics, documents))
     valid = list(itertools.product(valid_topics, documents))
     test = list(itertools.product(test_topics, documents))
@@ -121,13 +127,13 @@ def get_elbo_csv(vae, results_dir):
                 vae_svi = SVI(vae.model, vae.encoder_guide, pyro_scheduler, loss=vae_elbo, num_steps=0, num_samples=100)
 
                 vae_posterior = vae_svi.run(data_i, topics_i)
-                vae_loss = vae_svi.evaluate_loss(data_i, topics_i)
+                vae_loss = -vae_svi.evaluate_loss(data_i, topics_i)
                 svi_loss = np.nan
                 while torch_isnan(svi_loss):
                     svi_elbo = Trace_ELBO()
                     svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=svi_elbo, num_steps=400, num_samples=100)
                     svi_posterior = svi.run(data_i, topics_i)
-                    svi_loss = svi.evaluate_loss(data_i, topics_i)
+                    svi_loss = -svi.evaluate_loss(data_i, topics_i)
                     pyro.clear_param_store()
                 writer.writerow([data_name, i, svi_loss, vae_loss])
                 pyro.clear_param_store()
