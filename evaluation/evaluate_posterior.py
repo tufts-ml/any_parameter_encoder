@@ -65,8 +65,9 @@ def kl_enc_svi(results_dir, data_names=['train', 'valid', 'test']):
         vae_scale = np.load(os.path.join(results_dir, '{}_{}_z_scale.npy'.format(data_name, 'vae')))
         kl_divs_q_p = map(kl_mult_gauss, vae_loc, vae_scale, svi_loc, svi_scale)
         kl_divs_p_q = map(kl_mult_gauss, svi_loc, svi_scale, vae_loc, vae_scale)
-        print("KL(q||p)", data_name, np.mean(kl_divs_q_p), np.std(kl_divs_q_p))
-        print("KL(p||q)", data_name, np.mean(kl_divs_p_q), np.std(kl_divs_p_q))
+        # TODO: where are the nans coming from?
+        print("KL(q||p)", data_name, np.nanmean(kl_divs_q_p), np.nanstd(kl_divs_q_p))
+        print("KL(p||q)", data_name, np.nanmean(kl_divs_p_q), np.nanstd(kl_divs_p_q))
         all_kl_q_p.append(kl_divs_q_p)
         all_kl_p_q.append(kl_divs_p_q)
     return all_kl_q_p, all_kl_p_q
