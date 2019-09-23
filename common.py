@@ -212,11 +212,19 @@ def save_kl_to_csv(results_dir, data_name):
             writer.writerow([data_name, inference_name, kl_qp])
 
 
-def save_reconstruction_array(vae, topics, posterior, sample_idx, model_config):
-    # reconstruct the data
-    reconstructions = reconstruct_data(posterior, vae, topics)
-    # save sample reconstructions
-    averaged_reconstructions = np.mean(reconstructions[:, sample_idx], axis=0)
+def save_reconstruction_array(vae, topics, posterior, sample_idx, model_config, average_over='reconstructions'):
+    if average_over == 'reconstructions':
+        # reconstruct the data
+        reconstructions = reconstruct_data(posterior, vae, topics)
+        # save sample reconstructions
+        averaged_reconstructions = np.mean(reconstructions[:, sample_idx], axis=0)
+    elif average_over == 'samples':
+        zs = []
+        for tr in posterior.exec_traces:
+            zs.append(tr.nodes['latent']['value'].data.numpy())
+        zs = np.array(zs)
+        z = torch.from_numpy(np.mean(zs[:, sample_idx], axis=0).astype(np.float32))
+        averaged_reconstructions = vae.decoder(z, topics[:10]).detach().numpy()
     results_dir = model_config['results_dir']
     inference = model_config['inference']
     model_name = model_config['model_name']
