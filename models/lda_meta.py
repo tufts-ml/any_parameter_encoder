@@ -2,6 +2,7 @@ import os
 import h5py
 import numpy as np
 import torch
+from torch import autograd
 import torch.nn as nn
 
 import pyro
@@ -701,13 +702,13 @@ class Decoder(nn.Module):
         super(Decoder, self).__init__()
         self.use_scale = use_scale
         if self.use_scale:
-            self.scale = nn.Parameter(torch.ones([]))
+            self.scale = nn.Parameter(torch.ones([]), requires_grad=False)
         self.softmax = nn.Softmax(dim=1)
 
-    @torch.no_grad()
     def forward(self, z, topics):
         if self.use_scale:
-            z = torch.mul(self.scale, z)
+            print(self.scale)
+            z = torch.mul(autograd.Variable(self.scale), z)
         word_probs = torch.bmm(self.softmax(z).unsqueeze(1), topics)
         return torch.squeeze(word_probs, 1)
 
