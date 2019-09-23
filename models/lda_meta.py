@@ -688,7 +688,7 @@ class Encoder(nn.Module):
             # then return a mean vector and a (positive) square root covariance
             # each of size batch_size x n_topics
             z_loc = self.bnmu(self.fcmu(self.enc_layers_mu(x_and_topics)))
-            z_scale = torch.exp(self.bnsigma(self.fcsigma(self.enc_layers_sigma(x_and_topics))))
+            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers_sigma(x_and_topics)))))
         else:
             raise ValueError('Invalid architecture')
         if self.use_scale:
