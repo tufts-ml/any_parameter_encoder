@@ -704,6 +704,7 @@ class Decoder(nn.Module):
             self.scale = nn.Parameter(torch.ones([]))
         self.softmax = nn.Softmax(dim=1)
 
+    @torch.no_grad()
     def forward(self, z, topics):
         if self.use_scale:
             z = torch.mul(self.scale, z)
