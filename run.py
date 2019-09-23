@@ -55,23 +55,24 @@ model_config = {
     'results_file': results_file,
     'inference': 'vae',
     'model_name': 'lda_meta',
-    'architecture': 'standard',
+    'architecture': 'template',
     'scale_trainable': True,
     'n_hidden_layers': 5,
     'n_hidden_units': 100,
     'n_samples': 1,
     'decay_rate': .9,
-    'decay_steps': 5000,
-    'starting_learning_rate': 0.5,
+    'decay_steps': 8000,
+    'starting_learning_rate': 0.1,
     'n_steps_enc': 1,
     'custom_lr': False,
-    'use_dropout': True,
+    'use_dropout': False,
     'use_adamw': False,
     'alpha': .01,
-    'scale_type': 'mean',
-    'tot_epochs': 400,
+    'scale_type': 'sample',
+    'tot_epochs': 1000,
     'batch_size': 50,
-    'seed': 0
+    'seed': 0,
+    'skip_connections': True
 }
 
 # toy bars data
@@ -100,7 +101,7 @@ else:
         beta[popular_words] *= 5
         betas.append(beta)
         test_betas.append(normalize1d(beta + 1))
-    train_topics = generate_topics(n=1, betas=betas, seed=0)
+    train_topics = generate_topics(n=2, betas=betas, seed=0)
     valid_topics = generate_topics(n=5, betas=betas, seed=1)
     test_topics = generate_topics(n=5, betas=betas, seed=2)
     # train_topics = [toy_bars()]
@@ -170,7 +171,7 @@ if args.evaluate:
     elif model_config['scale_type'] == 'sample':
         print(vae.decoder.scale)
 
-    get_elbo_csv(vae, results_dir)
+    get_elbo_csv(vae, results_dir, restart=False)
     plot_svi_vs_vae_elbo(results_dir)
 
     for data_name, data_and_topics in zip(dataset_names, datasets):
@@ -200,7 +201,7 @@ if args.evaluate:
             end = time.time()
             save_speed_to_csv(model_config, end - start)
 
-            save_reconstruction_array(vae, topics, posterior, sample_idx, model_config)
+            save_reconstruction_array(vae, topics, posterior, sample_idx, model_config, average_over='reconstructions')
 
             # save the estimated posterior predictive log likelihood
             for i in range(10):
