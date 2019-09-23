@@ -675,14 +675,14 @@ class Encoder(nn.Module):
             # then return a mean vector and a (positive) square root covariance
             # each of size batch_size x n_topics
             z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
-            z_scale = torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics))))
+            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
         elif self.architecture == 'template':
             x_and_topics = torch.einsum("ab,abc->ac", (x, torch.transpose(topics, 1, 2)))
             z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
-            z_scale = torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics))))
+            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
         elif self.architecture == 'standard':
             z_loc = self.bnmu(self.fcmu(self.enc_layers(x)))
-            z_scale = torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x))))
+            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x)))))
         elif self.architecture == 'naive_separated':
             x_and_topics = torch.cat((x, topics.reshape(-1, self.n_topics * self.vocab_size)), dim=1)
             # then return a mean vector and a (positive) square root covariance
