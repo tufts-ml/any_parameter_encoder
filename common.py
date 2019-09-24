@@ -26,7 +26,8 @@ from utils import unzip_X_and_topics, softmax
 
 MIN_LOG_PROB = -9999999999
 
-def train_save_VAE(train_data, valid_data, model_config, training_epochs=120, batch_size=200, tensorboard=True, hallucinations=False, shuffle=True, display_step=5):
+def train_save_VAE(train_data, valid_data, model_config, training_epochs=120, batch_size=200,
+                   tensorboard=True, hallucinations=False, shuffle=True, display_step=5, recreate_docs=True):
     vae = VAE_tf(tensorboard=tensorboard, **model_config)
     tensorboard_logs_dir = os.path.join(
         model_config['results_dir'], model_config['model_name'],
@@ -37,10 +38,11 @@ def train_save_VAE(train_data, valid_data, model_config, training_epochs=120, ba
     else:
         vae = train(train_data, valid_data, vae, training_epochs=training_epochs, tensorboard=tensorboard, batch_size=batch_size,
             tensorboard_logs_dir=tensorboard_logs_dir, results_dir=model_config['results_dir'], display_step=display_step)
-    for data_name, batch_xs in zip(['train', 'valid'], [train_data[:10], valid_data[:10]]):
-        recreated_docs, _, _ = vae.recreate_input(batch_xs)
-        X, topics = unzip_X_and_topics(batch_xs)
-        plot_side_by_side_docs(np.concatenate([X, recreated_docs]), os.path.join(model_config['results_dir'], 'recreated_docs_{}.pdf'.format(str(data_name).zfill(2))))
+    if recreate_docs:
+        for data_name, batch_xs in zip(['train', 'valid'], [train_data[:10], valid_data[:10]]):
+            recreated_docs, _, _ = vae.recreate_input(batch_xs)
+            X, topics = unzip_X_and_topics(batch_xs)
+            plot_side_by_side_docs(np.concatenate([X, recreated_docs]), os.path.join(model_config['results_dir'], 'recreated_docs_{}.pdf'.format(str(data_name).zfill(2))))
     vae.save()
     vae.sess.close()
     tf.reset_default_graph()

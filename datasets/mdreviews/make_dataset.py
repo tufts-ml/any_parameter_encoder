@@ -37,17 +37,20 @@ for doc in X:
 	corpus.append([(word_idx, count) for word_idx, count in enumerate(doc)])
 
 id2word = {}
-with open('datasets/mdreviews/raw/X_colnames.txt', 'r') as f:
+# with open('datasets/mdreviews/raw/X_colnames.txt', 'r') as f:
+#     for i, line in enumerate(f):
+#         id2word[i] = line.strip()
+with open('datasets/mdreviews/raw/vocab.txt', 'r') as f:
     for i, line in enumerate(f):
         id2word[i] = line.strip()
 path_to_mallet_binary = "/Users/lilyzhang/Documents/coding_projects/Mallet/bin/mallet"
-lda = LdaMallet(path_to_mallet_binary, corpus=corpus, id2word=id2word, num_topics=20, iterations=1000, alpha=.1)
-print(lda.fdoctopics())
+lda = LdaMallet(path_to_mallet_binary, corpus=corpus, id2word=id2word, num_topics=100, iterations=1000, alpha=.01)
+# print(lda.fdoctopics())
 # lda = LdaModel(corpus, num_topics=20, id2word=id2word)
 print(lda.print_topics())
 topics = lda.get_topics()
-np.save('mdreviews_topics1.npy', inverse_softmax(topics))
-lda.save('lda_gibbs.gensim1')
+np.save('resources/mdreviews_topics3.npy', topics)
+lda.save('lda_gibbs.gensim3')
 
 # topics = np.load('true_topics.npy')
 # take the inverse softmax
