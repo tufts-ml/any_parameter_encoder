@@ -28,14 +28,16 @@ from utils import unzip_X_and_topics, softmax
 MIN_LOG_PROB = -9999999999
 
 def train_save_VAE(train_data, valid_data, model_config, training_epochs=120, batch_size=200,
-                   tensorboard=True, hallucinations=False, shuffle=True, display_step=5, recreate_docs=True):
+                   tensorboard=True, hallucinations=False, shuffle=True, display_step=5, recreate_docs=True,
+                   vocab_size=100, n_topics=20):
     vae = VAE_tf(tensorboard=tensorboard, **model_config)
     tensorboard_logs_dir = os.path.join(
         model_config['results_dir'], model_config['model_name'],
         'logs_{}_{}'.format(model_config['n_hidden_layers'], model_config['n_hidden_units']))
     if hallucinations:
         vae = train_with_hallucinations(train_data, valid_data, vae, model_config, training_epochs=training_epochs, batch_size=batch_size,
-            tensorboard=tensorboard, tensorboard_logs_dir=tensorboard_logs_dir, results_dir=model_config['results_dir'])
+            tensorboard=tensorboard, tensorboard_logs_dir=tensorboard_logs_dir, results_dir=model_config['results_dir'], vocab_size=vocab_size,
+            n_topics=n_topics)
     else:
         vae = train(train_data, valid_data, vae, training_epochs=training_epochs, tensorboard=tensorboard, batch_size=batch_size,
             tensorboard_logs_dir=tensorboard_logs_dir, results_dir=model_config['results_dir'], display_step=display_step)

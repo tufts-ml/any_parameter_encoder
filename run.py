@@ -72,7 +72,7 @@ model_config = {
     'use_adamw': False,
     'alpha': .01,
     'scale_type': 'mean',
-    'tot_epochs': 800,
+    'tot_epochs': 8,
     'batch_size': 200,
     'seed': 0
 }
@@ -122,9 +122,20 @@ else:
     np.save(os.path.join(results_dir, 'documents.npy'), documents)
 
 # TODO: perform correct queuing so full dataset doesn't need to be in memory
-train = list(itertools.product(documents, train_topics))
-valid = list(itertools.product(documents, valid_topics))
-test = list(itertools.product(documents, test_topics))
+# train = list(itertools.product(documents, train_topics))
+# valid = list(itertools.product(documents, valid_topics))
+# test = list(itertools.product(documents, test_topics))
+
+def expand_docs_and_topics(documents, topics):
+    return (
+        np.repeat(documents, [len(topics)] * len(documents), axis=0),
+        np.tile(topics, (len(documents), 1, 1))
+    )
+
+train = expand_docs_and_topics(documents, train_topics)
+valid = expand_docs_and_topics(documents, valid_topics)
+test = expand_docs_and_topics(documents, test_topics)
+
 # TODO: fix to evaluate on same number of topics
 datasets = [train[:300], valid[:300], test[:300]]
 # datasets = [train, valid, test]
@@ -159,7 +170,8 @@ if args.train:
     vae = train_save_VAE(
         train, valid, model_config,
         training_epochs=model_config['tot_epochs'], batch_size=model_config['batch_size'],
-        hallucinations=False, tensorboard=True, shuffle=True, display_step=1)
+        hallucinations=False, tensorboard=True, shuffle=True, display_step=1,
+        n_topics=n_topics, vocab_size=vocab_size)
 # load the VAE into pyro for evaluation
 if args.evaluate:
     vae = VAE_pyro(**model_config)

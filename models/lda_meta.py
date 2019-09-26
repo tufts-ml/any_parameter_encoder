@@ -136,8 +136,11 @@ class VAE_tf(object):
             self.global_step = tf.Variable(0, trainable=False, name='global_step')
         self.summaries = []
         """----------------Inputs----------------"""
-        self.x = tf.placeholder(tf.float32, [None, self.vocab_size], name='x')
-        self.topics = tf.placeholder(tf.float32, [None, self.n_topics, self.vocab_size], name='topics')
+        self.x_placeholder = tf.placeholder(tf.float32, [None, self.vocab_size], name='x')
+        self.topics_placeholder = tf.placeholder(tf.float32, [None, self.n_topics, self.vocab_size], name='topics')
+        dataset = tf.data.Dataset.from_tensor_slices((self.x_placeholder, self.topics_placeholder)).repeat().batch(batch_size)
+        self.iterator = dataset.make_initializable_iterator()
+        self.x, self.topics = self.iterator.get_next()
         self.keep_prob = tf.placeholder(tf.float32, name='keep_prob')
         if self.test_lr:
             self.lr = tf.placeholder(tf.float32, name='learning_rate')

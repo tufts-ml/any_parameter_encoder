@@ -15,7 +15,6 @@ def create_minibatch(data, batch_size, shuffle=True):
     for start_idx in range(0, len(data), batch_size):
         yield data[start_idx: start_idx + batch_size]
 
-
 def train(
     train_data,
     valid_data,
@@ -27,102 +26,145 @@ def train(
     tensorboard_logs_dir=None,
     results_dir=None,
     vae_meta=True,
-    shuffle=True
+    shuffle=True,
+    vocab_size=100,
+    num_topics=20,
 ):
     if tensorboard:
         train_writer = tf.summary.FileWriter(
             os.path.join(tensorboard_logs_dir, 'train'), vae.sess.graph)
         valid_writer = tf.summary.FileWriter(
             os.path.join(tensorboard_logs_dir, 'val'), vae.sess.graph)
-
-    # Training cycle
+    train_docs, train_topics = train_data
+    valid_docs, valid_topics = valid_data
     for epoch in range(training_epochs):
-        total_cost = 0.0
-        num_batches = 0
-        # Loop over all batches
-        for batch_xs in create_minibatch(train_data, batch_size, shuffle=shuffle):
-            # Fit training using batch data
-            cost = vae.partial_fit(batch_xs)
-            # Keep track of the number of batches
-            num_batches += 1
-            # Keep track of the loss
-            total_cost += cost
-            X, topics = unzip_X_and_topics(batch_xs)
-
-            if np.isnan(total_cost):
-                if vae_meta:
-                    z = vae.sess.run(vae.z,
-                                     feed_dict={vae.x: X, vae.topics: topics, vae.keep_prob: 1.0})
-                else:
-                    z = vae.sess.run(vae.z,
-                                   feed_dict={vae.x: X, vae.keep_prob: 1.0})
-                print(z)
-                print(z.shape)      
-                print(epoch, np.sum(X, 1).astype(np.int), X.shape)
-                print(cost)
-                print(
-                    "Encountered NaN, stopping training. "
-                    "Please check the learning_rate settings and the momentum."
-                )
-                # return vae,emb
-                sys.exit()
-        if not vae_meta and epoch < 15:
-            topics = softmax(vae.topic_prop(batch_xs))
-            plot_side_by_side_docs(topics, os.path.join(results_dir, 'topics_{}.pdf'.format(str(epoch).zfill(2))))
-            recreated_docs, _, _ = vae.recreate_input(batch_xs[:10])
-            X, topics = unzip_X_and_topics(batch_xs[:10])
-            plot_side_by_side_docs(np.concatenate([X, recreated_docs]), os.path.join(results_dir, 'recreated_docs_{}.pdf'.format(str(epoch).zfill(2))))
-
-        # Display logs per epoch step
-        if epoch % display_step == 0:
-            print(
-                "Epoch: %04d" % (epoch + 1),
-                "cost={:.9f}".format(total_cost / num_batches),
-            )
-            if tensorboard:
-                merge = tf.summary.merge(vae.summaries)
-                if vae_meta:
-                    summary = vae.sess.run(merge,
-                                            feed_dict={vae.x: X, vae.topics: topics, vae.keep_prob: 1.0})
-                else:
-                    summary = vae.sess.run(merge,
-                                            feed_dict={vae.x: X, vae.keep_prob: 1.0})
-                train_writer.add_summary(summary, epoch)
-                X_val, topics_val = unzip_X_and_topics(valid_data)
-                if vae_meta:
-                    valid_cost = vae.sess.run(vae.cost,
-                                            feed_dict={vae.x: X_val, vae.topics: topics_val, vae.keep_prob: 1.0})
-                else:
-                    valid_cost = vae.sess.run(vae.cost,
-                                            feed_dict={vae.x: X_val, vae.keep_prob: 1.0})
-                print(valid_cost)
-                print('writing valid summary')
-                valid_summary = tf.Summary(value=[tf.Summary.Value(tag="valid_loss", simple_value=valid_cost)])
-                valid_writer.add_summary(valid_summary, epoch)
-                valid_writer.flush()
-    return vae
-
-
-def generate_data(vae, zs, vocab_size, num_docs=10000, min_n_words_per_doc=45, max_n_words_per_doc=60, d=0):
-    prng = np.random.RandomState(d)
-    reconstructed = vae.generate(inverse_softmax(zs))
-    # bring it to count space
-    new_docs = []
-    for i in range(num_docs):
-        new_doc = draw_random_doc(
-            reconstructed,
-            do_return_square=False, d=i
+        vae.sess.run(vae.iterator.initializer, feed_dict={vae.x_placeholder: train_docs, vae.topics_placeholder: train_topics})
+        _, cost = vae.sess.run(
+            (vae.optimizer, vae.cost),
+            feed_dict={vae.keep_prob: 0.75},
         )
-        new_docs.append(new_doc)
+        print(cost)
+        if tensorboard:
+            merge = tf.summary.merge(vae.summaries)
+            if vae_meta:
+                summary = vae.sess.run(merge,
+                                        feed_dict={vae.x_placeholder: train_docs, vae.topics_placeholder: train_topics, vae.keep_prob: 1.0})
+            train_writer.add_summary(summary, epoch)
+            vae.sess.run(vae.iterator.initializer, feed_dict={vae.x_placeholder: valid_docs, vae.topics_placeholder: valid_topics})
+            valid_cost = vae.sess.run(vae.cost, feed_dict={vae.keep_prob: 1.0})
+            valid_summary = tf.Summary(value=[tf.Summary.Value(tag="valid_loss", simple_value=valid_cost)])
+            valid_writer.add_summary(valid_summary, epoch)
+            valid_writer.flush()
+    return vae
+    
 
-    new_docs = np.array(
-        [
-            np.bincount(doc.astype("int"), minlength=vocab_size)
-            for doc in new_docs
-            if np.sum(doc) != 0
-        ]
-    )
-    return np.array(new_docs)
+
+# def train(
+#     train_data,
+#     valid_data,
+#     vae,
+#     batch_size=200,
+#     training_epochs=100,
+#     display_step=5,
+#     tensorboard=False,
+#     tensorboard_logs_dir=None,
+#     results_dir=None,
+#     vae_meta=True,
+#     shuffle=True
+# ):
+#     if tensorboard:
+#         train_writer = tf.summary.FileWriter(
+#             os.path.join(tensorboard_logs_dir, 'train'), vae.sess.graph)
+#         valid_writer = tf.summary.FileWriter(
+#             os.path.join(tensorboard_logs_dir, 'val'), vae.sess.graph)
+
+#     # Training cycle
+#     for epoch in range(training_epochs):
+#         total_cost = 0.0
+#         num_batches = 0
+#         for batch_xs in create_minibatch(train_data, batch_size, shuffle=shuffle):
+#             # Fit training using batch data
+#             cost = vae.partial_fit(batch_xs)
+#             # Keep track of the number of batches
+#             num_batches += 1
+#             # Keep track of the loss
+#             total_cost += cost
+#             X, topics = unzip_X_and_topics(batch_xs)
+
+#             if np.isnan(total_cost):
+#                 if vae_meta:
+#                     z = vae.sess.run(vae.z,
+#                                      feed_dict={vae.x: X, vae.topics: topics, vae.keep_prob: 1.0})
+#                 else:
+#                     z = vae.sess.run(vae.z,
+#                                    feed_dict={vae.x: X, vae.keep_prob: 1.0})
+#                 print(z)
+#                 print(z.shape)      
+#                 print(epoch, np.sum(X, 1).astype(np.int), X.shape)
+#                 print(cost)
+#                 print(
+#                     "Encountered NaN, stopping training. "
+#                     "Please check the learning_rate settings and the momentum."
+#                 )
+#                 # return vae,emb
+#                 sys.exit()
+#         if not vae_meta and epoch < 15:
+#             topics = softmax(vae.topic_prop(batch_xs))
+#             plot_side_by_side_docs(topics, os.path.join(results_dir, 'topics_{}.pdf'.format(str(epoch).zfill(2))))
+#             recreated_docs, _, _ = vae.recreate_input(batch_xs[:10])
+#             X, topics = unzip_X_and_topics(batch_xs[:10])
+#             plot_side_by_side_docs(np.concatenate([X, recreated_docs]), os.path.join(results_dir, 'recreated_docs_{}.pdf'.format(str(epoch).zfill(2))))
+
+#         # Display logs per epoch step
+#         if epoch % display_step == 0:
+#             print(
+#                 "Epoch: %04d" % (epoch + 1),
+#                 "cost={:.9f}".format(total_cost / num_batches),
+#             )
+#             if tensorboard:
+#                 merge = tf.summary.merge(vae.summaries)
+#                 if vae_meta:
+#                     summary = vae.sess.run(merge,
+#                                             feed_dict={vae.x: X, vae.topics: topics, vae.keep_prob: 1.0})
+#                 else:
+#                     summary = vae.sess.run(merge,
+#                                             feed_dict={vae.x: X, vae.keep_prob: 1.0})
+#                 train_writer.add_summary(summary, epoch)
+#                 X_val, topics_val = unzip_X_and_topics(valid_data)
+#                 if vae_meta:
+#                     valid_cost = vae.sess.run(vae.cost,
+#                                             feed_dict={vae.x: X_val, vae.topics: topics_val, vae.keep_prob: 1.0})
+#                 else:
+#                     valid_cost = vae.sess.run(vae.cost,
+#                                             feed_dict={vae.x: X_val, vae.keep_prob: 1.0})
+#                 print(valid_cost)
+#                 print('writing valid summary')
+#                 valid_summary = tf.Summary(value=[tf.Summary.Value(tag="valid_loss", simple_value=valid_cost)])
+#                 valid_writer.add_summary(valid_summary, epoch)
+#                 valid_writer.flush()
+#     return vae
+
+
+# def generate_data(vae, zs, vocab_size, num_docs=10000, min_n_words_per_doc=45, max_n_words_per_doc=60, d=0):
+#     prng = np.random.RandomState(d)
+#     reconstructed = vae.generate(inverse_softmax(zs))
+#     # bring it to count space
+#     new_docs = []
+#     for i in range(num_docs):
+#         new_doc = draw_random_doc(
+#             reconstructed,
+#             do_return_square=False, d=i
+#         )
+#         new_docs.append(new_doc)
+
+#     new_docs = np.array(
+#         [
+#             np.bincount(doc.astype("int"), minlength=vocab_size)
+#             for doc in new_docs
+#             if np.sum(doc) != 0
+#         ]
+#     )
+#     return np.array(new_docs)
 
 
 def train_with_hallucinations(data, vae, model_config, alpha=.01, num_samples=10000,
