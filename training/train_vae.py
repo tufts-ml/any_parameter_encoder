@@ -38,7 +38,8 @@ def train(
     train_docs, train_topics = train_data
     valid_docs, valid_topics = valid_data
     for epoch in range(training_epochs):
-        vae.sess.run(vae.iterator.initializer, feed_dict={vae.x_placeholder: train_docs, vae.topics_placeholder: train_topics})
+        # vae.sess.run(vae.iterator.initializer, feed_dict={vae.x_placeholder: train_docs, vae.topics_placeholder: train_topics})
+        vae.sess.run(vae.iterator.initializer, feed_dict={vae.data_name: 'train'})
         _, cost = vae.sess.run(
             (vae.optimizer, vae.cost),
             feed_dict={vae.keep_prob: 0.75},
@@ -47,10 +48,12 @@ def train(
         if tensorboard:
             merge = tf.summary.merge(vae.summaries)
             if vae_meta:
-                summary = vae.sess.run(merge,
-                                        feed_dict={vae.x_placeholder: train_docs, vae.topics_placeholder: train_topics, vae.keep_prob: 1.0})
+                # summary = vae.sess.run(merge,
+                #                         feed_dict={vae.x_placeholder: train_docs, vae.topics_placeholder: train_topics, vae.keep_prob: 1.0})
+                summary = vae.sess.run(merge, feed_dict={vae.data_name: 'train', vae.keep_prob: 1.0})
             train_writer.add_summary(summary, epoch)
-            vae.sess.run(vae.iterator.initializer, feed_dict={vae.x_placeholder: valid_docs, vae.topics_placeholder: valid_topics})
+            # vae.sess.run(vae.iterator.initializer, feed_dict={vae.x_placeholder: valid_docs, vae.topics_placeholder: valid_topics})
+            vae.sess.run(vae.iterator.initializer, feed_dict={vae.data_name: 'valid'})
             valid_cost = vae.sess.run(vae.cost, feed_dict={vae.keep_prob: 1.0})
             valid_summary = tf.Summary(value=[tf.Summary.Value(tag="valid_loss", simple_value=valid_cost)])
             valid_writer.add_summary(valid_summary, epoch)
