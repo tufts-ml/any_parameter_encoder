@@ -3,6 +3,7 @@ import csv
 import numpy as np
 import tensorflow as tf
 import itertools
+import time
 
 from pyro.infer.abstract_infer import TracePredictive
 from pyro.infer.util import torch_item
@@ -46,6 +47,44 @@ def train_save_VAE(train_data, valid_data, model_config, training_epochs=120, ba
     vae.save()
     vae.sess.close()
     tf.reset_default_graph()
+
+
+def run_posterior_evaluation(inference, inference_name, data, data_name, topics, vae, sample_idx, model_config):
+    print(inference_name)
+    model_config.update({'inference': inference_name})
+    print(model_config)
+
+    start = time.time()
+    posterior = inference.run(data, topics)
+    end = time.time()
+    save_speed_to_csv(model_config, end - start)
+
+    save_reconstruction_array(vae, topics, posterior, sample_idx, model_config)
+
+    # save the estimated posterior predictive log likelihood
+    for i in range(10):
+        # saves a separate row to the csv
+        save_loglik_to_csv(data, topics, vae.model, posterior, model_config, num_samples=10)
+    
+    # save the posteriors for later analysis
+    if inference_name == 'mcmc':
+        # [num_samples, num_docs, num_topics]
+        samples = [t.nodes['latent']['value'].detach().cpu().numpy() for t in posterior.exec_traces]
+        np.save(os.path.join(model_config['results_dir'], '{}_{}_samples.npy'.format(data_name, inference_name)), np.array(samples))
+        log_prob_sums = [t.log_prob_sum() for t in posterior.exec_traces]
+        np.save(os.path.join(model_config['results_dir'], '{}_{}_log_prob_sums.npy'.format(data_name, inference_name)), np.array(log_prob_sums))
+    else:
+        if inference_name == 'vae':
+            z_loc, z_scale = vae.encoder.forward(data, topics)
+            z_loc = z_loc.data.numpy()
+            z_scale = z_scale.data.numpy()
+        elif inference_name == 'svi':
+            z_loc = pyro.get_param_store().match('z_loc')['z_loc'].detach().numpy()
+            z_scale = pyro.get_param_store().match('z_scale')['z_scale'].detach().numpy()
+        np.save(os.path.join(model_config['results_dir'], '{}_{}_z_loc.npy'.format(data_name, inference_name)), z_loc)
+        np.save(os.path.join(model_config['results_dir'], '{}_{}_z_scale.npy'.format(data_name, inference_name)), z_scale)
+    
+    return inference
 
 
 def save_speed_to_csv(model_config, clock_time):
