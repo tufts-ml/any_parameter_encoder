@@ -36,6 +36,7 @@ parser.add_argument('--train', help='train the model in tf', action='store_true'
 parser.add_argument('--evaluate', help='evaluate posteriors in pyro', action='store_true')
 parser.add_argument('--run_mcmc', help='run mcmc', action='store_true')
 parser.add_argument('--use_cached', help='run mcmc', action='store_true')
+parser.add_argument('--mdreviews', help='run mdreviews data', action='store_true')
 args = parser.parse_args()
 
 # where to write the results
@@ -47,9 +48,14 @@ if not os.path.exists(results_dir):
 shutil.copy(os.path.abspath(__file__), os.path.join(results_dir, 'run_simple.py'))
 
 # global params
-n_topics = 20
-vocab_size = 100
-sample_idx = list(range(10))
+if args.mdreviews:
+    n_topics = 100
+    vocab_size = 7729
+    sample_idx = list(range(10))
+else:
+    n_topics = 20
+    vocab_size = 100
+    sample_idx = list(range(10))
 
 model_config = {
     'vocab_size': vocab_size,
@@ -92,17 +98,29 @@ else:
     betas = []
     test_betas = []
     for i in range(n_topics):
-        beta = np.ones(vocab_size)
-        dim = math.sqrt(vocab_size)
-        if i < dim:
-            popular_words = [idx for idx in range(vocab_size) if idx % dim == i]
+        if args.mdreviews:
+            betas = []
+            orig_topics = np.load('resources/mdreviews_topics3.npy')
+            for i, topic in enumerate(orig_topics):
+                beta = np.ones(vocab_size)
+                # we take the top 100 words as the popular words
+                popular_words = np.argpartition(topic, -100)[-100:]
+                beta[popular_words] = 1000
+                beta = normalize1d(beta)
+                beta[popular_words] *= 50
+                betas.append(beta)
         else:
-            popular_words = [idx for idx in range(vocab_size) if int(idx / dim) == i - dim]
-        beta[popular_words] = 1000
-        beta = normalize1d(beta)
-        beta[popular_words] *= 5
-        betas.append(beta)
-        test_betas.append(normalize1d(beta + 1))
+            beta = np.ones(vocab_size)
+            dim = math.sqrt(vocab_size)
+            if i < dim:
+                popular_words = [idx for idx in range(vocab_size) if idx % dim == i]
+            else:
+                popular_words = [idx for idx in range(vocab_size) if int(idx / dim) == i - dim]
+            beta[popular_words] = 1000
+            beta = normalize1d(beta)
+            beta[popular_words] *= 5
+            betas.append(beta)
+            test_betas.append(normalize1d(beta + 1))
     train_topics = generate_topics(n=50, betas=betas, seed=0)
     valid_topics = generate_topics(n=5, betas=betas, seed=1)
     test_topics = generate_topics(n=5, betas=betas, seed=2)
@@ -126,15 +144,20 @@ else:
 # valid = list(itertools.product(documents, valid_topics))
 # test = list(itertools.product(documents, test_topics))
 
-def expand_docs_and_topics(documents, topics):
-    return (
-        np.repeat(documents, [len(topics)] * len(documents), axis=0),
-        np.tile(topics, (len(documents), 1, 1))
-    )
+# def expand_docs_and_topics(documents, topics):
+#     return (
+#         np.repeat(documents, [len(topics)] * len(documents), axis=0),
+#         np.tile(topics, (len(documents), 1, 1))
+#     )
 
-train = expand_docs_and_topics(documents, train_topics)
-valid = expand_docs_and_topics(documents, valid_topics)
-test = expand_docs_and_topics(documents, test_topics)
+# train = expand_docs_and_topics(documents, train_topics)
+# valid = expand_docs_and_topics(documents, valid_topics)
+# test = expand_docs_and_topics(documents, test_topics)
+
+train = (documents, train_topics)
+print(train_topics.shape)
+valid = (documents, valid_topics)
+test = (documents, test_topics)
 
 # TODO: fix to evaluate on same number of topics
 datasets = [train[:300], valid[:300], test[:300]]
