@@ -194,7 +194,7 @@ if args.train:
         train, valid, model_config,
         training_epochs=model_config['tot_epochs'], batch_size=model_config['batch_size'],
         hallucinations=False, tensorboard=True, shuffle=True, display_step=1,
-        n_topics=n_topics, vocab_size=vocab_size)
+        n_topics=n_topics, vocab_size=vocab_size, recreate_docs=False)
 # load the VAE into pyro for evaluation
 if args.evaluate:
     vae = VAE_pyro(**model_config)

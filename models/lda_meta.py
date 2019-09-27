@@ -137,26 +137,34 @@ class VAE_tf(object):
         self.summaries = []
         """----------------Inputs----------------"""
         def generate_batches(data_name):
-            print(data_name)
-            if data_name == 'train':
-                topics = np.load(os.path.join(results_dir, 'train_topics.npy'))
-            elif data_name == 'valid':
-                topics = np.load(os.path.join(results_dir, 'valid_topics.npy'))
+            topics = np.load(os.path.join(results_dir, '{}_topics.npy'.format(data_name)))
             documents = np.load(os.path.join(results_dir, 'documents.npy'))
             for doc in documents:
                 for t in topics:
                     yield doc, t
+
         # self.x_placeholder = tf.placeholder(tf.float32, [None, self.vocab_size], name='x')
         # self.topics_placeholder = tf.placeholder(tf.float32, [None, self.n_topics, self.vocab_size], name='topics')
-        self.data_name = tf.placeholder(tf.string)
-        dataset = tf.data.Dataset.from_generator(
-            partial(generate_batches, self.data_name),
-            (tf.float32, tf.float32),
-            (tf.TensorShape([vocab_size]), tf.TensorShape([self.n_topics, vocab_size]))
-        ).repeat().batch(batch_size)
-        # dataset = tf.data.Dataset.from_tensor_slices((self.x_placeholder, self.topics_placeholder)).repeat().batch(batch_size)
-        self.iterator = dataset.make_initializable_iterator()
-        self.x, self.topics = self.iterator.get_next()
+        self.training_data = True
+        generate_train_batches = partial(generate_batches, 'train')
+        generate_valid_batches = partial(generate_batches, 'valid')
+        train_dataset = tf.data.Dataset.from_generator(
+                generate_train_batches, (tf.float32, tf.float32),
+                (tf.TensorShape([vocab_size]), tf.TensorShape([self.n_topics, vocab_size]))
+            ).repeat().batch(batch_size)
+        valid_dataset = tf.data.Dataset.from_generator(
+                generate_valid_batches, (tf.float32, tf.float32),
+                (tf.TensorShape([vocab_size]), tf.TensorShape([self.n_topics, vocab_size]))
+            ).repeat().batch(batch_size)
+        self.train_iterator = train_dataset.make_initializable_iterator()
+        self.valid_iterator = valid_dataset.make_initializable_iterator()
+        if self.training_data:
+            iterator = self.train_iterator
+        else:
+            iterator = self.valid_iterator
+        self.x, self.topics = iterator.get_next()
+        # self.x = tf.placeholder(tf.float32, [None, self.vocab_size], name='x')
+        # self.topics = tf.placeholder(tf.float32, [None, self.n_topics, self.vocab_size], name='topics')
         self.keep_prob = tf.placeholder(tf.float32, name='keep_prob')
         if self.test_lr:
             self.lr = tf.placeholder(tf.float32, name='learning_rate')
