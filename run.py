@@ -69,7 +69,7 @@ else:
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-fh = logging.handlers.FileHandler(os.path.join(results_dir, 'memory_consumption.log'), when='D', interval=2)
+fh = logging.FileHandler(os.path.join(results_dir, 'memory_consumption.log'), when='D', interval=2)
 formatter = logging.Formatter('%(asctime)s: %(message)s')
 fh.setFormatter(formatter)
 logger.addHandler(fh)
