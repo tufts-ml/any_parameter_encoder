@@ -37,15 +37,23 @@ def train(
             os.path.join(tensorboard_logs_dir, 'val'), vae.sess.graph)
     train_docs, train_topics = train_data
     valid_docs, valid_topics = valid_data
+    num_batches = int(math.ceil(len(train_docs) * len(train_topics) / batch_size))
     for epoch in range(training_epochs):
-        # vae.sess.run(vae.iterator.initializer, feed_dict={vae.x_placeholder: train_docs, vae.topics_placeholder: train_topics})
-        vae.training_data = True
-        vae.sess.run(vae.train_iterator.initializer)
-        _, cost = vae.sess.run(
-            (vae.optimizer, vae.cost),
-            feed_dict={vae.keep_prob: 0.75},
-        )
-        print(cost)
+        costs_over_batches = []
+        for batch in range(num_batches):
+            vae.training_data = True
+            vae.sess.run(vae.train_iterator.initializer)
+            _, cost = vae.sess.run(
+                (vae.optimizer, vae.cost),
+                feed_dict={vae.keep_prob: 0.75},
+            )
+            costs_over_batches.append(cost)
+
+        if epoch % display_step == 0:
+            print(
+                "Epoch: %04d" % (epoch + 1),
+                "cost={:.9f}".format(sum(costs_over_batches)/len(costs_over_batches)),
+            )
         if tensorboard:
             merge = tf.summary.merge(vae.summaries)
             if vae_meta:
