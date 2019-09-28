@@ -18,9 +18,6 @@ def evaluate_log_predictive_density(posterior_predictive_traces):
     # Use LogSumExp trick to evaluate $log(1/num_samples \sum_i p(new_data | \theta^{i})) $,
     # where $\theta^{i}$ are parameter samples from the model's posterior.
     posterior_pred_density = logsumexp(torch.stack(trace_log_pdf), dim=-1) - math.log(len(trace_log_pdf))
-    print("\nLog posterior predictive density")
-    print("--------------------------------")
-    print("{:.4f}\n".format(posterior_pred_density))
     return posterior_pred_density
 
 
