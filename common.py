@@ -76,11 +76,11 @@ def run_posterior_evaluation(inference, inference_name, data, data_name, topics,
         log_prob_sums = [t.log_prob_sum() for t in posterior.exec_traces]
         np.save(os.path.join(model_config['results_dir'], '{}_{}_log_prob_sums.npy'.format(data_name, inference_name)), np.array(log_prob_sums))
     else:
-        if inference_name == 'vae':
+        if 'vae' in inference_name:
             z_loc, z_scale = vae.encoder.forward(data, topics)
             z_loc = z_loc.data.numpy()
             z_scale = z_scale.data.numpy()
-        elif inference_name == 'svi':
+        elif 'svi' in inference_name:
             z_loc = pyro.get_param_store().match('z_loc')['z_loc'].detach().numpy()
             z_scale = pyro.get_param_store().match('z_scale')['z_scale'].detach().numpy()
         np.save(os.path.join(model_config['results_dir'], '{}_{}_z_loc.npy'.format(data_name, inference_name)), z_loc)

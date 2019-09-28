@@ -23,7 +23,7 @@ from common import (
     train_save_VAE, save_speed_to_csv, save_loglik_to_csv, save_reconstruction_array, save_kl_to_csv, get_elbo_csv, run_posterior_evaluation
 )
 from visualization.reconstructions import plot_side_by_side_docs, plot_saved_samples
-from visualization.posterior import plot_posterior, plot_posterior_v2
+from visualization.posterior import plot_posterior, plot_posterior_v2, plot_posterior_v3
 from visualization.ranking import plot_svi_vs_vae_elbo
 from utils import softmax, unzip_X_and_topics, normalize1d
 from training.train_vae import find_lr
@@ -38,6 +38,7 @@ parser.add_argument('--evaluate', help='evaluate posteriors in pyro', action='st
 parser.add_argument('--run_mcmc', help='run mcmc', action='store_true')
 parser.add_argument('--use_cached', help='run mcmc', action='store_true')
 parser.add_argument('--mdreviews', help='run mdreviews data', action='store_true')
+parser.add_argument('--additive_topics', help='run mdreviews data', action='store_true')
 args = parser.parse_args()
 
 # where to write the results
@@ -49,6 +50,11 @@ if not os.path.exists(results_dir):
 shutil.copy(os.path.abspath(__file__), os.path.join(results_dir, 'run_simple.py'))
 
 sample_idx = list(range(0, 20, 2))
+num_documents = 50
+num_train_topics = 5
+num_valid_topics = 5
+num_test_topics = 5
+num_combinations_to_evaluate = 30
 
 # global params
 if args.mdreviews:
@@ -57,6 +63,12 @@ if args.mdreviews:
 else:
     n_topics = 20
     vocab_size = 100
+
+
+if args.run_mcmc:
+    inference_names = ['mcmc', 'svi', 'svi_warmstart', 'vae', 'vae_single']
+else:
+    inference_names = ['svi', 'svi_warmstart', 'vae', 'vae_single']
 
 model_config = {
     'vocab_size': vocab_size,
@@ -84,6 +96,10 @@ model_config = {
     'seed': 0
 }
 
+model_config_single = model_config.copy()
+model_config_single.update({'model_name': 'lda_orig', 'architecture': 'standard', 'n_hidden_layers': 5})
+model_config_single.update({'starting_learning_rate': .01, 'tot_epochs': 100, 'batch_size': 150})
+
 # toy bars data
 if args.use_cached and os.path.exists(os.path.join(results_dir, 'train_topics.npy')):
     train_topics = np.load(os.path.join(results_dir, 'train_topics.npy'))
@@ -96,21 +112,36 @@ elif args.use_cached and os.path.exists(os.path.join('experiments', 'train_topic
     test_topics = np.load(os.path.join('experiments', 'test_topics.npy'))
     documents = np.load(os.path.join('experiments', 'documents.npy'))
 else:
-    betas = []
-    test_betas = []
-    for i in range(n_topics):
-        if args.mdreviews:
-            betas = []
-            orig_topics = np.load('resources/mdreviews_topics3.npy')
-            for i, topic in enumerate(orig_topics):
-                beta = np.ones(vocab_size)
-                # we take the top 100 words as the popular words
-                popular_words = np.argpartition(topic, -100)[-100:]
-                beta[popular_words] = 1000
-                beta = normalize1d(beta)
-                beta[popular_words] *= 50
-                betas.append(beta)
-        else:
+    if args.mdreviews:
+        betas = []
+        orig_topics = np.load('resources/mdreviews_topics3.npy')
+        for i, topic in enumerate(orig_topics):
+            beta = np.ones(vocab_size)
+            # we take the top 100 words as the popular words
+            popular_words = np.argpartition(topic, -100)[-100:]
+            beta[popular_words] = 1000
+            beta = normalize1d(beta)
+            beta[popular_words] *= 50
+            betas.append(beta)
+    elif args.additive_topics:
+        betas = []
+        for i in range(n_topics):
+            beta = np.ones(vocab_size)
+            dim = math.sqrt(vocab_size)
+            if i < dim:
+                popular_words = [idx for idx in range(vocab_size) if idx % dim == i]
+            else:
+                popular_words = [idx for idx in range(vocab_size) if int(idx / dim) == i - dim]
+            random_additions = list(np.random.choice(range(vocab_size), 20))
+            beta[popular_words] = 1000
+            beta[random_additions] = 200
+            beta = normalize1d(beta)
+            beta[popular_words] *= 50
+            beta[random_additions] *= 10
+            betas.append(beta)
+    else:
+        betas = []
+        for i in range(n_topics):
             beta = np.ones(vocab_size)
             dim = math.sqrt(vocab_size)
             if i < dim:
@@ -121,10 +152,9 @@ else:
             beta = normalize1d(beta)
             beta[popular_words] *= 5
             betas.append(beta)
-            test_betas.append(normalize1d(beta + 1))
-    train_topics = generate_topics(n=50, betas=betas, seed=0)
-    valid_topics = generate_topics(n=5, betas=betas, seed=1)
-    test_topics = generate_topics(n=5, betas=betas, seed=2)
+    train_topics = generate_topics(n=num_train_topics, betas=betas, seed=0)
+    valid_topics = generate_topics(n=num_valid_topics, betas=betas, seed=1)
+    test_topics = generate_topics(n=num_test_topics, betas=betas, seed=2)
 
     for i, topics in zip(range(10), train_topics):
         plot_side_by_side_docs(topics, os.path.join(results_dir, 'train_topics_{}.pdf'.format(str(i).zfill(3))))
@@ -133,27 +163,12 @@ else:
     for i, topics in enumerate(test_topics):
         plot_side_by_side_docs(topics, os.path.join(results_dir, 'test_topics_{}.pdf'.format(str(i).zfill(3))))
 
-    documents, doc_topic_dists = generate_documents(train_topics[0], 50, alpha=.01, seed=0)
+    documents, doc_topic_dists = generate_documents(train_topics[0], num_documents, alpha=.01, seed=0)
 
     np.save(os.path.join(results_dir, 'train_topics.npy'), train_topics)
     np.save(os.path.join(results_dir, 'valid_topics.npy'), valid_topics)
     np.save(os.path.join(results_dir, 'test_topics.npy'), test_topics)
     np.save(os.path.join(results_dir, 'documents.npy'), documents)
-
-# TODO: perform correct queuing so full dataset doesn't need to be in memory
-# train = list(itertools.product(documents, train_topics))
-# valid = list(itertools.product(documents, valid_topics))
-# test = list(itertools.product(documents, test_topics))
-
-# def expand_docs_and_topics(documents, topics):
-#     return (
-#         np.repeat(documents, [len(topics)] * len(documents), axis=0),
-#         np.tile(topics, (len(documents), 1, 1))
-#     )
-
-# train = expand_docs_and_topics(documents, train_topics)
-# valid = expand_docs_and_topics(documents, valid_topics)
-# test = expand_docs_and_topics(documents, test_topics)
 
 train = (documents, train_topics)
 valid = (documents, valid_topics)
@@ -167,12 +182,12 @@ def generate_datasets(train, valid, test, n):
         yield subset
 
 # TODO: fix to evaluate on same number of topics
-datasets = generate_datasets(train, valid, test, n=300)
+datasets = generate_datasets(train, valid, test, n=num_combinations_to_evaluate)
 dataset_names = ['train', 'valid', 'test']
-model_config['num_batches'] = math.ceil(len(train) / model_config['batch_size'])
 
 # train the VAE and save the weights
 if args.find_lr:
+    model_config['num_batches'] = math.ceil(len(documents) * len(train_topics) / model_config['batch_size'])
     vae = VAE_tf(test_lr=True, **model_config)
     log_lrs, losses = find_lr(vae, train, batch_size=model_config['batch_size'], final_value=1e2)
     print(log_lrs)
@@ -211,11 +226,10 @@ if args.evaluate_svi_convergence_with_vae_init:
     pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .1}, 'step_size': 10000, 'gamma': 0.95})
     vae_svi = SVI(vae.model, vae.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=0, num_samples=100)
     vae_svi = posterior_eval(vae_svi, 'vae')
+    svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=num_steps, num_samples=100)
     z_loc, z_scale = vae.encoder.forward(data, topics)
     print(z_loc[0])
     print(z_scale[0])
-    svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=num_steps, num_samples=100)
-
     pyro.clear_param_store()
     pyro.get_param_store().get_param('z_loc', init_tensor=z_loc.detach())
     pyro.get_param_store().get_param('z_scale', init_tensor=z_scale.detach())
@@ -235,9 +249,17 @@ if args.evaluate_svi_convergence_with_vae_init:
 
 
 if args.train:
-    vae = train_save_VAE(
+    train_save_VAE(
         train, valid, model_config,
         training_epochs=model_config['tot_epochs'], batch_size=model_config['batch_size'],
+        hallucinations=False, tensorboard=True, shuffle=True, display_step=1,
+        n_topics=n_topics, vocab_size=vocab_size, recreate_docs=False)
+    
+    random_topics_idx = 2
+    single_train = (documents, train_topics[random_topics_idx])
+    train_save_VAE(
+        train, valid, model_config_single,
+        training_epochs=model_config_single['tot_epochs'], batch_size=model_config_single['batch_size'],
         hallucinations=False, tensorboard=True, shuffle=True, display_step=1,
         n_topics=n_topics, vocab_size=vocab_size, recreate_docs=False)
 # load the VAE into pyro for evaluation
@@ -245,6 +267,11 @@ if args.evaluate:
     vae = VAE_pyro(**model_config)
     state_dict = vae.load()
     vae.load_state_dict(state_dict)
+
+    vae_single = VAE_pyro(**model_config_single)
+    state_dict = vae_single.load()
+    vae_single.load_state_dict(state_dict)
+
     if model_config['scale_type'] == 'mean':
         print(vae.encoder.scale)
     elif model_config['scale_type'] == 'sample':
@@ -258,16 +285,35 @@ if args.evaluate:
             'data_name': data_name,
             'results_dir': results_dir,
         })
+        model_config_single.update({
+            'data_name': data_name,
+            'results_dir': results_dir,
+        })
 
         posterior_eval = partial(
             run_posterior_evaluation,
             data=data, data_name=data_name, topics=topics, vae=vae, sample_idx=sample_idx, model_config=model_config)
+        single_vae_posterior_eval = partial(
+            run_posterior_evaluation,
+            data=data, data_name=data_name, topics=topics, vae=vae_single, sample_idx=sample_idx, model_config=model_config_single)
 
         pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .1}, 'step_size': 10000, 'gamma': 0.95})
         # Note: pyro scheduler doesn't have any effect in the VAE case since we never take any optimization steps
         pyro.clear_param_store()
         vae_svi = SVI(vae.model, vae.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=0, num_samples=100)
         vae_svi = posterior_eval(vae_svi, 'vae')
+
+        pyro.clear_param_store()
+        vae_svi_single = SVI(vae_single.model, vae_single.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=0, num_samples=100)
+        vae_svi_single = single_vae_posterior_eval(vae_svi_single, 'vae_single')
+
+        pyro.clear_param_store()
+        svi_warmstart = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=600, num_samples=100)
+        z_loc, z_scale = vae_single.encoder.forward(data, topics)
+        pyro.clear_param_store()
+        pyro.get_param_store().get_param('z_loc', init_tensor=z_loc.detach())
+        pyro.get_param_store().get_param('z_scale', init_tensor=z_scale.detach())
+        svi_warmstart = posterior_eval(svi_warmstart, 'svi_warmstart')
 
         pyro.clear_param_store()
         svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=600, num_samples=100)
@@ -284,24 +330,25 @@ if args.evaluate:
         #     save_kl_to_csv(results_dir, data_name)
 
     # plot the posteriors
-    for i in sample_idx:
-        if args.run_mcmc:
-            inference_names = ['vae', 'svi', 'mcmc']
-        else:
-            inference_names = ['vae', 'svi']
-        if model_config['scale_type'] == 'sample':
-            scale = vae.decoder.scale.data.numpy()
-        else:
-            scale = 1
-        plot_posterior(results_dir, i, dataset_names, inference_names, scale=scale)
-    plot_posterior_v2(results_dir, sample_idx, ['train', 'valid', 'test'], inference_names, scale)
+    if model_config['scale_type'] == 'sample':
+        scale = vae.decoder.scale.data.numpy()
+    else:
+        scale = 1
+    # for i in sample_idx:
+    #     plot_posterior(results_dir, i, dataset_names, inference_names, scale=scale)
+    # plot_posterior_v2(results_dir, sample_idx, ['train', 'valid', 'test'], inference_names, scale)
+    plot_posterior_v3(results_dir, sample_idx, ['train', 'valid', 'test'], inference_names, scale)
 
     # plot the reconstructions
+    datasets = generate_datasets(train, valid, test, n=num_combinations_to_evaluate)
     for data_name, data_and_topics in zip(dataset_names, datasets):
         data, _ = unzip_X_and_topics(data_and_topics)
         filenames = []
-        for inference in ['vae', 'svi', 'mcmc']:
-            file = '_'.join([inference, model_config['model_name'], data_name, str(model_config['n_hidden_layers']), str(model_config['n_hidden_units'])]) + '.npy'
+        for inference in inference_names:
+            if inference == 'vae_single':
+                file = '_'.join([inference, model_config_single['model_name'], data_name, str(model_config_single['n_hidden_layers']), str(model_config_single['n_hidden_units'])]) + '.npy'
+            else:
+                file = '_'.join([inference, model_config['model_name'], data_name, str(model_config['n_hidden_layers']), str(model_config['n_hidden_units'])]) + '.npy'
             filepath = os.path.join(os.getcwd(), results_dir, file)
             if os.path.exists(filepath):
                 filenames.append(filepath)
@@ -309,6 +356,7 @@ if args.evaluate:
         plot_name = os.path.join(results_dir, data_name + '_vae_reconstructions.pdf')
         plot_saved_samples(np.array(data)[sample_idx], filenames, plot_name, vocab_size=vocab_size, intensity=10)
     
+    pyro.clear_param_store()
     # reload vae to be able to take in different-sized batches
     vae = VAE_pyro(**model_config)
     state_dict = vae.load()
