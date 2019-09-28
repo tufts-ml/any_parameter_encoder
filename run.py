@@ -69,13 +69,13 @@ else:
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-fh = logging.handlers.FileHandler(os.path.join(results_dir, 'memory_consumption_by_time.csv'), when='D', interval=2)
+fh = logging.handlers.FileHandler(os.path.join(results_dir, 'memory_consumption.log'), when='D', interval=2)
 formatter = logging.Formatter('%(asctime)s: %(message)s')
 fh.setFormatter(formatter)
 logger.addHandler(fh)
 
 def get_memory_consumption():
-    process = psutil.Process(34213)
+    process = psutil.Process(os.getpid())
     logger.info('{}'.format(process.memory_info()[0]))
 
 if args.run_mcmc:
@@ -187,6 +187,7 @@ else:
     np.save(os.path.join(results_dir, 'documents.npy'), documents)
 
 logging.info('Data acquired')
+get_memory_consumption()
 
 train = (documents, train_topics)
 valid = (documents, valid_topics)
@@ -202,6 +203,9 @@ def generate_datasets(train, valid, test, n):
 # TODO: fix to evaluate on same number of topics
 datasets = generate_datasets(train, valid, test, n=num_combinations_to_evaluate)
 dataset_names = ['train', 'valid', 'test']
+
+logging.info('Datasets generated')
+get_memory_consumption()
 
 # train the VAE and save the weights
 if args.find_lr:
@@ -333,11 +337,19 @@ if args.evaluate:
         pyro.clear_param_store()
         vae_svi = SVI(vae.model, vae.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=0, num_samples=100)
         vae_svi = posterior_eval(vae_svi, 'vae')
+        get_memory_consumption()
+        logging.info('Deleting vae_svi')
+        del vae_svi
+        get_memory_consumption()
 
         logging.info('Starting VAE single evaluation')
         pyro.clear_param_store()
         vae_svi_single = SVI(vae_single.model, vae_single.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=0, num_samples=100)
         vae_svi_single = single_vae_posterior_eval(vae_svi_single, 'vae_single')
+        get_memory_consumption()
+        logging.info('Deleting vae_svi_single')
+        del vae_svi_single
+        get_memory_consumption()
 
         logging.info('Starting SVI warmstart evaluation')
         pyro.clear_param_store()
@@ -347,6 +359,10 @@ if args.evaluate:
         pyro.get_param_store().get_param('z_loc', init_tensor=z_loc.detach())
         pyro.get_param_store().get_param('z_scale', init_tensor=z_scale.detach())
         svi_warmstart = posterior_eval(svi_warmstart, 'svi_warmstart')
+        get_memory_consumption()
+        logging.info('Deleting svi_warmstart')
+        del svi_warmstart
+        get_memory_consumption()
 
         logging.info('Starting SVI evaluation')
         pyro.clear_param_store()
@@ -356,9 +372,18 @@ if args.evaluate:
             logging.info('Starting MCMC evaluation')
             nuts_kernel = NUTS(vae.model, adapt_step_size=True)
             nuts_kernel.initial_trace = svi.exec_traces[-1]
+            get_memory_consumption()
+            logging.info('Deleting svi')
+            del svi
+            get_memory_consumption()
             pyro.clear_param_store()
             mcmc = MCMC(nuts_kernel, num_samples=100, warmup_steps=100)
             mcmc = posterior_eval(mcmc, 'mcmc')
+        else:
+            get_memory_consumption()
+            logging.info('Deleting svi')
+            del svi
+            get_memory_consumption()
 
         # save kl between MCMC and the others
         # if args.run_mcmc:
