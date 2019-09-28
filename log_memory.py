@@ -4,8 +4,14 @@ import psutil
 import os
 import sys
 import time
+import argparse
 
-results_dir = 'experiments/mdreview_debugging1'
+parser = argparse.ArgumentParser(description='Results summary')
+parser.add_argument('results_dir', type=str, help='directory of results')
+parser.add_argument('pid', type=int)
+args = parser.parse_args()
+
+results_dir = args.results_dir
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -15,7 +21,7 @@ fh.setFormatter(formatter)
 logger.addHandler(fh)
 
 def get_memory_consumption():
-    process = psutil.Process(34213)
+    process = psutil.Process(args.pid)
     logger.info('{}'.format(process.memory_info()[0]))
 
 try:
