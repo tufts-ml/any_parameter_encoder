@@ -47,15 +47,15 @@ if not os.path.exists(results_dir):
     os.system('mkdir -p ' + results_dir)
 shutil.copy(os.path.abspath(__file__), os.path.join(results_dir, 'run_simple.py'))
 
+sample_idx = list(range(0, 20, 2))
+
 # global params
 if args.mdreviews:
     n_topics = 100
     vocab_size = 7729
-    sample_idx = list(range(10))
 else:
     n_topics = 20
     vocab_size = 100
-    sample_idx = list(range(10))
 
 model_config = {
     'vocab_size': vocab_size,
@@ -155,13 +155,18 @@ else:
 # test = expand_docs_and_topics(documents, test_topics)
 
 train = (documents, train_topics)
-print(train_topics.shape)
 valid = (documents, valid_topics)
 test = (documents, test_topics)
 
+def generate_datasets(train, valid, test, n):
+    datasets = [train, valid, test]
+    for dataset in datasets:
+        docs, topics = dataset
+        subset = [comb for _, comb in zip(range(n), itertools.product(docs, topics))]
+        yield subset
+
 # TODO: fix to evaluate on same number of topics
-datasets = [train[:300], valid[:300], test[:300]]
-# datasets = [train, valid, test]
+datasets = generate_datasets(train, valid, test, n=300)
 dataset_names = ['train', 'valid', 'test']
 model_config['num_batches'] = math.ceil(len(train) / model_config['batch_size'])
 
@@ -249,7 +254,7 @@ if args.evaluate:
         else:
             scale = 1
         plot_posterior(results_dir, i, dataset_names, inference_names, scale=scale)
-    plot_posterior_v2(results_dir, list(range(0, 30, 5)), ['train', 'valid', 'test'], inference_names, scale)
+    plot_posterior_v2(results_dir, sample_idx, ['train', 'valid', 'test'], inference_names, scale)
 
     # plot the reconstructions
     for data_name, data_and_topics in zip(dataset_names, datasets):
