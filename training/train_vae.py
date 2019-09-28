@@ -84,7 +84,8 @@ def train(
     tensorboard_logs_dir=None,
     results_dir=None,
     vae_meta=True,
-    shuffle=True
+    shuffle=True,
+    save_iter=100
 ):
     train_docs, train_topics = train_data
     train_data = list(itertools.product(train_docs, train_topics))
@@ -133,6 +134,8 @@ def train(
             X, topics = unzip_X_and_topics(batch_xs[:10])
             plot_side_by_side_docs(np.concatenate([X, recreated_docs]), os.path.join(results_dir, 'recreated_docs_{}.pdf'.format(str(epoch).zfill(2))))
 
+        if epoch % save_iter == 0:
+            vae.save()
         # Display logs per epoch step
         if epoch % display_step == 0:
             print(
