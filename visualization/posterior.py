@@ -119,7 +119,8 @@ def plot_posterior_v2(results_dir, sample_indices, data_names, inference_names, 
         plt.savefig(os.path.join(results_dir, 'posteriors_{}.png'.format(data)))
 
 
-def plot_posterior_v3(results_dir, sample_indices, data_names, inference_names, scale=1, scale_type='mean', seed=0):
+def plot_posterior_v3(results_dir, sample_indices, data_names, inference_names,
+                      scale=1, scale_type='mean', seed=0, colors=['red', 'purple', 'blue', 'turquoise', 'green']):
     """ Each plot is a different sample. """
     np.random.seed(seed)
     nrows = 2
@@ -128,7 +129,7 @@ def plot_posterior_v3(results_dir, sample_indices, data_names, inference_names, 
         fig, axes = plt.subplots(nrows, ncols, sharex=False, sharey=False, tight_layout=True, figsize=(ncols * 4, nrows * 4))
         for j, sample_idx in enumerate(sample_indices):
             top_2_idx = None
-            for inference, color in zip(inference_names, ['red', 'green', 'purple']):
+            for inference, color in zip(inference_names, colors):
                 if inference == "mcmc":
                     samples_unnormalized = np.load(os.path.join(results_dir, '{}_{}_samples.npy'.format(data, inference)))[:, sample_idx]
                     if scale_type == 'sample':
@@ -145,7 +146,6 @@ def plot_posterior_v3(results_dir, sample_indices, data_names, inference_names, 
                 means = np.mean(samples, axis=0)
                 if top_2_idx is None:
                     top_2_idx = np.argpartition(means, -2)[-2:]
-                axes[j / ncols][j % ncols].set_title("Top two topics for " + inference)
                 axes[j / ncols][j % ncols].set_ylim(0, 1)
                 axes[j / ncols][j % ncols].set_xlim(0, 1)
                 axes[j / ncols][j % ncols].scatter(samples[:, top_2_idx[-1]], samples[:, top_2_idx[0]], label=inference, alpha=.2, color=color)
@@ -158,5 +158,5 @@ if __name__ == "__main__":
     #     plot_posterior('experiments/vae_experiments/naive_scale1/', i,
     #                    ['train', 'valid', 'test'], ['vae', 'svi', 'mcmc'])
     # plot_posterior_v2('experiments/naive_20k1/', list(range(0, 30, 5)), ['train', 'valid', 'test'], ['vae', 'svi', 'mcmc'], scale=2)
-    # plot_posterior_v3('experiments/overfitting_experiments/50topics4/', list(range(0, 20, 2)), ['train', 'valid', 'test'], ['vae', 'svi', 'mcmc'], scale=2)
-    plot_posterior_v2('experiments/overfitting_experiments/50topics3/', list(range(0, 20, 2)), ['train', 'valid', 'test'], ['mcmc', 'svi', 'vae'], scale=2)
+    plot_posterior_v3('experiments/final/test/', list(range(0, 20, 2)), ['train', 'valid', 'test'], ['svi', 'svi_warmstart', 'vae', 'vae_single'], scale=2)
+    # plot_posterior_v2('experiments/overfitting_experiments/50topics3/', list(range(0, 20, 2)), ['train', 'valid', 'test'], ['mcmc', 'svi', 'vae'], scale=2)

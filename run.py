@@ -49,12 +49,13 @@ if not os.path.exists(results_dir):
     os.system('mkdir -p ' + results_dir)
 shutil.copy(os.path.abspath(__file__), os.path.join(results_dir, 'run_simple.py'))
 
-sample_idx = list(range(0, 20, 2))
-num_documents = 50
-num_train_topics = 5
-num_valid_topics = 5
-num_test_topics = 5
-num_combinations_to_evaluate = 30
+sample_idx = list(range(10, 20, 2)) + list(range(90, 100, 2))
+num_documents = 500
+num_train_topics = 50
+num_valid_topics = 10
+num_test_topics = 10
+num_combinations_to_evaluate = 300
+random_topics_idx = 2
 
 # global params
 if args.mdreviews:
@@ -82,8 +83,8 @@ model_config = {
     'n_hidden_layers': 2,
     'n_hidden_units': 100,
     'n_samples': 100,
-    'decay_rate': .5,
-    'decay_steps': 1000,
+    'decay_rate': .9,
+    'decay_steps': 2000,
     'starting_learning_rate': .1,
     'n_steps_enc': 1,
     'custom_lr': False,
@@ -91,14 +92,14 @@ model_config = {
     'use_adamw': False,
     'alpha': .01,
     'scale_type': 'mean',
-    'tot_epochs': 8,
+    'tot_epochs': 800,
     'batch_size': 200,
     'seed': 0
 }
 
 model_config_single = model_config.copy()
 model_config_single.update({'model_name': 'lda_orig', 'architecture': 'standard', 'n_hidden_layers': 5})
-model_config_single.update({'starting_learning_rate': .01, 'tot_epochs': 100, 'batch_size': 150})
+model_config_single.update({'starting_learning_rate': .01, 'tot_epochs': 400, 'batch_size': 150, 'decay_steps': 800})
 
 # toy bars data
 if args.use_cached and os.path.exists(os.path.join(results_dir, 'train_topics.npy')):
@@ -136,8 +137,8 @@ else:
             beta[popular_words] = 1000
             beta[random_additions] = 200
             beta = normalize1d(beta)
-            beta[popular_words] *= 50
-            beta[random_additions] *= 10
+            beta[popular_words] *= 5
+            beta[random_additions] *= 2
             betas.append(beta)
     else:
         betas = []
@@ -163,7 +164,8 @@ else:
     for i, topics in enumerate(test_topics):
         plot_side_by_side_docs(topics, os.path.join(results_dir, 'test_topics_{}.pdf'.format(str(i).zfill(3))))
 
-    documents, doc_topic_dists = generate_documents(train_topics[0], num_documents, alpha=.01, seed=0)
+    documents, doc_topic_dists = generate_documents(train_topics[0], num_documents, alpha=.05, seed=0)
+    plot_side_by_side_docs(documents[:40], os.path.join(results_dir, 'documents.pdf'))
 
     np.save(os.path.join(results_dir, 'train_topics.npy'), train_topics)
     np.save(os.path.join(results_dir, 'valid_topics.npy'), valid_topics)
@@ -187,13 +189,22 @@ dataset_names = ['train', 'valid', 'test']
 
 # train the VAE and save the weights
 if args.find_lr:
-    model_config['num_batches'] = math.ceil(len(documents) * len(train_topics) / model_config['batch_size'])
-    vae = VAE_tf(test_lr=True, **model_config)
-    log_lrs, losses = find_lr(vae, train, batch_size=model_config['batch_size'], final_value=1e2)
-    print(log_lrs)
-    print(losses)
-    plt.plot(log_lrs[10:-5],losses[10:-5])
-    plt.savefig(os.path.join(results_dir, 'learning_rates.png'))
+    def plot_lr(topics, model_config, name='learning_rates.png'):
+        model_config['num_batches'] = math.ceil(len(documents) * len(topics) / model_config['batch_size'])
+        vae = VAE_tf(test_lr=True, **model_config)
+        train_data = list(itertools.product(documents, topics))
+        log_lrs, losses = find_lr(vae, train_data, batch_size=model_config['batch_size'], final_value=1e2)
+        print(log_lrs)
+        print(losses)
+        plt.plot(log_lrs[10:-5],losses[10:-5])
+        plt.savefig(os.path.join(results_dir, name))
+        plt.close()
+        vae.sess.close()
+        tf.reset_default_graph()
+    
+    plot_lr(train_topics, model_config)
+    plot_lr([train_topics[random_topics_idx]], model_config_single, 'learning_rates_vae_single.png')
+
 if args.evaluate_svi_convergence:
     vae = VAE_pyro(**model_config)
     num_steps = 600
@@ -209,6 +220,7 @@ if args.evaluate_svi_convergence:
     print(losses)
     plt.plot(range(num_steps), losses)
     plt.savefig(os.path.join(results_dir, 'svi_convergence.png'))
+
 if args.evaluate_svi_convergence_with_vae_init:
     vae = VAE_pyro(**model_config)
     data, topics = unzip_X_and_topics(next(datasets))
@@ -247,18 +259,16 @@ if args.evaluate_svi_convergence_with_vae_init:
     plt.plot(range(num_steps), losses)
     plt.savefig(os.path.join(results_dir, 'svi_convergence_vae_init.png'))
 
-
 if args.train:
     train_save_VAE(
         train, valid, model_config,
         training_epochs=model_config['tot_epochs'], batch_size=model_config['batch_size'],
         hallucinations=False, tensorboard=True, shuffle=True, display_step=1,
         n_topics=n_topics, vocab_size=vocab_size, recreate_docs=False)
-    
-    random_topics_idx = 2
-    single_train = (documents, train_topics[random_topics_idx])
+
+    single_train = (documents, [train_topics[random_topics_idx]])
     train_save_VAE(
-        train, valid, model_config_single,
+        single_train, valid, model_config_single,
         training_epochs=model_config_single['tot_epochs'], batch_size=model_config_single['batch_size'],
         hallucinations=False, tensorboard=True, shuffle=True, display_step=1,
         n_topics=n_topics, vocab_size=vocab_size, recreate_docs=False)
@@ -352,6 +362,8 @@ if args.evaluate:
             filepath = os.path.join(os.getcwd(), results_dir, file)
             if os.path.exists(filepath):
                 filenames.append(filepath)
+            else:
+                print(inference)
 
         plot_name = os.path.join(results_dir, data_name + '_vae_reconstructions.pdf')
         plot_saved_samples(np.array(data)[sample_idx], filenames, plot_name, vocab_size=vocab_size, intensity=10)
