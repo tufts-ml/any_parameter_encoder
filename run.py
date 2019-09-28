@@ -32,6 +32,7 @@ parser = argparse.ArgumentParser(description='Results summary')
 parser.add_argument('results_dir', type=str, help='directory of results')
 parser.add_argument('--find_lr', help='find best learning rate', action='store_true')
 parser.add_argument('--evaluate_svi_convergence', help='run SVI to see if it converges', action='store_true')
+parser.add_argument('--evaluate_svi_convergence_with_vae_init', help='run SVI to see if it converges', action='store_true')
 parser.add_argument('--train', help='train the model in tf', action='store_true')
 parser.add_argument('--evaluate', help='evaluate posteriors in pyro', action='store_true')
 parser.add_argument('--run_mcmc', help='run mcmc', action='store_true')
@@ -183,7 +184,7 @@ if args.evaluate_svi_convergence:
     num_steps = 600
     pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .1}, 'step_size': 10000, 'gamma': 0.95})
     svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=num_steps, num_samples=100)
-    data, topics = unzip_X_and_topics(train[:300])
+    data, topics = unzip_X_and_topics(next(datasets))
     data = torch.from_numpy(data.astype(np.float32))
     topics = torch.from_numpy(topics.astype(np.float32))
     losses = []
@@ -193,6 +194,45 @@ if args.evaluate_svi_convergence:
     print(losses)
     plt.plot(range(num_steps), losses)
     plt.savefig(os.path.join(results_dir, 'svi_convergence.png'))
+if args.evaluate_svi_convergence_with_vae_init:
+    vae = VAE_pyro(**model_config)
+    data, topics = unzip_X_and_topics(next(datasets))
+    data = torch.from_numpy(data.astype(np.float32))
+    topics = torch.from_numpy(topics.astype(np.float32))
+    data_name = 'train'
+    num_steps = 600
+    model_config.update({
+            'data_name': data_name,
+            'results_dir': results_dir,
+        })
+    posterior_eval = partial(
+            run_posterior_evaluation, 
+            data=data, data_name=data_name, topics=topics, vae=vae, sample_idx=sample_idx, model_config=model_config)
+    pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .1}, 'step_size': 10000, 'gamma': 0.95})
+    vae_svi = SVI(vae.model, vae.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=0, num_samples=100)
+    vae_svi = posterior_eval(vae_svi, 'vae')
+    z_loc, z_scale = vae.encoder.forward(data, topics)
+    print(z_loc[0])
+    print(z_scale[0])
+    svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=num_steps, num_samples=100)
+
+    pyro.clear_param_store()
+    pyro.get_param_store().get_param('z_loc', init_tensor=z_loc.detach())
+    pyro.get_param_store().get_param('z_scale', init_tensor=z_scale.detach())
+    print(pyro.get_param_store().get_all_param_names())
+    # pyro.get_param_store().replace_param("z_loc", z_loc, torch.zeros(data.shape[0], topics.shape[1]))
+    # pyro.get_param_store().replace_param("z_scale", z_scale, torch.ones(data.shape[0], topics.shape[1]))
+    losses = []
+    for i in range(num_steps):
+        print(pyro.get_param_store().get_param('z_loc')[0])
+        print(pyro.get_param_store().get_param('z_scale')[0])
+        loss = svi.step(data, topics)
+        losses.append(loss)
+        break
+    print(losses)
+    plt.plot(range(num_steps), losses)
+    plt.savefig(os.path.join(results_dir, 'svi_convergence_vae_init.png'))
+
 
 if args.train:
     vae = train_save_VAE(
@@ -220,7 +260,7 @@ if args.evaluate:
         })
 
         posterior_eval = partial(
-            run_posterior_evaluation, 
+            run_posterior_evaluation,
             data=data, data_name=data_name, topics=topics, vae=vae, sample_idx=sample_idx, model_config=model_config)
 
         pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .1}, 'step_size': 10000, 'gamma': 0.95})
