@@ -9,6 +9,8 @@ import torch
 import argparse
 import matplotlib.pyplot as plt
 from functools import partial
+import logging
+import psutil
 
 from pyro.optim import StepLR
 from pyro.infer import SVI, Trace_ELBO, TraceMeanField_ELBO
@@ -65,6 +67,16 @@ else:
     n_topics = 20
     vocab_size = 100
 
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+fh = logging.handlers.FileHandler(os.path.join(results_dir, 'memory_consumption_by_time.csv'), when='D', interval=2)
+formatter = logging.Formatter('%(asctime)s: %(message)s')
+fh.setFormatter(formatter)
+logger.addHandler(fh)
+
+def get_memory_consumption():
+    process = psutil.Process(34213)
+    logger.info('{}'.format(process.memory_info()[0]))
 
 if args.run_mcmc:
     inference_names = ['mcmc', 'svi', 'svi_warmstart', 'vae', 'vae_single']
@@ -83,9 +95,9 @@ model_config = {
     'n_hidden_layers': 2,
     'n_hidden_units': 100,
     'n_samples': 100,
-    'decay_rate': .9,
-    'decay_steps': 2000,
-    'starting_learning_rate': .1,
+    'decay_rate': .5,
+    'decay_steps': 1000,
+    'starting_learning_rate': .01,
     'n_steps_enc': 1,
     'custom_lr': False,
     'use_dropout': True,
@@ -103,6 +115,7 @@ model_config_single.update({'starting_learning_rate': .01, 'tot_epochs': 400, 'b
 
 # toy bars data
 if args.use_cached and os.path.exists(os.path.join(results_dir, 'train_topics.npy')):
+    logging.info('Loading data')
     train_topics = np.load(os.path.join(results_dir, 'train_topics.npy'))
     valid_topics = np.load(os.path.join(results_dir, 'valid_topics.npy'))
     test_topics = np.load(os.path.join(results_dir, 'test_topics.npy'))
@@ -113,6 +126,7 @@ elif args.use_cached and os.path.exists(os.path.join('experiments', 'train_topic
     test_topics = np.load(os.path.join('experiments', 'test_topics.npy'))
     documents = np.load(os.path.join('experiments', 'documents.npy'))
 else:
+    logging.info('Creating data')
     if args.mdreviews:
         betas = []
         orig_topics = np.load('resources/mdreviews_topics3.npy')
@@ -171,6 +185,8 @@ else:
     np.save(os.path.join(results_dir, 'valid_topics.npy'), valid_topics)
     np.save(os.path.join(results_dir, 'test_topics.npy'), test_topics)
     np.save(os.path.join(results_dir, 'documents.npy'), documents)
+
+logging.info('Data acquired')
 
 train = (documents, train_topics)
 valid = (documents, valid_topics)
@@ -260,18 +276,22 @@ if args.evaluate_svi_convergence_with_vae_init:
     plt.savefig(os.path.join(results_dir, 'svi_convergence_vae_init.png'))
 
 if args.train:
+    logging.info('Starting train')
     train_save_VAE(
         train, valid, model_config,
         training_epochs=model_config['tot_epochs'], batch_size=model_config['batch_size'],
         hallucinations=False, tensorboard=True, shuffle=True, display_step=1,
         n_topics=n_topics, vocab_size=vocab_size, recreate_docs=False)
 
+    logging.info('Finished train')
+    logging.info('Starting training single')
     single_train = (documents, [train_topics[random_topics_idx]])
     train_save_VAE(
         single_train, valid, model_config_single,
         training_epochs=model_config_single['tot_epochs'], batch_size=model_config_single['batch_size'],
         hallucinations=False, tensorboard=True, shuffle=True, display_step=1,
         n_topics=n_topics, vocab_size=vocab_size, recreate_docs=False)
+    logging.info('Finished training single')
 # load the VAE into pyro for evaluation
 if args.evaluate:
     vae = VAE_pyro(**model_config)
@@ -309,14 +329,17 @@ if args.evaluate:
 
         pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .1}, 'step_size': 10000, 'gamma': 0.95})
         # Note: pyro scheduler doesn't have any effect in the VAE case since we never take any optimization steps
+        logging.info('Starting VAE evaluation')
         pyro.clear_param_store()
         vae_svi = SVI(vae.model, vae.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=0, num_samples=100)
         vae_svi = posterior_eval(vae_svi, 'vae')
 
+        logging.info('Starting VAE single evaluation')
         pyro.clear_param_store()
         vae_svi_single = SVI(vae_single.model, vae_single.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=0, num_samples=100)
         vae_svi_single = single_vae_posterior_eval(vae_svi_single, 'vae_single')
 
+        logging.info('Starting SVI warmstart evaluation')
         pyro.clear_param_store()
         svi_warmstart = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=600, num_samples=100)
         z_loc, z_scale = vae_single.encoder.forward(data, topics)
@@ -325,10 +348,12 @@ if args.evaluate:
         pyro.get_param_store().get_param('z_scale', init_tensor=z_scale.detach())
         svi_warmstart = posterior_eval(svi_warmstart, 'svi_warmstart')
 
+        logging.info('Starting SVI evaluation')
         pyro.clear_param_store()
         svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=600, num_samples=100)
         svi = posterior_eval(svi, 'svi')
         if args.run_mcmc:
+            logging.info('Starting MCMC evaluation')
             nuts_kernel = NUTS(vae.model, adapt_step_size=True)
             nuts_kernel.initial_trace = svi.exec_traces[-1]
             pyro.clear_param_store()
@@ -340,6 +365,7 @@ if args.evaluate:
         #     save_kl_to_csv(results_dir, data_name)
 
     # plot the posteriors
+    logging.info('Plotting posteriors')
     if model_config['scale_type'] == 'sample':
         scale = vae.decoder.scale.data.numpy()
     else:
@@ -350,6 +376,7 @@ if args.evaluate:
     plot_posterior_v3(results_dir, sample_idx, ['train', 'valid', 'test'], inference_names, scale)
 
     # plot the reconstructions
+    logging.info('Plotting reconstructions')
     datasets = generate_datasets(train, valid, test, n=num_combinations_to_evaluate)
     for data_name, data_and_topics in zip(dataset_names, datasets):
         data, _ = unzip_X_and_topics(data_and_topics)
@@ -368,6 +395,7 @@ if args.evaluate:
         plot_name = os.path.join(results_dir, data_name + '_vae_reconstructions.pdf')
         plot_saved_samples(np.array(data)[sample_idx], filenames, plot_name, vocab_size=vocab_size, intensity=10)
     
+    logging.info('Plotting SVI vs VAE ELBOs')
     pyro.clear_param_store()
     # reload vae to be able to take in different-sized batches
     vae = VAE_pyro(**model_config)
