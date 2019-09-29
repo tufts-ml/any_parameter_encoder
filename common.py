@@ -179,21 +179,35 @@ def get_elbo_csv(vae, vae_single, results_dir, restart=True):
                 vae_single_posterior = vae_single_svi.run(data_i, topics_i)
                 vae_single_loss = -vae_single_svi.evaluate_loss(data_i, topics_i)
 
+                num_steps = 400
                 svi_loss = np.nan
                 if restart:
                     i = 0
+                    svi_losses = []
+                    svi_elbo = Trace_ELBO()
                     while torch_isnan(svi_loss) and i < 3:
-                        svi_elbo = Trace_ELBO()
-                        svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=svi_elbo, num_steps=400, num_samples=100)
-                        svi_posterior = svi.run(data_i, topics_i)
-                        svi_loss = -svi.evaluate_loss(data_i, topics_i)
+                        pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .1 * 10**(-1 * i)}, 'step_size': 10000, 'gamma': 0.95})
+                        svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=svi_elbo, num_steps=num_steps, num_samples=100)
+                        for i in range(num_steps):
+                            loss = svi.step(data_i, topics_i)
+                            if not torch_isnan(loss):
+                                svi_loss = loss
+                            else:
+                                break
                         i += 1
+                        svi_losses.append(svi_loss)
                         pyro.clear_param_store()
+                    svi_loss = max(svi_losses)
                 else:
                     svi_elbo = Trace_ELBO()
-                    svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=svi_elbo, num_steps=400, num_samples=100)
+                    svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=svi_elbo, num_steps=num_steps, num_samples=100)
                     svi_posterior = svi.run(data_i, topics_i)
-                    svi_loss = -svi.evaluate_loss(data_i, topics_i)
+                    for i in range(num_steps):
+                        loss = svi.step(data_i, topics_i)
+                        if not torch_isnan(loss):
+                            svi_loss = loss
+                        else:
+                            break
                     pyro.clear_param_store()
                 writer.writerow([data_name, i, svi_loss, vae_loss, vae_single_loss])
                 pyro.clear_param_store()
