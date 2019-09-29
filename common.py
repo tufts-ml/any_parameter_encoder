@@ -30,7 +30,7 @@ MIN_LOG_PROB = -9999999999
 
 def train_save_VAE(train_data, valid_data, model_config, training_epochs=120, batch_size=200,
                    tensorboard=True, hallucinations=False, shuffle=True, display_step=5, recreate_docs=True,
-                   vocab_size=100, n_topics=20, save_iter=100):
+                   vocab_size=100, n_topics=20, save_iter=100, plot_valid_cost=True):
     vae = VAE_tf(tensorboard=tensorboard, **model_config)
     tensorboard_logs_dir = os.path.join(
         model_config['results_dir'], model_config['model_name'],
@@ -41,7 +41,8 @@ def train_save_VAE(train_data, valid_data, model_config, training_epochs=120, ba
             n_topics=n_topics)
     else:
         vae = train(train_data, valid_data, vae, training_epochs=training_epochs, tensorboard=tensorboard, batch_size=batch_size,
-            tensorboard_logs_dir=tensorboard_logs_dir, results_dir=model_config['results_dir'], display_step=display_step, save_iter=save_iter)
+            tensorboard_logs_dir=tensorboard_logs_dir, results_dir=model_config['results_dir'], display_step=display_step, save_iter=save_iter,
+            plot_valid_cost=plot_valid_cost)
     if recreate_docs:
         for data_name, batch_xs in zip(['train', 'valid'], [train_data[:10], valid_data[:10]]):
             recreated_docs, _, _ = vae.recreate_input(batch_xs)
@@ -176,7 +177,7 @@ def get_elbo_csv(vae, vae_single, results_dir, restart=True):
                 vae_posterior = vae_svi.run(data_i, topics_i)
                 vae_loss = -vae_svi.evaluate_loss(data_i, topics_i)
 
-                vae_single_svi = SVI(vae.model, vae.encoder_guide, pyro_scheduler, loss=vae_elbo, num_steps=0, num_samples=100)
+                vae_single_svi = SVI(vae_single.model, vae_single.encoder_guide, pyro_scheduler, loss=vae_elbo, num_steps=0, num_samples=100)
                 vae_single_posterior = vae_single_svi.run(data_i, topics_i)
                 vae_single_loss = -vae_single_svi.evaluate_loss(data_i, topics_i)
 
@@ -187,7 +188,12 @@ def get_elbo_csv(vae, vae_single, results_dir, restart=True):
                     svi_losses = []
                     svi_elbo = Trace_ELBO()
                     while torch_isnan(svi_loss) and n_runs < 3:
-                        pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .1 * 10**(-1 * i)}, 'step_size': 10000, 'gamma': 0.95})
+                        pyro_scheduler = StepLR(
+                            {'optimizer': torch.optim.Adam,
+                            'optim_args': {"lr": .1 * 10**(-1 * n_runs)},
+                            'step_size': 10000 * 10**(-1 * n_runs),
+                            'gamma': 0.1 + (n_runs * .4)}
+                        )
                         svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=svi_elbo, num_steps=num_steps, num_samples=100)
                         losses = []
                         for _ in range(num_steps):
@@ -195,13 +201,13 @@ def get_elbo_csv(vae, vae_single, results_dir, restart=True):
                             if not torch_isnan(loss):
                                 svi_loss = loss
                                 losses.append(loss)
+                            else:
                                 plt.plot(range(len(losses)), losses)
                                 plots_dir = os.path.join(results_dir, 'svi_losses')
                                 if not os.path.exists(plots_dir):
                                     os.mkdir(plots_dir)
                                 plt.savefig(os.path.join(plots_dir, 'svi_losses_{}_{}.png'.format(i, n_runs)))
                                 plt.close()
-                            else:
                                 break
                         n_runs += 1
                         svi_losses.append(svi_loss)
