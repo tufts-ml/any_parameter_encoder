@@ -4,6 +4,7 @@ import math
 import itertools
 import numpy as np
 import tensorflow as tf
+import logging
 
 from datasets.create import draw_random_doc
 from utils import inverse_softmax, softmax, unzip_X_and_topics
@@ -87,12 +88,15 @@ def train(
     shuffle=True,
     save_iter=100
 ):
+    logger = logging.getLogger()
     train_docs, train_topics = train_data
     train_data = list(itertools.product(train_docs, train_topics))
+    logger.info('Train data created for training.')
     valid_docs, valid_topics = valid_data
     num_valid_topics = len(valid_topics)
     X_val = [d for d in valid_docs for _ in range(num_valid_topics)]
     topics_val = np.tile(valid_topics, (len(valid_docs), 1, 1))
+    logger.info('Validation data created for training.')
     del valid_data
     if tensorboard:
         train_writer = tf.summary.FileWriter(
@@ -145,6 +149,7 @@ def train(
                 "Epoch: %04d" % (epoch + 1),
                 "cost={:.9f}".format(total_cost / num_batches),
             )
+            logger.info('Epoch: {}, cost: {}'.format(epoch + 1, total_cost / num_batches))
             if tensorboard:
                 merge = tf.summary.merge(vae.summaries)
                 if vae_meta:
@@ -162,6 +167,7 @@ def train(
                                             feed_dict={vae.x: X_val, vae.keep_prob: 1.0})
                 print(valid_cost)
                 print('writing valid summary')
+                logger.info('writing valid summary')
                 valid_summary = tf.Summary(value=[tf.Summary.Value(tag="valid_loss", simple_value=valid_cost)])
                 valid_writer.add_summary(valid_summary, epoch)
                 valid_writer.flush()
