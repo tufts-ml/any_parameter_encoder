@@ -15,6 +15,7 @@ import pyro
 import tensorflow as tf
 import torch
 from scipy.stats import multivariate_normal, norm
+import matplotlib.pyplot as plt
 
 from evaluation.evaluate_posterior import evaluate_log_predictive_density
 from evaluation.evaluate_posterior import reconstruct_data
@@ -182,19 +183,27 @@ def get_elbo_csv(vae, vae_single, results_dir, restart=True):
                 num_steps = 400
                 svi_loss = np.nan
                 if restart:
-                    i = 0
+                    n_runs = 0
                     svi_losses = []
                     svi_elbo = Trace_ELBO()
-                    while torch_isnan(svi_loss) and i < 3:
+                    while torch_isnan(svi_loss) and n_runs < 3:
                         pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .1 * 10**(-1 * i)}, 'step_size': 10000, 'gamma': 0.95})
                         svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=svi_elbo, num_steps=num_steps, num_samples=100)
-                        for i in range(num_steps):
+                        losses = []
+                        for _ in range(num_steps):
                             loss = -svi.step(data_i, topics_i)
                             if not torch_isnan(loss):
                                 svi_loss = loss
+                                losses.append(loss)
+                                plt.plot(range(len(losses)), losses)
+                                plots_dir = os.path.join(results_dir, 'svi_losses')
+                                if not os.path.exists(plots_dir):
+                                    os.mkdir(plots_dir)
+                                plt.savefig(os.path.join(plots_dir, 'svi_losses_{}_{}.png'.format(i, n_runs)))
+                                plt.close()
                             else:
                                 break
-                        i += 1
+                        n_runs += 1
                         svi_losses.append(svi_loss)
                         pyro.clear_param_store()
                     svi_loss = max(svi_losses)
