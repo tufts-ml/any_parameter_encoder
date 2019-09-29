@@ -4,12 +4,16 @@ from visualization.reconstructions import plot_side_by_side_docs
 from utils import normalize1d
 
 
-def generate_topics(n, betas, seed):
+def generate_topics(n, betas, seed, shuffle=False):
     np.random.seed(seed)
     topics = []
     for beta in betas:
         topics.append(np.random.dirichlet(beta, size=n))
-    return np.transpose(np.array(topics), [1, 0, 2])
+    topics = np.transpose(np.array(topics), [1, 0, 2])
+    if shuffle:
+        for topic in topics:
+            np.random.shuffle(topics)
+    return topics
 
 def toy_bars(normalized=True):
     topics = []
