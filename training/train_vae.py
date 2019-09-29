@@ -91,6 +91,8 @@ def train(
     train_data = list(itertools.product(train_docs, train_topics))
     valid_docs, valid_topics = valid_data
     valid_data = list(itertools.product(valid_docs, valid_topics))
+    X_val, topics_val = unzip_X_and_topics(valid_data)
+    del valid_data
     if tensorboard:
         train_writer = tf.summary.FileWriter(
             os.path.join(tensorboard_logs_dir, 'train'), vae.sess.graph)
@@ -151,7 +153,6 @@ def train(
                     summary = vae.sess.run(merge,
                                             feed_dict={vae.x: X, vae.keep_prob: 1.0})
                 train_writer.add_summary(summary, epoch)
-                X_val, topics_val = unzip_X_and_topics(valid_data)
                 if vae_meta:
                     valid_cost = vae.sess.run(vae.cost,
                                             feed_dict={vae.x: X_val, vae.topics: topics_val, vae.keep_prob: 1.0})
