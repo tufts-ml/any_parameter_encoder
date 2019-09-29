@@ -98,7 +98,7 @@ model_config = {
     'n_hidden_units': 100,
     'n_samples': 100,
     'decay_rate': .5,
-    'decay_steps': 5000,
+    'decay_steps': 35000,
     'starting_learning_rate': .01,
     'n_steps_enc': 1,
     'custom_lr': False,
