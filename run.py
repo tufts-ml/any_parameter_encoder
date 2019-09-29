@@ -288,7 +288,7 @@ if args.train:
         train, valid, model_config,
         training_epochs=model_config['tot_epochs'], batch_size=model_config['batch_size'],
         hallucinations=False, tensorboard=True, shuffle=True, display_step=1,
-        n_topics=n_topics, vocab_size=vocab_size, recreate_docs=False, save_iter=30)
+        n_topics=n_topics, vocab_size=vocab_size, recreate_docs=False, save_iter=1)
     logging.info('Finished train')
 if args.train_single:
     logging.info('Starting training single')
@@ -297,7 +297,7 @@ if args.train_single:
         single_train, valid, model_config_single,
         training_epochs=model_config_single['tot_epochs'], batch_size=model_config_single['batch_size'],
         hallucinations=False, tensorboard=True, shuffle=True, display_step=1,
-        n_topics=n_topics, vocab_size=vocab_size, recreate_docs=False, save_iter=30)
+        n_topics=n_topics, vocab_size=vocab_size, recreate_docs=False, save_iter=1)
     logging.info('Finished training single')
 # load the VAE into pyro for evaluation
 if args.evaluate:

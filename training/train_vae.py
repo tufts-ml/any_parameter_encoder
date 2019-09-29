@@ -116,6 +116,7 @@ def train(
             # Fit training using batch data
             logger.info('Running first training step')
             cost = vae.partial_fit(batch_xs)
+            logger.info('cost: {}'.format(cost))
             # Keep track of the number of batches
             num_batches += 1
             # Keep track of the loss
@@ -172,7 +173,7 @@ def train(
                                             feed_dict={vae.x: X_val, vae.keep_prob: 1.0})
                 print(valid_cost)
                 print('writing valid summary')
-                logger.info('writing valid summary')
+                logger.info('writing valid summary: {}'.format(valid_cost))
                 valid_summary = tf.Summary(value=[tf.Summary.Value(tag="valid_loss", simple_value=valid_cost)])
                 valid_writer.add_summary(valid_summary, epoch)
                 valid_writer.flush()
