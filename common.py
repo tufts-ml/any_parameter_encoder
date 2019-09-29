@@ -189,7 +189,7 @@ def get_elbo_csv(vae, vae_single, results_dir, restart=True):
                         pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .1 * 10**(-1 * i)}, 'step_size': 10000, 'gamma': 0.95})
                         svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=svi_elbo, num_steps=num_steps, num_samples=100)
                         for i in range(num_steps):
-                            loss = svi.step(data_i, topics_i)
+                            loss = -svi.step(data_i, topics_i)
                             if not torch_isnan(loss):
                                 svi_loss = loss
                             else:
@@ -203,7 +203,7 @@ def get_elbo_csv(vae, vae_single, results_dir, restart=True):
                     svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=svi_elbo, num_steps=num_steps, num_samples=100)
                     svi_posterior = svi.run(data_i, topics_i)
                     for i in range(num_steps):
-                        loss = svi.step(data_i, topics_i)
+                        loss = -svi.step(data_i, topics_i)
                         if not torch_isnan(loss):
                             svi_loss = loss
                         else:
