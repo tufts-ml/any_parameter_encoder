@@ -90,8 +90,9 @@ def train(
     train_docs, train_topics = train_data
     train_data = list(itertools.product(train_docs, train_topics))
     valid_docs, valid_topics = valid_data
-    valid_data = list(itertools.product(valid_docs, valid_topics))
-    X_val, topics_val = unzip_X_and_topics(valid_data)
+    num_valid_topics = len(valid_topics)
+    X_val = [d for d in valid_docs for _ in range(num_valid_topics)]
+    topics_val = np.tile(valid_topics, (len(valid_docs), 1, 1))
     del valid_data
     if tensorboard:
         train_writer = tf.summary.FileWriter(
