@@ -52,8 +52,9 @@ if not os.path.exists(results_dir):
     os.system('mkdir -p ' + results_dir)
 shutil.copy(os.path.abspath(__file__), os.path.join(results_dir, 'run_simple.py'))
 
-sample_idx = list(range(10, 20, 2)) + list(range(90, 100, 2))
-num_documents = 500
+# sample_idx = list(range(10, 20, 2)) + list(range(90, 100, 2))
+sample_idx = [0, 1, 52, 53, 104, 105, 156, 157, 208, 209]
+num_documents = 5000
 num_train_topics = 50
 num_valid_topics = 10
 num_test_topics = 10
@@ -97,7 +98,7 @@ model_config = {
     'n_hidden_units': 100,
     'n_samples': 100,
     'decay_rate': .5,
-    'decay_steps': 2000,
+    'decay_steps': 3000,
     'starting_learning_rate': .01,
     'n_steps_enc': 1,
     'custom_lr': False,
@@ -106,7 +107,7 @@ model_config = {
     'alpha': .01,
     'scale_type': 'mean',
     'tot_epochs': 300,
-    'batch_size': 200,
+    'batch_size': 500,
     'seed': 1
 }
 
@@ -192,8 +193,8 @@ logging.info('Data acquired')
 get_memory_consumption()
 
 train = (documents, train_topics)
-valid = (documents, valid_topics)
-test = (documents, test_topics)
+valid = (documents[:100], valid_topics)
+test = (documents[100:200], test_topics)
 
 def generate_datasets(train, valid, test, n):
     datasets = [train, valid, test]
