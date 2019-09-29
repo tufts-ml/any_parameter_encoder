@@ -12,7 +12,9 @@ import numpy as np
 import tensorflow as tf
 from functools import partial
 from utils import unzip_X_and_topics
+import logging
 
+logger = logging.getLogger()
 l2_norm = lambda t: tf.sqrt(tf.reduce_sum(tf.pow(t, 2)))
 cwd = os.getcwd()
 
@@ -505,6 +507,7 @@ class VAE_tf(object):
 
     def partial_fit(self, X_and_topics, learning_rate=None):
         X, topics = unzip_X_and_topics(X_and_topics)
+        logger.info('Finished unzipping X and topics')
         if self.test_lr:
             opt, cost = self.sess.run(
             (self.optimizer, self.cost),

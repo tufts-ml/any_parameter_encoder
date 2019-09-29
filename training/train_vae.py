@@ -11,9 +11,12 @@ from utils import inverse_softmax, softmax, unzip_X_and_topics
 from visualization.reconstructions import plot_side_by_side_docs
 
 
+logger = logging.getLogger()
+
 def create_minibatch(data, batch_size, shuffle=True):
     rng = np.random.RandomState(10)
     np.random.shuffle(data)
+    logger.info('Finished shuffling training data.')
     for start_idx in range(0, len(data), batch_size):
         yield data[start_idx: start_idx + batch_size]
 
@@ -88,7 +91,6 @@ def train(
     shuffle=True,
     save_iter=100
 ):
-    logger = logging.getLogger()
     train_docs, train_topics = train_data
     train_data = list(itertools.product(train_docs, train_topics))
     logger.info('Train data created for training.')
@@ -98,6 +100,7 @@ def train(
     topics_val = np.tile(valid_topics, (len(valid_docs), 1, 1))
     logger.info('Validation data created for training.')
     del valid_data
+    logger.info('Deleted validation data.')
     if tensorboard:
         train_writer = tf.summary.FileWriter(
             os.path.join(tensorboard_logs_dir, 'train'), vae.sess.graph)
@@ -108,8 +111,10 @@ def train(
     for epoch in range(training_epochs):
         total_cost = 0.0
         num_batches = 0
+        logger.info('Creating minibatches')
         for batch_xs in create_minibatch(train_data, batch_size, shuffle=shuffle):
             # Fit training using batch data
+            logger.info('Running first training step')
             cost = vae.partial_fit(batch_xs)
             # Keep track of the number of batches
             num_batches += 1
