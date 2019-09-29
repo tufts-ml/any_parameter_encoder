@@ -333,26 +333,26 @@ class VAE_tf(object):
                         tf.matmul(layer, weights["out_log_sigma"]), biases["out_log_sigma"]
                     )
                 )
-            if self.tensorboard:
-                for i in range(1, self.n_hidden_layers + 1):
-                    if self.architecture == "naive_separated":
-                        for j in ['mu', 'sigma']:
-                            self.summaries.append(tf.summary.histogram(
-                                "weights_h{}_{}".format(i, j), weights["h{}_{}".format(i, j)]))
-                            self.summaries.append(tf.summary.histogram(
-                                "biases_h{}_{}".format(i, j), biases["b{}_{}".format(i, j)]))
-                    else:
-                        self.summaries.append(tf.summary.histogram(
-                            "weights_h{}".format(i), weights["h{}".format(i)]))
-                        self.summaries.append(tf.summary.histogram(
-                            "biases_h{}".format(i), biases["b{}".format(i)]))
+            # if self.tensorboard:
+            #     for i in range(1, self.n_hidden_layers + 1):
+            #         if self.architecture == "naive_separated":
+            #             for j in ['mu', 'sigma']:
+            #                 self.summaries.append(tf.summary.histogram(
+            #                     "weights_h{}_{}".format(i, j), weights["h{}_{}".format(i, j)]))
+            #                 self.summaries.append(tf.summary.histogram(
+            #                     "biases_h{}_{}".format(i, j), biases["b{}_{}".format(i, j)]))
+            #         else:
+            #             self.summaries.append(tf.summary.histogram(
+            #                 "weights_h{}".format(i), weights["h{}".format(i)]))
+            #             self.summaries.append(tf.summary.histogram(
+            #                 "biases_h{}".format(i), biases["b{}".format(i)]))
 
-                self.summaries.append(tf.summary.histogram("weights_out_mean", weights["out_mean"]))
-                self.summaries.append(tf.summary.histogram("biases_out_mean", biases["out_mean"]))
-                self.summaries.append(tf.summary.histogram("weights_out_sigma", weights["out_log_sigma"]))
-                self.summaries.append(tf.summary.histogram("biases_out_sigma", biases["out_log_sigma"]))
-                self.summaries.append(tf.summary.histogram("z_mean", z_mean))
-                self.summaries.append(tf.summary.histogram("z_log_sigma_sq", z_log_sigma_sq))
+            #     self.summaries.append(tf.summary.histogram("weights_out_mean", weights["out_mean"]))
+            #     self.summaries.append(tf.summary.histogram("biases_out_mean", biases["out_mean"]))
+            #     self.summaries.append(tf.summary.histogram("weights_out_sigma", weights["out_log_sigma"]))
+            #     self.summaries.append(tf.summary.histogram("biases_out_sigma", biases["out_log_sigma"]))
+            #     self.summaries.append(tf.summary.histogram("z_mean", z_mean))
+            #     self.summaries.append(tf.summary.histogram("z_log_sigma_sq", z_log_sigma_sq))
 
         return (z_mean, z_log_sigma_sq)
 
@@ -369,8 +369,8 @@ class VAE_tf(object):
             x_reconstr_means =tf.matmul(self.layer_do_0, topic_weights)  # (batch, n_samples, vocab_size)
             # x_reconstr_mean = tf.reduce_mean(x_reconstr_means, axis=1)
 
-            if self.tensorboard:
-                self.summaries.append(tf.summary.histogram("z", self.layer_do_0))
+            # if self.tensorboard:
+            #     self.summaries.append(tf.summary.histogram("z", self.layer_do_0))
 
         return x_reconstr_means
 
@@ -499,11 +499,11 @@ class VAE_tf(object):
                 if dec_vars:
                     self.summaries.append(tf.summary.scalar("learning_rate_dec", learning_rate_dec))
             # TODO: add the accumulated gradients from the encoder
-            if dec_vars:
-                for gradient, variable in grad_and_vars_dec:
-                    variable_name = variable.name.replace(':', '_')
-                    self.summaries.append(tf.summary.histogram("dec_gradients/" + variable_name, l2_norm(gradient)))
-                    self.summaries.append(tf.summary.histogram("dec_variables/" + variable_name, l2_norm(variable)))
+            # if dec_vars:
+            #     for gradient, variable in grad_and_vars_dec:
+            #         variable_name = variable.name.replace(':', '_')
+            #         self.summaries.append(tf.summary.histogram("dec_gradients/" + variable_name, l2_norm(gradient)))
+            #         self.summaries.append(tf.summary.histogram("dec_variables/" + variable_name, l2_norm(variable)))
 
     def partial_fit(self, X_and_topics, learning_rate=None):
         X, topics = unzip_X_and_topics(X_and_topics)
