@@ -36,6 +36,7 @@ parser.add_argument('--find_lr', help='find best learning rate', action='store_t
 parser.add_argument('--evaluate_svi_convergence', help='run SVI to see if it converges', action='store_true')
 parser.add_argument('--evaluate_svi_convergence_with_vae_init', help='run SVI to see if it converges', action='store_true')
 parser.add_argument('--train', help='train the model in tf', action='store_true')
+parser.add_argument('--train_single', help='train the model in tf', action='store_true')
 parser.add_argument('--evaluate', help='evaluate posteriors in pyro', action='store_true')
 parser.add_argument('--run_mcmc', help='run mcmc', action='store_true')
 parser.add_argument('--use_cached', help='run mcmc', action='store_true')
@@ -90,13 +91,13 @@ model_config = {
     'results_file': results_file,
     'inference': 'vae',
     'model_name': 'lda_meta',
-    'architecture': 'naive',
+    'architecture': 'template_plus_topics',
     'scale_trainable': True,
     'n_hidden_layers': 2,
     'n_hidden_units': 100,
     'n_samples': 100,
     'decay_rate': .5,
-    'decay_steps': 1000,
+    'decay_steps': 2000,
     'starting_learning_rate': .01,
     'n_steps_enc': 1,
     'custom_lr': False,
@@ -104,9 +105,9 @@ model_config = {
     'use_adamw': False,
     'alpha': .01,
     'scale_type': 'mean',
-    'tot_epochs': 800,
+    'tot_epochs': 300,
     'batch_size': 200,
-    'seed': 0
+    'seed': 1
 }
 
 model_config_single = model_config.copy()
@@ -167,9 +168,9 @@ else:
             beta = normalize1d(beta)
             beta[popular_words] *= 5
             betas.append(beta)
-    train_topics = generate_topics(n=num_train_topics, betas=betas, seed=0)
-    valid_topics = generate_topics(n=num_valid_topics, betas=betas, seed=1)
-    test_topics = generate_topics(n=num_test_topics, betas=betas, seed=2)
+    train_topics = generate_topics(n=num_train_topics, betas=betas, seed=0, shuffle=True)
+    valid_topics = generate_topics(n=num_valid_topics, betas=betas, seed=1, shuffle=True)
+    test_topics = generate_topics(n=num_test_topics, betas=betas, seed=2, shuffle=True)
 
     for i, topics in zip(range(10), train_topics):
         plot_side_by_side_docs(topics, os.path.join(results_dir, 'train_topics_{}.pdf'.format(str(i).zfill(3))))
@@ -178,13 +179,14 @@ else:
     for i, topics in enumerate(test_topics):
         plot_side_by_side_docs(topics, os.path.join(results_dir, 'test_topics_{}.pdf'.format(str(i).zfill(3))))
 
-    documents, doc_topic_dists = generate_documents(train_topics[0], num_documents, alpha=.05, seed=0)
+    documents, doc_topic_dists = generate_documents(train_topics[0], num_documents, alpha=.01, seed=0)
     plot_side_by_side_docs(documents[:40], os.path.join(results_dir, 'documents.pdf'))
 
     np.save(os.path.join(results_dir, 'train_topics.npy'), train_topics)
     np.save(os.path.join(results_dir, 'valid_topics.npy'), valid_topics)
     np.save(os.path.join(results_dir, 'test_topics.npy'), test_topics)
     np.save(os.path.join(results_dir, 'documents.npy'), documents)
+    np.save(os.path.join(results_dir, 'document_topic_dists.npy'), doc_topic_dists)
 
 logging.info('Data acquired')
 get_memory_consumption()
@@ -285,16 +287,16 @@ if args.train:
         train, valid, model_config,
         training_epochs=model_config['tot_epochs'], batch_size=model_config['batch_size'],
         hallucinations=False, tensorboard=True, shuffle=True, display_step=1,
-        n_topics=n_topics, vocab_size=vocab_size, recreate_docs=False)
-
+        n_topics=n_topics, vocab_size=vocab_size, recreate_docs=False, save_iter=30)
     logging.info('Finished train')
+if args.train_single:
     logging.info('Starting training single')
     single_train = (documents, [train_topics[random_topics_idx]])
     train_save_VAE(
         single_train, valid, model_config_single,
         training_epochs=model_config_single['tot_epochs'], batch_size=model_config_single['batch_size'],
         hallucinations=False, tensorboard=True, shuffle=True, display_step=1,
-        n_topics=n_topics, vocab_size=vocab_size, recreate_docs=False)
+        n_topics=n_topics, vocab_size=vocab_size, recreate_docs=False, save_iter=30)
     logging.info('Finished training single')
 # load the VAE into pyro for evaluation
 if args.evaluate:
@@ -426,5 +428,5 @@ if args.evaluate:
     vae = VAE_pyro(**model_config)
     state_dict = vae.load()
     vae.load_state_dict(state_dict)
-    get_elbo_csv(vae, results_dir)
+    get_elbo_csv(vae, vae_single, results_dir)
     plot_svi_vs_vae_elbo(results_dir)
