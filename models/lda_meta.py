@@ -240,6 +240,10 @@ class VAE_tf(object):
                 all_weights["weights_recog"].update({
                     "h1": tf.get_variable(
                         "h1", [self.n_topics, self.n_hidden_units])})
+            elif self.architecture == "template_plus_topics":
+                all_weights["weights_recog"].update({
+                    "h1": tf.get_variable(
+                        "h1", [self.n_topics * (1 + self.vocab_size), self.n_hidden_units])})
             elif self.architecture == "standard":
                 all_weights["weights_recog"].update(
                     {"h1": tf.get_variable("h1", [self.vocab_size, self.n_hidden_units])})
@@ -273,6 +277,11 @@ class VAE_tf(object):
                     tf.add(tf.matmul(x_and_topics, weights["h1"]), biases["b1"])))
             elif self.architecture == "template":
                 layer = tf.einsum("ab,abc->ac", self.x, tf.transpose(self.topics, perm=[0, 2, 1]))
+                layer = tf.contrib.layers.batch_norm(self.transfer_fct(
+                    tf.add(tf.matmul(layer, weights["h1"]), biases["b1"])))
+            elif self.architecture == "template_plus_topics":
+                layer = tf.einsum("ab,abc->ac", self.x, tf.transpose(self.topics, perm=[0, 2, 1]))
+                layer = tf.concat([layer, tf.reshape(self.topics, (-1, self.n_topics * self.vocab_size))], axis=1)
                 layer = tf.contrib.layers.batch_norm(self.transfer_fct(
                     tf.add(tf.matmul(layer, weights["h1"]), biases["b1"])))
             elif self.architecture == "standard":
@@ -672,6 +681,8 @@ class Encoder(nn.Module):
             modules.append(MLP((1 + n_topics) * vocab_size, n_hidden_units))
         elif architecture == 'template':
             modules.append(MLP(n_topics, n_hidden_units))
+        elif architecture == 'template_plus_topics':
+            modules.append(MLP(n_topics * (1 + vocab_size), n_hidden_units))
         elif architecture == 'standard':
             modules.append(MLP(vocab_size, n_hidden_units))
         else:
@@ -707,6 +718,11 @@ class Encoder(nn.Module):
             z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
         elif self.architecture == 'template':
             x_and_topics = torch.einsum("ab,abc->ac", (x, torch.transpose(topics, 1, 2)))
+            z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
+            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+        elif self.architecture == 'template_plus_topics':
+            x_and_topics = torch.einsum("ab,abc->ac", (x, torch.transpose(topics, 1, 2)))
+            x_and_topics = torch.cat((x_and_topics, topics.reshape(-1, self.n_topics * self.vocab_size)), dim=1)
             z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
             z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
         elif self.architecture == 'standard':
