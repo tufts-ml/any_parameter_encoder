@@ -115,9 +115,9 @@ def train(
         logger.info('Creating minibatches')
         for batch_xs in create_minibatch(train_data, batch_size, shuffle=shuffle):
             # Fit training using batch data
-            logger.info('Running first training step')
             cost = vae.partial_fit(batch_xs)
-            logger.info('cost: {}'.format(cost))
+            if not tensorboard:
+                logger.info('cost: {}'.format(cost))
             # Keep track of the number of batches
             num_batches += 1
             # Keep track of the loss
