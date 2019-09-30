@@ -68,6 +68,7 @@ if args.mdreviews:
 else:
     n_topics = 20
     vocab_size = 100
+    avg_num_words = 50
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -180,7 +181,7 @@ else:
     for i, topics in enumerate(test_topics):
         plot_side_by_side_docs(topics, os.path.join(results_dir, 'test_topics_{}.pdf'.format(str(i).zfill(3))))
 
-    documents, doc_topic_dists = generate_documents(train_topics[0], num_documents, alpha=.01, seed=0)
+    documents, doc_topic_dists = generate_documents(train_topics[0], num_documents, n_topics, vocab_size, avg_num_words, alpha=.01, seed=0)
     plot_side_by_side_docs(documents[:40], os.path.join(results_dir, 'documents.pdf'))
 
     np.save(os.path.join(results_dir, 'train_topics.npy'), train_topics)
