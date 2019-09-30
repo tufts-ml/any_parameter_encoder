@@ -4,6 +4,7 @@ import numpy as np
 import tensorflow as tf
 import itertools
 import time
+import logging
 
 from pyro.infer.abstract_infer import TracePredictive
 from pyro.infer.util import torch_item
@@ -27,6 +28,7 @@ from utils import unzip_X_and_topics, softmax
 
 
 MIN_LOG_PROB = -9999999999
+logger = logging.getLogger()
 
 def train_save_VAE(train_data, valid_data, model_config, training_epochs=120, batch_size=200,
                    tensorboard=True, hallucinations=False, shuffle=True, display_step=5, recreate_docs=True,
@@ -173,14 +175,21 @@ def get_elbo_csv(vae, vae_single, results_dir, restart=True):
                 data_i = data[i * num_docs: (i + 1) * num_docs]
                 topics_i = topics[i * num_docs: (i + 1) * num_docs]
                 vae_elbo = Trace_ELBO()
+                start = time.time()
                 vae_svi = SVI(vae.model, vae.encoder_guide, pyro_scheduler, loss=vae_elbo, num_steps=0, num_samples=100)
-                vae_posterior = vae_svi.run(data_i, topics_i)
+                # vae_posterior = vae_svi.run(data_i, topics_i)
                 vae_loss = -vae_svi.evaluate_loss(data_i, topics_i)
+                end = time.time()
+                logger.info('Decoder-aware VAE inference time: {}'.format(end - start))
 
+                start = time.time()
                 vae_single_svi = SVI(vae_single.model, vae_single.encoder_guide, pyro_scheduler, loss=vae_elbo, num_steps=0, num_samples=100)
-                vae_single_posterior = vae_single_svi.run(data_i, topics_i)
+                # vae_single_posterior = vae_single_svi.run(data_i, topics_i)
                 vae_single_loss = -vae_single_svi.evaluate_loss(data_i, topics_i)
+                end = time.time()
+                logger.info('Standard VAE inference time: {}'.format(end - start))
 
+                start = time.time()
                 num_steps = 400
                 svi_loss = np.nan
                 if restart:
@@ -224,6 +233,8 @@ def get_elbo_csv(vae, vae_single, results_dir, restart=True):
                         else:
                             break
                     pyro.clear_param_store()
+                end = time.time()
+                logger.info('SVI inference time: {}'.format(end - start))
                 writer.writerow([data_name, i, svi_loss, vae_loss, vae_single_loss])
                 pyro.clear_param_store()
 
