@@ -92,10 +92,10 @@ model_config = {
     'results_file': results_file,
     'inference': 'vae',
     'model_name': 'lda_meta',
-    'architecture': 'template_plus_topics',
+    'architecture': 'template',
     'scale_trainable': True,
     'n_hidden_layers': 2,
-    'n_hidden_units': 100,
+    'n_hidden_units': vocab_size,
     'n_samples': 100,
     'decay_rate': .5,
     'decay_steps': 35000,
@@ -106,14 +106,14 @@ model_config = {
     'use_adamw': False,
     'alpha': .01,
     'scale_type': 'mean',
-    'tot_epochs': 300,
+    'tot_epochs': 200,
     'batch_size': 10,
     'seed': 1
 }
 
 model_config_single = model_config.copy()
 model_config_single.update({'model_name': 'lda_orig', 'architecture': 'standard', 'n_hidden_layers': 5})
-model_config_single.update({'starting_learning_rate': .01, 'tot_epochs': 400, 'batch_size': 10, 'decay_steps': 800})
+model_config_single.update({'starting_learning_rate': .001, 'tot_epochs': 500, 'batch_size': 10, 'decay_steps': 800})
 
 # toy bars data
 if args.use_cached and os.path.exists(os.path.join(results_dir, 'train_topics.npy')):
@@ -288,7 +288,7 @@ if args.train:
     train_save_VAE(
         train, valid, model_config,
         training_epochs=model_config['tot_epochs'], batch_size=model_config['batch_size'],
-        hallucinations=False, tensorboard=False, shuffle=True, display_step=1,
+        hallucinations=False, tensorboard=True, shuffle=True, display_step=1,
         n_topics=n_topics, vocab_size=vocab_size, recreate_docs=False, save_iter=1, plot_valid_cost=False)
     logging.info('Finished train')
 if args.train_single:
@@ -297,7 +297,7 @@ if args.train_single:
     train_save_VAE(
         single_train, valid, model_config_single,
         training_epochs=model_config_single['tot_epochs'], batch_size=model_config_single['batch_size'],
-        hallucinations=False, tensorboard=False, shuffle=True, display_step=1,
+        hallucinations=False, tensorboard=True, shuffle=True, display_step=1,
         n_topics=n_topics, vocab_size=vocab_size, recreate_docs=False, save_iter=1, plot_valid_cost=False)
     logging.info('Finished training single')
 # load the VAE into pyro for evaluation
