@@ -172,6 +172,7 @@ def get_elbo_csv(vae, vae_single, results_dir, restart=True):
             num_topics = num_topics_by_data[data_name]
 
             for i in range(num_topics):
+                print('topics set', i)
                 data_i = data[i * num_docs: (i + 1) * num_docs]
                 topics_i = topics[i * num_docs: (i + 1) * num_docs]
                 vae_elbo = Trace_ELBO()
@@ -181,6 +182,7 @@ def get_elbo_csv(vae, vae_single, results_dir, restart=True):
                 vae_loss = -vae_svi.evaluate_loss(data_i, topics_i)
                 end = time.time()
                 logger.info('Decoder-aware VAE inference time: {}'.format(end - start))
+                print('Decoder-aware VAE inference time: {}'.format(end - start))
 
                 start = time.time()
                 vae_single_svi = SVI(vae_single.model, vae_single.encoder_guide, pyro_scheduler, loss=vae_elbo, num_steps=0, num_samples=100)
@@ -188,20 +190,25 @@ def get_elbo_csv(vae, vae_single, results_dir, restart=True):
                 vae_single_loss = -vae_single_svi.evaluate_loss(data_i, topics_i)
                 end = time.time()
                 logger.info('Standard VAE inference time: {}'.format(end - start))
+                print('Standard VAE inference time: {}'.format(end - start))
 
                 start = time.time()
                 num_steps = 400
-                svi_loss = np.nan
+                loss = np.nan
+                lrs = [.05, .01, .05]
+                step_sizes = [10000, 5000, 5000]
+                gammas = [.3, .5, .5]
                 if restart:
                     n_runs = 0
                     svi_losses = []
                     svi_elbo = Trace_ELBO()
-                    while torch_isnan(svi_loss) and n_runs < 3:
+                    while torch_isnan(loss) and n_runs < 3:
+                        print(n_runs)
                         pyro_scheduler = StepLR(
                             {'optimizer': torch.optim.Adam,
-                            'optim_args': {"lr": .1 * 10**(-1 * n_runs)},
-                            'step_size': 10000 * 10**(-1 * n_runs),
-                            'gamma': 0.1 + (n_runs * .4)}
+                            'optim_args': {"lr": lrs[n_runs]},
+                            'step_size': step_sizes[n_runs],
+                            'gamma': gammas[n_runs]}
                         )
                         svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=svi_elbo, num_steps=num_steps, num_samples=100)
                         losses = []
@@ -211,13 +218,13 @@ def get_elbo_csv(vae, vae_single, results_dir, restart=True):
                                 svi_loss = loss
                                 losses.append(loss)
                             else:
-                                plt.plot(range(len(losses)), losses)
-                                plots_dir = os.path.join(results_dir, 'svi_losses')
-                                if not os.path.exists(plots_dir):
-                                    os.mkdir(plots_dir)
-                                plt.savefig(os.path.join(plots_dir, 'svi_losses_{}_{}.png'.format(i, n_runs)))
-                                plt.close()
                                 break
+                        plt.plot(range(len(losses)), losses)
+                        plots_dir = os.path.join(results_dir, 'svi_losses')
+                        if not os.path.exists(plots_dir):
+                            os.mkdir(plots_dir)
+                        plt.savefig(os.path.join(plots_dir, 'svi_losses_{}_{}.png'.format(i, n_runs)))
+                        plt.close()
                         n_runs += 1
                         svi_losses.append(svi_loss)
                         pyro.clear_param_store()
@@ -235,6 +242,7 @@ def get_elbo_csv(vae, vae_single, results_dir, restart=True):
                     pyro.clear_param_store()
                 end = time.time()
                 logger.info('SVI inference time: {}'.format(end - start))
+                print('SVI inference time: {}'.format(end - start))
                 writer.writerow([data_name, i, svi_loss, vae_loss, vae_single_loss])
                 pyro.clear_param_store()
 
