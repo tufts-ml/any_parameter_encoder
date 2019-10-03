@@ -13,7 +13,7 @@ def plot_side_by_side_docs(docs, name, ncols=10, intensity=10):
     # (the first counts row is very different from the "recreated docs" rows)
     docs = normalize(docs, axis=1)
     vmax = np.mean(np.sum(docs, axis=1))
-    show_square_images(docs * intensity, vmin=0, vmax=vmax, ncols=ncols)
+    show_square_images(docs * intensity, vmin=0, vmax=vmax, ncols=ncols, max_n_images=100)
     plt.tight_layout()
     plt.savefig(name)
     plt.clf()
