@@ -214,10 +214,11 @@ class VAE_tf(object):
 
     def _initialize_weights(self):
         all_weights = dict()
+        initializer = tf.contrib.layers.variance_scaling_initializer(2.0)
         with tf.variable_scope("recognition_network"):
             all_weights["weights_recog"] = {
-                "out_mean": tf.get_variable("out_mean", [self.n_hidden_units, self.n_topics]),
-                "out_log_sigma": tf.get_variable("out_log_sigma", [self.n_hidden_units, self.n_topics]),
+                "out_mean": tf.get_variable("out_mean", [self.n_hidden_units, self.n_topics], initializer=initializer),
+                "out_log_sigma": tf.get_variable("out_log_sigma", [self.n_hidden_units, self.n_topics], initializer=initializer),
             }
 
             all_weights["biases_recog"] = {
@@ -230,38 +231,38 @@ class VAE_tf(object):
             if self.n_hidden_layers > 1:
                 for i in range(2, self.n_hidden_layers + 1):
                     all_weights["weights_recog"]["h{}".format(i)] = tf.get_variable(
-                        "h{}".format(i), [self.n_hidden_units, self.n_hidden_units])
+                        "h{}".format(i), [self.n_hidden_units, self.n_hidden_units], initializer=initializer)
                     all_weights["biases_recog"]["b{}".format(i)] = tf.get_variable(
                         "b{}".format(i), [self.n_hidden_units], initializer=tf.zeros_initializer())
             # first layer is larger
             if self.architecture == "naive":
                 all_weights["weights_recog"].update({
                     "h1": tf.get_variable(
-                        "h1", [(1 + self.n_topics) * self.vocab_size, self.n_hidden_units])})
+                        "h1", [(1 + self.n_topics) * self.vocab_size, self.n_hidden_units])}, initializer=initializer)
             elif self.architecture == "template":
                 all_weights["weights_recog"].update({
                     "h1": tf.get_variable(
-                        "h1", [self.n_topics, self.n_hidden_units])})
+                        "h1", [self.n_topics, self.n_hidden_units])}, initializer=initializer)
             elif self.architecture == "template_plus_topics":
                 all_weights["weights_recog"].update({
                     "h1": tf.get_variable(
-                        "h1", [self.n_topics * (1 + self.vocab_size), self.n_hidden_units])})
+                        "h1", [self.n_topics * (1 + self.vocab_size), self.n_hidden_units])}, initializer=initializer)
             elif self.architecture == "standard":
                 all_weights["weights_recog"].update(
-                    {"h1": tf.get_variable("h1", [self.vocab_size, self.n_hidden_units])})
+                    {"h1": tf.get_variable("h1", [self.vocab_size, self.n_hidden_units])}, initializer=initializer)
             elif self.architecture == "naive_separated":
                 if self.n_hidden_layers > 1:
                     raise NotImplementedError('This architecture only supports one hidden layer right now')
                 all_weights["weights_recog"].update({
                     "h1_mu": tf.get_variable(
-                        "h1_mu", [(1 + self.n_topics) * self.vocab_size, self.n_hidden_units])})
+                        "h1_mu", [(1 + self.n_topics) * self.vocab_size, self.n_hidden_units])}, initializer=initializer)
                 all_weights["weights_recog"].update({
                     "h1_sigma": tf.get_variable(
-                        "h1_sigma", [(1 + self.n_topics) * self.vocab_size, self.n_hidden_units])})
+                        "h1_sigma", [(1 + self.n_topics) * self.vocab_size, self.n_hidden_units])}, initializer=initializer)
                 all_weights["biases_recog"].update({
-                    "b1_mu": tf.get_variable("b1_mu", [self.n_hidden_units], initializer=tf.zeros_initializer())})
+                    "b1_mu": tf.get_variable("b1_mu", [self.n_hidden_units], initializer=tf.zeros_initializer())}, initializer=initializer)
                 all_weights["biases_recog"].update({
-                    "b1_sigma": tf.get_variable("b1_sigma", [self.n_hidden_units], initializer=tf.zeros_initializer())})
+                    "b1_sigma": tf.get_variable("b1_sigma", [self.n_hidden_units], initializer=tf.zeros_initializer())}, initializer=initializer)
             else:
                 raise ValueError("architecture must be either 'naive' or 'template'")
 
