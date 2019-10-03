@@ -61,6 +61,9 @@ def run_posterior_evaluation(inference, inference_name, data, data_name, topics,
     print(model_config)
 
     start = time.time()
+    # we might have to restart a few times to get the best results
+    if 'svi' in inference_name:
+        inference, _ = run_svi(vae, data, topics, plot=True, results_dir=model_config['results_dir'], name=data_name)
     posterior = inference.run(data, topics)
     end = time.time()
     save_speed_to_csv(model_config, end - start)
@@ -193,58 +196,58 @@ def get_elbo_csv(vae, vae_single, results_dir, restart=True):
                 print('Standard VAE inference time: {}'.format(end - start))
 
                 start = time.time()
-                num_steps = 400
-                loss = np.nan
-                lrs = [.05, .01, .05]
-                step_sizes = [10000, 5000, 5000]
-                gammas = [.3, .5, .5]
-                if restart:
-                    n_runs = 0
-                    svi_losses = []
-                    svi_elbo = Trace_ELBO()
-                    while torch_isnan(loss) and n_runs < 3:
-                        print(n_runs)
-                        pyro_scheduler = StepLR(
-                            {'optimizer': torch.optim.Adam,
-                            'optim_args': {"lr": lrs[n_runs]},
-                            'step_size': step_sizes[n_runs],
-                            'gamma': gammas[n_runs]}
-                        )
-                        svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=svi_elbo, num_steps=num_steps, num_samples=100)
-                        losses = []
-                        for _ in range(num_steps):
-                            loss = -svi.step(data_i, topics_i)
-                            if not torch_isnan(loss):
-                                svi_loss = loss
-                                losses.append(loss)
-                            else:
-                                break
-                        plt.plot(range(len(losses)), losses)
-                        plots_dir = os.path.join(results_dir, 'svi_losses')
-                        if not os.path.exists(plots_dir):
-                            os.mkdir(plots_dir)
-                        plt.savefig(os.path.join(plots_dir, 'svi_losses_{}_{}.png'.format(i, n_runs)))
-                        plt.close()
-                        n_runs += 1
-                        svi_losses.append(svi_loss)
-                        pyro.clear_param_store()
-                    svi_loss = max(svi_losses)
-                else:
-                    svi_elbo = Trace_ELBO()
-                    svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=svi_elbo, num_steps=num_steps, num_samples=100)
-                    svi_posterior = svi.run(data_i, topics_i)
-                    for i in range(num_steps):
-                        loss = -svi.step(data_i, topics_i)
-                        if not torch_isnan(loss):
-                            svi_loss = loss
-                        else:
-                            break
-                    pyro.clear_param_store()
+                svi, svi_loss = run_svi(vae, data_i, topics_i, plot=True, results_dir=results_dir, name=i)
                 end = time.time()
                 logger.info('SVI inference time: {}'.format(end - start))
                 print('SVI inference time: {}'.format(end - start))
                 writer.writerow([data_name, i, svi_loss, vae_loss, vae_single_loss])
                 pyro.clear_param_store()
+
+def run_svi(vae, data, topics, plot=False, results_dir=None, name=''):
+    num_steps = 400
+    loss = np.nan
+    lrs = [.1, .05, .01, .05]
+    step_sizes = [10000, 10000, 5000, 5000]
+    gammas = [.95, .7, .5, .5]
+    n_runs = 0
+    svi_losses = []
+    svi_elbo = Trace_ELBO()
+    svis = []
+    while torch_isnan(loss) and n_runs < 4:
+        print(n_runs)
+        pyro_scheduler = StepLR(
+            {'optimizer': torch.optim.Adam,
+            'optim_args': {"lr": lrs[n_runs]},
+            'step_size': step_sizes[n_runs],
+            'gamma': gammas[n_runs]}
+        )
+        svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=svi_elbo, num_samples=100)
+        losses = []
+        for _ in range(num_steps):
+            loss = -svi.step(data, topics)
+            if not torch_isnan(loss):
+                svi_loss = loss
+                losses.append(loss)
+            else:
+                pyro.clear_param_store()
+                break
+        if plot:
+            plt.plot(range(len(losses)), losses)
+            plots_dir = os.path.join(results_dir, 'svi_losses')
+            if not os.path.exists(plots_dir):
+                os.mkdir(plots_dir)
+            plt.savefig(os.path.join(plots_dir, 'svi_losses_{}_{}.png'.format(name, n_runs)))
+            plt.close()
+        n_runs += 1
+        svi_losses.append(svi_loss)
+        svis.append(svi)
+        # pyro.clear_param_store()
+    best_idx = svi_losses.index(max(svi_losses))
+    svi_loss = svi_losses[best_idx]
+    svi = svis[best_idx]
+    # no more steps after we leave this function
+    svi.num_steps = 0
+    return svi, svi_loss
 
 
 def save_loglik_to_csv(data, topics, model, posterior, model_config, num_samples=10):
