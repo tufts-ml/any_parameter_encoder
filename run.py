@@ -28,7 +28,7 @@ from common import (
 )
 from visualization.reconstructions import plot_side_by_side_docs, plot_saved_samples
 from visualization.posterior import plot_posterior, plot_posterior_v2, plot_posterior_v3
-from visualization.ranking import plot_svi_vs_vae_elbo
+from visualization.ranking import plot_svi_vs_vae_elbo_v1
 from evaluation.evaluate_posterior import evaluate_log_predictive_density
 from utils import softmax, unzip_X_and_topics, normalize1d
 from training.train_vae import find_lr
@@ -402,8 +402,8 @@ if args.evaluate:
         
         logging.info('Starting SVI under time constraint')
         start = time.time()
-        num_steps_to_try = [3, 5, 10]
-        lrs = [.1, 1, 10]
+        num_steps_to_try = [3, 4, 5]
+        lrs = [.1, .2, .5]
         svi_stats = []
         for num_steps in num_steps_to_try:
             for lr in lrs:
@@ -423,7 +423,7 @@ if args.evaluate:
                 svi_stats.append([data_name, num_steps, lr, end - start, posterior_predictive_density])
                 del svi
         get_memory_consumption()
-        with open(os.path.join(results_dir, 'short_svi.csv'), 'w') as f:
+        with open(os.path.join(results_dir, 'short_svi.csv'), 'a') as f:
             csv_writer = csv.writer(f)
             csv_writer.writerow(['data', 'num_steps', 'lr', 'time', 'posterior_predictive'])
             for row in svi_stats:
@@ -472,4 +472,4 @@ if args.evaluate:
     state_dict = vae.load()
     vae.load_state_dict(state_dict)
     get_elbo_csv(vae, vae_single, results_dir)
-    plot_svi_vs_vae_elbo(results_dir)
+    plot_svi_vs_vae_elbo_v1(results_dir)
