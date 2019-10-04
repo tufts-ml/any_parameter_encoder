@@ -103,8 +103,8 @@ model_config = {
     'n_hidden_layers': 2,
     'n_hidden_units': 100,
     'n_samples': 100,
-    'decay_rate': .5,
-    'decay_steps': 10000,
+    'decay_rate': .8,
+    'decay_steps': 5000,
     'starting_learning_rate': .01,
     'n_steps_enc': 1,
     'custom_lr': False,
@@ -200,7 +200,8 @@ else:
     np.save(os.path.join(results_dir, 'valid_topics.npy'), valid_topics)
     np.save(os.path.join(results_dir, 'test_topics.npy'), test_topics)
     np.save(os.path.join(results_dir, 'documents.npy'), documents)
-    np.save(os.path.join(results_dir, 'document_topic_dists.npy'), doc_topic_dists)
+    if not args.mdreviews:
+        np.save(os.path.join(results_dir, 'document_topic_dists.npy'), doc_topic_dists)
 
 logging.info('Data acquired')
 get_memory_consumption()
@@ -298,7 +299,7 @@ if args.train:
     train_save_VAE(
         train, valid, model_config,
         training_epochs=model_config['tot_epochs'], batch_size=model_config['batch_size'],
-        hallucinations=False, tensorboard=True, shuffle=True, display_step=1,
+        hallucinations=False, tensorboard=True, shuffle=True, display_step=100,
         n_topics=n_topics, vocab_size=vocab_size, recreate_docs=False, save_iter=10)
     logging.info('Finished train')
 if args.train_single:
@@ -307,7 +308,7 @@ if args.train_single:
     train_save_VAE(
         single_train, valid, model_config_single,
         training_epochs=model_config_single['tot_epochs'], batch_size=model_config_single['batch_size'],
-        hallucinations=False, tensorboard=True, shuffle=True, display_step=1,
+        hallucinations=False, tensorboard=True, shuffle=True, display_step=100,
         n_topics=n_topics, vocab_size=vocab_size, recreate_docs=False, save_iter=30)
     logging.info('Finished training single')
 # load the VAE into pyro for evaluation
