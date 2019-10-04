@@ -192,7 +192,7 @@ else:
             plot_side_by_side_docs(topics, os.path.join(results_dir, 'test_topics_{}.pdf'.format(str(i).zfill(3))))
 
     if args.mdreviews:
-        documents = [np.load('datasets/mdreviews/train.npy')[0]]
+        documents = np.load('datasets/mdreviews/train_3k_reviews.npy')
     else:
         documents, doc_topic_dists = generate_documents(test_topics[0], num_documents, n_topics, vocab_size, avg_num_words, alpha=.01, seed=0)
     if not args.mdreviews:
