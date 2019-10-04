@@ -24,7 +24,7 @@ from data.topics import toy_bars, permuted_toy_bars, diagonal_bars, generate_top
 from data.documents import generate_documents
 from models.lda_meta import VAE_pyro, VAE_tf
 from common import (
-    train_save_VAE, save_speed_to_csv, save_loglik_to_csv, save_reconstruction_array, run_posterior_evaluation
+    train_save_VAE, save_speed_to_csv, save_loglik_to_csv, save_reconstruction_array, run_posterior_evaluation, get_elbo_csv
 )
 from visualization.reconstructions import plot_side_by_side_docs, plot_saved_samples
 from visualization.posterior import plot_posterior, plot_posterior_v2, plot_posterior_v3
@@ -57,13 +57,13 @@ if not os.path.exists(results_dir):
 shutil.copy(os.path.abspath(__file__), os.path.join(results_dir, 'run_simple.py'))
 
 # sample_idx = list(range(10, 20, 2)) + list(range(90, 100, 2))
-# sample_idx = [0, 1, 52, 53, 104, 105, 156, 157, 208, 209]
-sample_idx = list(range(10))
-num_documents = 100
-num_train_topics = 10
-num_valid_topics = 1
-num_test_topics = 1
-num_combinations_to_evaluate = 10
+sample_idx = [0, 1, 52, 53, 104, 105, 156, 157, 208, 209]
+# sample_idx = list(range(10))
+num_documents = 500
+num_train_topics = 50
+num_valid_topics = 10
+num_test_topics = 10
+num_combinations_to_evaluate = 300
 random_topics_idx = 2
 
 # global params
@@ -73,7 +73,7 @@ if args.mdreviews:
 else:
     n_topics = 20
     vocab_size = 100
-    avg_num_words = 5
+    avg_num_words = 50
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -104,22 +104,22 @@ model_config = {
     'n_hidden_units': 100,
     'n_samples': 100,
     'decay_rate': .5,
-    'decay_steps': 5000,
-    'starting_learning_rate': .1,
+    'decay_steps': 10000,
+    'starting_learning_rate': .01,
     'n_steps_enc': 1,
     'custom_lr': False,
     'use_dropout': True,
     'use_adamw': False,
     'alpha': .01,
     'scale_type': 'mean',
-    'tot_epochs': 10,
-    'batch_size': 10,
+    'tot_epochs': 300,
+    'batch_size': 200,
     'seed': 1
 }
 
 model_config_single = model_config.copy()
-model_config_single.update({'model_name': 'lda_orig', 'architecture': 'standard', 'n_hidden_layers': 5})
-model_config_single.update({'starting_learning_rate': .01, 'tot_epochs': 400, 'batch_size': 10, 'decay_steps': 800})
+model_config_single.update({'model_name': 'lda_orig', 'architecture': 'standard', 'n_hidden_layers': 2})
+model_config_single.update({'starting_learning_rate': .01, 'tot_epochs': 400, 'batch_size': 150, 'decay_steps': 800})
 
 # toy bars data
 if args.use_cached and os.path.exists(os.path.join(results_dir, 'train_topics.npy')):
@@ -419,13 +419,12 @@ if args.evaluate:
                 # get the posterior predictive log likelihood
                 posterior_predictive_density = evaluate_log_predictive_density(posterior_predictive_traces)
                 posterior_predictive_density = float(posterior_predictive_density.detach().numpy())
-                svi_stats.append([num_steps, lr, end - start, posterior_predictive_density])
+                svi_stats.append([data_name, num_steps, lr, end - start, posterior_predictive_density])
+                del svi
         get_memory_consumption()
-        logging.info('Deleting SVI under time constraint')
-        del svi
         with open(os.path.join(results_dir, 'short_svi.csv'), 'w') as f:
             csv_writer = csv.writer(f)
-            csv_writer.writerow('num_steps', 'lr', 'time', 'posterior_predictive')
+            csv_writer.writerow(['data', 'num_steps', 'lr', 'time', 'posterior_predictive'])
             for row in svi_stats:
                 csv_writer.writerow(row)
 
