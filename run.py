@@ -42,6 +42,7 @@ parser.add_argument('--run_mcmc', help='run mcmc', action='store_true')
 parser.add_argument('--use_cached', help='run mcmc', action='store_true')
 parser.add_argument('--mdreviews', help='run mdreviews data', action='store_true')
 parser.add_argument('--additive_topics', help='run mdreviews data', action='store_true')
+parser.add_argument('--uniform_prior', help='run mdreviews data', action='store_true')
 args = parser.parse_args()
 
 # where to write the results
@@ -53,12 +54,13 @@ if not os.path.exists(results_dir):
 shutil.copy(os.path.abspath(__file__), os.path.join(results_dir, 'run_simple.py'))
 
 # sample_idx = list(range(10, 20, 2)) + list(range(90, 100, 2))
-sample_idx = [0, 1, 52, 53, 104, 105, 156, 157, 208, 209]
-num_documents = 5000
-num_train_topics = 50
-num_valid_topics = 10
-num_test_topics = 10
-num_combinations_to_evaluate = 300
+# sample_idx = [0, 1, 52, 53, 104, 105, 156, 157, 208, 209]
+sample_idx = list(range(10))
+num_documents = 100
+num_train_topics = 10
+num_valid_topics = 1
+num_test_topics = 1
+num_combinations_to_evaluate = 10
 random_topics_idx = 2
 
 # global params
@@ -68,7 +70,7 @@ if args.mdreviews:
 else:
     n_topics = 20
     vocab_size = 100
-    avg_num_words = 50
+    avg_num_words = 5
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -100,21 +102,21 @@ model_config = {
     'n_samples': 100,
     'decay_rate': .5,
     'decay_steps': 5000,
-    'starting_learning_rate': .01,
+    'starting_learning_rate': .1,
     'n_steps_enc': 1,
     'custom_lr': False,
     'use_dropout': True,
     'use_adamw': False,
     'alpha': .01,
     'scale_type': 'mean',
-    'tot_epochs': 300,
-    'batch_size': 500,
+    'tot_epochs': 10,
+    'batch_size': 10,
     'seed': 1
 }
 
 model_config_single = model_config.copy()
-model_config_single.update({'model_name': 'lda_orig', 'architecture': 'standard', 'n_hidden_layers': 5})
-model_config_single.update({'starting_learning_rate': .01, 'tot_epochs': 400, 'batch_size': 150, 'decay_steps': 800})
+model_config_single.update({'model_name': 'lda_orig', 'architecture': 'standard', 'n_hidden_layers': 2})
+model_config_single.update({'starting_learning_rate': .01, 'tot_epochs': 400, 'batch_size': 10, 'decay_steps': 800})
 
 # toy bars data
 if args.use_cached and os.path.exists(os.path.join(results_dir, 'train_topics.npy')):
@@ -157,6 +159,8 @@ else:
             beta[popular_words] *= 5
             beta[random_additions] *= 2
             betas.append(beta)
+    elif args.uniform_prior:
+        betas = np.ones((n_topics, vocab_size))
     else:
         betas = []
         for i in range(n_topics):
@@ -174,15 +178,20 @@ else:
     valid_topics = generate_topics(n=num_valid_topics, betas=betas, seed=1, shuffle=True)
     test_topics = generate_topics(n=num_test_topics, betas=betas, seed=2, shuffle=True)
 
-    for i, topics in zip(range(10), train_topics):
-        plot_side_by_side_docs(topics, os.path.join(results_dir, 'train_topics_{}.pdf'.format(str(i).zfill(3))))
-    for i, topics in enumerate(valid_topics):
-        plot_side_by_side_docs(topics, os.path.join(results_dir, 'valid_topics_{}.pdf'.format(str(i).zfill(3))))
-    for i, topics in enumerate(test_topics):
-        plot_side_by_side_docs(topics, os.path.join(results_dir, 'test_topics_{}.pdf'.format(str(i).zfill(3))))
+    if not args.mdreviews:
+        for i, topics in zip(range(10), train_topics):
+            plot_side_by_side_docs(topics, os.path.join(results_dir, 'train_topics_{}.pdf'.format(str(i).zfill(3))))
+        for i, topics in enumerate(valid_topics):
+            plot_side_by_side_docs(topics, os.path.join(results_dir, 'valid_topics_{}.pdf'.format(str(i).zfill(3))))
+        for i, topics in enumerate(test_topics):
+            plot_side_by_side_docs(topics, os.path.join(results_dir, 'test_topics_{}.pdf'.format(str(i).zfill(3))))
 
-    documents, doc_topic_dists = generate_documents(train_topics[0], num_documents, n_topics, vocab_size, avg_num_words, alpha=.01, seed=0)
-    plot_side_by_side_docs(documents[:40], os.path.join(results_dir, 'documents.pdf'))
+    if args.mdreviews:
+        documents = [np.load('datasets/mdreviews/train.npy')[0]]
+    else:
+        documents, doc_topic_dists = generate_documents(train_topics[0], num_documents, n_topics, vocab_size, avg_num_words, alpha=.01, seed=0)
+    if not args.mdreviews:
+        plot_side_by_side_docs(documents[:40], os.path.join(results_dir, 'documents.pdf'))
 
     np.save(os.path.join(results_dir, 'train_topics.npy'), train_topics)
     np.save(os.path.join(results_dir, 'valid_topics.npy'), valid_topics)
@@ -194,8 +203,8 @@ logging.info('Data acquired')
 get_memory_consumption()
 
 train = (documents, train_topics)
-valid = (documents[:100], valid_topics)
-test = (documents[100:200], test_topics)
+valid = (documents, valid_topics)
+test = (documents, test_topics)
 
 def generate_datasets(train, valid, test, n):
     datasets = [train, valid, test]
@@ -289,7 +298,7 @@ if args.train:
         train, valid, model_config,
         training_epochs=model_config['tot_epochs'], batch_size=model_config['batch_size'],
         hallucinations=False, tensorboard=True, shuffle=True, display_step=1,
-        n_topics=n_topics, vocab_size=vocab_size, recreate_docs=False, save_iter=30)
+        n_topics=n_topics, vocab_size=vocab_size, recreate_docs=False, save_iter=10)
     logging.info('Finished train')
 if args.train_single:
     logging.info('Starting training single')
@@ -405,24 +414,25 @@ if args.evaluate:
     plot_posterior_v3(results_dir, sample_idx, ['train', 'valid', 'test'], inference_names, scale)
 
     # plot the reconstructions
-    logging.info('Plotting reconstructions')
-    datasets = generate_datasets(train, valid, test, n=num_combinations_to_evaluate)
-    for data_name, data_and_topics in zip(dataset_names, datasets):
-        data, _ = unzip_X_and_topics(data_and_topics)
-        filenames = []
-        for inference in inference_names:
-            if inference == 'vae_single':
-                file = '_'.join([inference, model_config_single['model_name'], data_name, str(model_config_single['n_hidden_layers']), str(model_config_single['n_hidden_units'])]) + '.npy'
-            else:
-                file = '_'.join([inference, model_config['model_name'], data_name, str(model_config['n_hidden_layers']), str(model_config['n_hidden_units'])]) + '.npy'
-            filepath = os.path.join(os.getcwd(), results_dir, file)
-            if os.path.exists(filepath):
-                filenames.append(filepath)
-            else:
-                print(inference)
+    if not args.mdreviews:
+        logging.info('Plotting reconstructions')
+        datasets = generate_datasets(train, valid, test, n=num_combinations_to_evaluate)
+        for data_name, data_and_topics in zip(dataset_names, datasets):
+            data, _ = unzip_X_and_topics(data_and_topics)
+            filenames = []
+            for inference in inference_names:
+                if inference == 'vae_single':
+                    file = '_'.join([inference, model_config_single['model_name'], data_name, str(model_config_single['n_hidden_layers']), str(model_config_single['n_hidden_units'])]) + '.npy'
+                else:
+                    file = '_'.join([inference, model_config['model_name'], data_name, str(model_config['n_hidden_layers']), str(model_config['n_hidden_units'])]) + '.npy'
+                filepath = os.path.join(os.getcwd(), results_dir, file)
+                if os.path.exists(filepath):
+                    filenames.append(filepath)
+                else:
+                    print(inference)
 
-        plot_name = os.path.join(results_dir, data_name + '_vae_reconstructions.pdf')
-        plot_saved_samples(np.array(data)[sample_idx], filenames, plot_name, vocab_size=vocab_size, intensity=10)
+            plot_name = os.path.join(results_dir, data_name + '_vae_reconstructions.pdf')
+            plot_saved_samples(np.array(data)[sample_idx], filenames, plot_name, vocab_size=vocab_size, intensity=10)
     
     logging.info('Plotting SVI vs VAE ELBOs')
     pyro.clear_param_store()
