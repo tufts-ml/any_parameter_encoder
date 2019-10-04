@@ -12,7 +12,7 @@ def generate_topics(n, betas, seed, shuffle=False):
     topics = np.transpose(np.array(topics), [1, 0, 2])
     if shuffle:
         for topic in topics:
-            np.random.shuffle(topics)
+            np.random.shuffle(topic)
     return topics
 
 def toy_bars(normalized=True):
@@ -136,16 +136,10 @@ def change_weights(topics):
         new_topics.append(new_topic)
     return new_topics
 
-if __name__ == "__main__":
-    toy_bar_topics = toy_bars(normalized=False)
-    # plot_side_by_side_docs(toy_bars(normalized=True), name="toy_bars.png")
-    # for i in range(30, 300, 30):
-    #     bars = np.array(change_weights(permuted_toy_bars(toy_bar_topics, i, seed=i)))
-    #     plot_side_by_side_docs(bars, name="bars{}.png".format(i))
-    # plot_side_by_side_docs(diagonal_bars(), name="diagonal_bars.png")
-    # n_topics = 10
+# if __name__ == "__main__":
+    # toy_bar_topics = toy_bars(normalized=False)
+    # n_topics = 20
     # vocab_size = 100
-    # # betas = .5 * np.ones((n_topics, vocab_size))
     # betas = []
     # for i in range(n_topics):
     #     beta = np.ones(vocab_size)
@@ -154,11 +148,8 @@ if __name__ == "__main__":
     #         popular_words = [idx for idx in range(vocab_size) if idx % dim == i]
     #     else:
     #         popular_words = [idx for idx in range(vocab_size) if int(idx / dim) == i - dim]
-    #     random_additions = list(np.random.choice(range(vocab_size), 20))
-    #     beta[popular_words] = 200
-    #     beta[random_additions] = 50
-    #     betas.append(normalize1d(beta))
-    # print(betas)
-    # test_topics = generate_topics(n=5, betas=betas, seed=0)
-    # for i, topics in enumerate(test_topics):
-    #     plot_side_by_side_docs(topics, name="test_topics{}.png".format(i))
+    #     beta[popular_words] = 1000
+    #     beta = normalize1d(beta)
+    #     beta[popular_words] *= 5
+    #     betas.append(beta)
+    
