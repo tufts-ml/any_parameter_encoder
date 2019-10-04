@@ -147,7 +147,8 @@ def train(
             X, topics = unzip_X_and_topics(batch_xs[:10])
             plot_side_by_side_docs(np.concatenate([X, recreated_docs]), os.path.join(results_dir, 'recreated_docs_{}.pdf'.format(str(epoch).zfill(2))))
 
-        if epoch % save_iter == 0:
+        if (epoch + 1) % save_iter == 0:
+            vae.saver.save(vae.sess, os.path.join(vae.results_dir, vae.model_name + '_tf'), vae.global_step)
             vae.save()
         # Display logs per epoch step
         if epoch % display_step == 0:

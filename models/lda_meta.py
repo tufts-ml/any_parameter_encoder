@@ -1,4 +1,5 @@
 import os
+import glob
 import h5py
 import numpy as np
 import torch
@@ -189,7 +190,16 @@ class VAE_tf(object):
         self._create_loss_optimizer()
         init = tf.global_variables_initializer()
         self.sess = tf.Session()
-        self.sess.run(init)
+        self.saver = tf.train.Saver()
+        meta_file = glob.glob(os.path.join(self.results_dir, self.model_name + '_tf*.meta'))
+        if meta_file:
+            print(meta_file)
+            # self.saver = tf.train.import_meta_graph(meta_file[0])
+            self.saver.restore(self.sess, tf.train.latest_checkpoint(self.results_dir))
+        else:
+            self.sess.run(init)
+
+        print(self.sess.run(self.scale))
 
     def _create_network(self):
         self.network_weights = self._initialize_weights()
@@ -427,65 +437,65 @@ class VAE_tf(object):
         # self.optimizer = train_op
 
         # diffferent number of steps for encoder and decoder
-        train_ops = []
+        # train_ops = []
 
-        enc_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='recognition_network')
-        if self.test_lr:
-            learning_rate_enc = self.lr
-        elif self.custom_lr:
-            learning_rate_enc, momentum = one_cycle_policy(self.starting_learning_rate, self.global_step, self.tot_epochs, self.num_batches)
-            self.momentum = momentum
-            self.global_step += 1
-            # tf.assign_add(self.global_step, 1, name='increment')
-        else:
-            learning_rate_enc = tf.train.exponential_decay(
-            self.starting_learning_rate, self.global_step, self.decay_steps,
-            self.decay_rate, staircase=True)
-        if self.use_adamw:
-            weight_decay = .2
-            optimizer_enc = tf.contrib.opt.AdamWOptimizer(weight_decay, learning_rate_enc)
-        else:
-            optimizer_enc = tf.train.AdamOptimizer(learning_rate_enc, beta1=self.momentum if self.momentum is not None else 0.99)
-
-        dec_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator_network')
-        if len(dec_vars):
-            if self.test_lr:
-                learning_rate_dec = self.lr
-            elif self.custom_lr:
-                learning_rate_dec = one_cycle_policy(self.starting_learning_rate, self.global_step)
-                self.global_step += 1
-            else:
-                learning_rate_dec = tf.train.exponential_decay(
-                    self.starting_learning_rate, self.global_step, self.decay_steps,
-                    self.decay_rate, staircase=True)
-            if self.use_adamw:
-                weight_decay = .2
-                optimizer_dec = tf.contrib.opt.AdamWOptimizer(weight_decay, learning_rate_dec)
-            else:
-                optimizer_dec = tf.train.AdamOptimizer(learning_rate_dec, beta1=0.99)
-            grad_and_vars_dec = optimizer_dec.compute_gradients(self.cost, dec_vars)
-            train_op_dec = optimizer_dec.apply_gradients(grad_and_vars_dec)
-            train_ops.append(train_op_dec)
-
-        enc_gv_collection = []
-        for i in range(self.n_steps_enc):
-            grad_and_vars_enc = optimizer_enc.compute_gradients(self.cost, enc_vars)
-            enc_gv_collection.append(grad_and_vars_enc)
-            if i == self.n_steps_enc - 1 and not self.custom_lr:
-                train_ops.append(optimizer_enc.apply_gradients(grad_and_vars_enc, global_step=self.global_step))
-            else:
-                train_ops.append(optimizer_enc.apply_gradients(grad_and_vars_enc))
-        train_op = tf.group(train_ops)
-        self.optimizer = train_op
-
-        # # typical learning rate
-        # learning_rate = tf.train.exponential_decay(
+        # enc_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='recognition_network')
+        # if self.test_lr:
+        #     learning_rate_enc = self.lr
+        # elif self.custom_lr:
+        #     learning_rate_enc, momentum = one_cycle_policy(self.starting_learning_rate, self.global_step, self.tot_epochs, self.num_batches)
+        #     self.momentum = momentum
+        #     self.global_step += 1
+        #     # tf.assign_add(self.global_step, 1, name='increment')
+        # else:
+        #     learning_rate_enc = tf.train.exponential_decay(
         #     self.starting_learning_rate, self.global_step, self.decay_steps,
         #     self.decay_rate, staircase=True)
-        # optimizer = tf.train.AdamOptimizer(learning_rate, beta1=0.99)
-        # grad_and_vars = optimizer.compute_gradients(loss=self.cost)
-        # # Passing global_step to minimize() will increment it at each step.
-        # self.optimizer = optimizer.apply_gradients(grad_and_vars, global_step=self.global_step)
+        # if self.use_adamw:
+        #     weight_decay = .2
+        #     optimizer_enc = tf.contrib.opt.AdamWOptimizer(weight_decay, learning_rate_enc)
+        # else:
+        #     optimizer_enc = tf.train.AdamOptimizer(learning_rate_enc, beta1=self.momentum if self.momentum is not None else 0.99)
+
+        # dec_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator_network')
+        # if len(dec_vars):
+        #     if self.test_lr:
+        #         learning_rate_dec = self.lr
+        #     elif self.custom_lr:
+        #         learning_rate_dec = one_cycle_policy(self.starting_learning_rate, self.global_step)
+        #         self.global_step += 1
+        #     else:
+        #         learning_rate_dec = tf.train.exponential_decay(
+        #             self.starting_learning_rate, self.global_step, self.decay_steps,
+        #             self.decay_rate, staircase=True)
+        #     if self.use_adamw:
+        #         weight_decay = .2
+        #         optimizer_dec = tf.contrib.opt.AdamWOptimizer(weight_decay, learning_rate_dec)
+        #     else:
+        #         optimizer_dec = tf.train.AdamOptimizer(learning_rate_dec, beta1=0.99)
+        #     grad_and_vars_dec = optimizer_dec.compute_gradients(self.cost, dec_vars)
+        #     train_op_dec = optimizer_dec.apply_gradients(grad_and_vars_dec)
+        #     train_ops.append(train_op_dec)
+
+        # enc_gv_collection = []
+        # for i in range(self.n_steps_enc):
+        #     grad_and_vars_enc = optimizer_enc.compute_gradients(self.cost, enc_vars)
+        #     enc_gv_collection.append(grad_and_vars_enc)
+        #     if i == self.n_steps_enc - 1 and not self.custom_lr:
+        #         train_ops.append(optimizer_enc.apply_gradients(grad_and_vars_enc, global_step=self.global_step))
+        #     else:
+        #         train_ops.append(optimizer_enc.apply_gradients(grad_and_vars_enc))
+        # train_op = tf.group(train_ops)
+        # self.optimizer = train_op
+
+        # # typical learning rate
+        learning_rate = tf.train.exponential_decay(
+            self.starting_learning_rate, self.global_step, self.decay_steps,
+            self.decay_rate, staircase=True)
+        optimizer = tf.train.AdamOptimizer(learning_rate, beta1=0.99)
+        grad_and_vars = optimizer.compute_gradients(loss=self.cost)
+        # Passing global_step to minimize() will increment it at each step.
+        self.optimizer = optimizer.apply_gradients(grad_and_vars, global_step=self.global_step)
 
         if self.tensorboard:
             with tf.name_scope("performance"):
@@ -494,11 +504,12 @@ class VAE_tf(object):
                     "latent_loss", tf.reduce_mean(latent_loss)))
                 self.summaries.append(tf.summary.scalar(
                     "reconstruction_loss", tf.reduce_mean(reconstr_loss)))
-                self.summaries.append(tf.summary.scalar("learning_rate_enc", learning_rate_enc))
                 if self.momentum is not None:
                     self.summaries.append(tf.summary.scalar("momentum_enc", self.momentum))
-                if dec_vars:
-                    self.summaries.append(tf.summary.scalar("learning_rate_dec", learning_rate_dec))
+                self.summaries.append(tf.summary.scalar("learning_rate", learning_rate))
+                # self.summaries.append(tf.summary.scalar("learning_rate_enc", learning_rate_enc))
+                # if dec_vars:
+                #     self.summaries.append(tf.summary.scalar("learning_rate_dec", learning_rate_dec))
             # TODO: add the accumulated gradients from the encoder
             # if dec_vars:
             #     for gradient, variable in grad_and_vars_dec:
