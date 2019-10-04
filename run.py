@@ -1,6 +1,7 @@
 import os
 import shutil
 import itertools
+import csv
 import time
 import pickle
 import numpy as np
@@ -14,6 +15,7 @@ import psutil
 
 from pyro.optim import StepLR
 from pyro.infer import SVI, Trace_ELBO, TraceMeanField_ELBO
+from pyro.infer.abstract_infer import TracePredictive
 from pyro.infer.mcmc import MCMC, NUTS
 import pyro
 import tensorflow as tf
@@ -22,11 +24,12 @@ from data.topics import toy_bars, permuted_toy_bars, diagonal_bars, generate_top
 from data.documents import generate_documents
 from models.lda_meta import VAE_pyro, VAE_tf
 from common import (
-    train_save_VAE, save_speed_to_csv, save_loglik_to_csv, save_reconstruction_array, save_kl_to_csv, get_elbo_csv, run_posterior_evaluation
+    train_save_VAE, save_speed_to_csv, save_loglik_to_csv, save_reconstruction_array, run_posterior_evaluation
 )
 from visualization.reconstructions import plot_side_by_side_docs, plot_saved_samples
 from visualization.posterior import plot_posterior, plot_posterior_v2, plot_posterior_v3
 from visualization.ranking import plot_svi_vs_vae_elbo
+from evaluation.evaluate_posterior import evaluate_log_predictive_density
 from utils import softmax, unzip_X_and_topics, normalize1d
 from training.train_vae import find_lr
 
@@ -115,7 +118,7 @@ model_config = {
 }
 
 model_config_single = model_config.copy()
-model_config_single.update({'model_name': 'lda_orig', 'architecture': 'standard', 'n_hidden_layers': 2})
+model_config_single.update({'model_name': 'lda_orig', 'architecture': 'standard', 'n_hidden_layers': 5})
 model_config_single.update({'starting_learning_rate': .01, 'tot_epochs': 400, 'batch_size': 10, 'decay_steps': 800})
 
 # toy bars data
@@ -189,7 +192,7 @@ else:
     if args.mdreviews:
         documents = [np.load('datasets/mdreviews/train.npy')[0]]
     else:
-        documents, doc_topic_dists = generate_documents(train_topics[0], num_documents, n_topics, vocab_size, avg_num_words, alpha=.01, seed=0)
+        documents, doc_topic_dists = generate_documents(test_topics[0], num_documents, n_topics, vocab_size, avg_num_words, alpha=.01, seed=0)
     if not args.mdreviews:
         plot_side_by_side_docs(documents[:40], os.path.join(results_dir, 'documents.pdf'))
 
@@ -279,8 +282,6 @@ if args.evaluate_svi_convergence_with_vae_init:
     pyro.get_param_store().get_param('z_loc', init_tensor=z_loc.detach())
     pyro.get_param_store().get_param('z_scale', init_tensor=z_scale.detach())
     print(pyro.get_param_store().get_all_param_names())
-    # pyro.get_param_store().replace_param("z_loc", z_loc, torch.zeros(data.shape[0], topics.shape[1]))
-    # pyro.get_param_store().replace_param("z_scale", z_scale, torch.ones(data.shape[0], topics.shape[1]))
     losses = []
     for i in range(num_steps):
         print(pyro.get_param_store().get_param('z_loc')[0])
@@ -397,6 +398,36 @@ if args.evaluate:
             logging.info('Deleting svi')
             del svi
             get_memory_consumption()
+        
+        logging.info('Starting SVI under time constraint')
+        start = time.time()
+        num_steps_to_try = [3, 5, 10]
+        lrs = [.1, 1, 10]
+        svi_stats = []
+        for num_steps in num_steps_to_try:
+            for lr in lrs:
+                pyro.clear_param_store()
+                start = time.time()
+                pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": lr}, 'step_size': 10000, 'gamma': 0.95})
+                svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=Trace_ELBO(), num_samples=100)
+                for _ in range(num_steps):
+                    loss = -svi.step(data, topics)
+                end = time.time()
+                posterior = svi.run(data, topics)
+                posterior_predictive = TracePredictive(vae.model, posterior, num_samples=10)
+                posterior_predictive_traces = posterior_predictive.run(data, topics)
+                # get the posterior predictive log likelihood
+                posterior_predictive_density = evaluate_log_predictive_density(posterior_predictive_traces)
+                posterior_predictive_density = float(posterior_predictive_density.detach().numpy())
+                svi_stats.append([num_steps, lr, end - start, posterior_predictive_density])
+        get_memory_consumption()
+        logging.info('Deleting SVI under time constraint')
+        del svi
+        with open(os.path.join(results_dir, 'short_svi.csv'), 'w') as f:
+            csv_writer = csv.writer(f)
+            csv_writer.writerow('num_steps', 'lr', 'time', 'posterior_predictive')
+            for row in svi_stats:
+                csv_writer.writerow(row)
 
         # save kl between MCMC and the others
         # if args.run_mcmc:
