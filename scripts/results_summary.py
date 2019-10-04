@@ -2,7 +2,18 @@ import os
 import pandas as pd
 import argparse
 import numpy as np
-from scripts.normalize_posterior_predictive import normalize_posterior_predictive
+
+
+def normalize_posterior_predictive(df, datasets, dataset_names):
+    subsets = []
+    for name, data in zip(dataset_names, datasets):
+        # num_words = data.sum()
+        num_words = sum([doc.sum() for doc in data])
+        print(num_words)
+        subset = df[df.dataset==name]
+        subset['posterior_predictive_density'] /= num_words
+        subsets.append(subset)
+    return pd.concat(subsets)
 
 
 if __name__ == "__main__":
