@@ -68,8 +68,10 @@ random_topics_idx = 2
 
 # global params
 if args.mdreviews:
-    n_topics = 100
-    vocab_size = 7729
+    # n_topics = 100
+    # vocab_size = 7729
+    n_topics = 30
+    vocab_size = 3000
 else:
     n_topics = 20
     vocab_size = 100
@@ -137,7 +139,7 @@ else:
     logging.info('Creating data')
     if args.mdreviews:
         betas = []
-        orig_topics = np.load('resources/mdreviews_topics3.npy')
+        orig_topics = np.load('resources/mdreviews_topics4.npy')
         for i, topic in enumerate(orig_topics):
             beta = np.ones(vocab_size)
             # we take the top 100 words as the popular words
@@ -328,6 +330,11 @@ if args.evaluate:
 
     for data_name, data_and_topics in zip(dataset_names, datasets):
         data, topics = unzip_X_and_topics(data_and_topics)
+        # save the total number of words in the data we are looking at
+        with open(os.path.join(results_dir, 'num_words.csv'), 'a') as f:
+            csv_writer = csv.writer(f)
+            num_words = sum(data)
+            csv_writer.writerow([data_name, num_words])
         data = torch.from_numpy(data.astype(np.float32))
         topics = torch.from_numpy(topics.astype(np.float32))
         model_config.update({
