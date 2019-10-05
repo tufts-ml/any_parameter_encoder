@@ -22,7 +22,7 @@ logger.addHandler(fh)
 
 def get_memory_consumption():
     process = psutil.Process(args.pid)
-    logger.info('{}'.format(process.memory_info()[0]))
+    logger.info('{}'.format(process.memory_info()[0] / 1e9))
 
 try:
     while True:
