@@ -313,6 +313,7 @@ if args.train:
 if args.train_single:
     logging.info('Starting training single')
     single_train = (documents, [train_topics[random_topics_idx]])
+    valid = (documents[:2], valid_topics)
     train_save_VAE(
         single_train, valid, model_config_single,
         training_epochs=model_config_single['tot_epochs'], batch_size=model_config_single['batch_size'],
