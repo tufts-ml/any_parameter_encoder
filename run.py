@@ -17,6 +17,7 @@ from pyro.optim import StepLR
 from pyro.infer import SVI, Trace_ELBO, TraceMeanField_ELBO
 from pyro.infer.abstract_infer import TracePredictive
 from pyro.infer.mcmc import MCMC, NUTS
+from pyro.util import torch_isnan
 import pyro
 import tensorflow as tf
 
@@ -255,6 +256,8 @@ if args.evaluate_svi_convergence:
     losses = []
     for i in range(num_steps):
         loss = svi.step(data, topics)
+        if torch_isnan(loss):
+            break
         losses.append(loss)
     print(losses)
     plt.plot(range(num_steps), losses)
@@ -266,7 +269,6 @@ if args.evaluate_svi_convergence_with_vae_init:
     data = torch.from_numpy(data.astype(np.float32))
     topics = torch.from_numpy(topics.astype(np.float32))
     data_name = 'train'
-    num_steps = 600
     model_config.update({
             'data_name': data_name,
             'results_dir': results_dir,
@@ -277,7 +279,7 @@ if args.evaluate_svi_convergence_with_vae_init:
     pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .1}, 'step_size': 10000, 'gamma': 0.95})
     vae_svi = SVI(vae.model, vae.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=0, num_samples=100)
     vae_svi = posterior_eval(vae_svi, 'vae')
-    svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=num_steps, num_samples=100)
+    svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=Trace_ELBO(), num_samples=100)
     z_loc, z_scale = vae.encoder.forward(data, topics)
     print(z_loc[0])
     print(z_scale[0])
@@ -333,7 +335,7 @@ if args.evaluate:
         # save the total number of words in the data we are looking at
         with open(os.path.join(results_dir, 'num_words.csv'), 'a') as f:
             csv_writer = csv.writer(f)
-            num_words = sum(data)
+            num_words = data.sum()
             csv_writer.writerow([data_name, num_words])
         data = torch.from_numpy(data.astype(np.float32))
         topics = torch.from_numpy(topics.astype(np.float32))

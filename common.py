@@ -204,7 +204,7 @@ def get_elbo_csv(vae, vae_single, results_dir, restart=True):
                 pyro.clear_param_store()
 
 def run_svi(vae, data, topics, plot=False, results_dir=None, name=''):
-    num_steps = 400
+    num_steps = 700
     loss = np.nan
     lrs = [.1, .05, .01, .05]
     step_sizes = [10000, 10000, 5000, 5000]
