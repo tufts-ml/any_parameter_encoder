@@ -290,12 +290,12 @@ class VAE_tf(object):
                     tf.add(tf.matmul(x_and_topics, weights["h1"]), biases["b1"])))
             elif self.architecture == "template":
                 template_output = tf.einsum("ab,abc->ac", self.x, tf.transpose(self.topics, perm=[0, 2, 1]))
-                layer = tf.math.divide(template_output, tf.reduce_sum(template_output, axis=1))
+                layer = tf.math.divide(template_output, tf.reshape(tf.reduce_sum(template_output, axis=1), (-1, 1)))
                 layer = tf.contrib.layers.batch_norm(self.transfer_fct(
                     tf.add(tf.matmul(layer, weights["h1"]), biases["b1"])))
             elif self.architecture == "template_plus_topics":
                 template_output = tf.einsum("ab,abc->ac", self.x, tf.transpose(self.topics, perm=[0, 2, 1]))
-                layer = tf.math.divide(template_output, tf.reduce_sum(template_output, axis=1))
+                layer = tf.math.divide(template_output, tf.reshape(tf.reduce_sum(template_output, axis=1), (-1, 1)))
                 layer = tf.concat([layer, tf.reshape(self.topics, (-1, self.n_topics * self.vocab_size))], axis=1)
                 layer = tf.contrib.layers.batch_norm(self.transfer_fct(
                     tf.add(tf.matmul(layer, weights["h1"]), biases["b1"])))
