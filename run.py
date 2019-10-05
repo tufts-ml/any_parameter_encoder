@@ -209,10 +209,6 @@ else:
 logging.info('Data acquired')
 get_memory_consumption()
 
-train = (documents, train_topics)
-valid = (documents, valid_topics)
-test = (documents, test_topics)
-
 def generate_datasets(train, valid, test, n):
     datasets = [train, valid, test]
     for dataset in datasets:
@@ -220,9 +216,15 @@ def generate_datasets(train, valid, test, n):
         subset = [comb for _, comb in zip(range(n), itertools.product(docs, topics))]
         yield subset
 
-# TODO: fix to evaluate on same number of topics
-datasets = generate_datasets(train, valid, test, n=num_combinations_to_evaluate)
-dataset_names = ['train', 'valid', 'test']
+
+if args.evaluate or args.evaluate_svi_convergence or args.evaluate_svi_convergence_with_vae_init:
+    train = (documents, train_topics)
+    valid = (documents, valid_topics)
+    test = (documents, test_topics)
+
+    # TODO: fix to evaluate on same number of topics
+    datasets = generate_datasets(train, valid, test, n=num_combinations_to_evaluate)
+    dataset_names = ['train', 'valid', 'test']
 
 logging.info('Datasets generated')
 get_memory_consumption()
@@ -299,6 +301,8 @@ if args.evaluate_svi_convergence_with_vae_init:
     plt.savefig(os.path.join(results_dir, 'svi_convergence_vae_init.png'))
 
 if args.train:
+    train = (documents, train_topics)
+    valid = (documents[:2], valid_topics)
     logging.info('Starting train')
     train_save_VAE(
         train, valid, model_config,
