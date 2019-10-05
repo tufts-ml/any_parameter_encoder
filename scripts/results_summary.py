@@ -41,9 +41,9 @@ if __name__ == "__main__":
                 csv_reader = csv.reader(f)
                 for row in csv_reader:
                     name, num_words = row
-                    num_words_per_dataset[name] = int(num_words)
+                    num_words_per_dataset[name] = int(float(num_words))
             print('num_words_per_dataset', num_words_per_dataset)
-        except:
+        except Exception as e:
             print('Could not find a num_words.csv. Assuming num words.')
             datasets = [
                 documents[0] * 200 + documents[1] * 100,
