@@ -85,7 +85,7 @@ class VAE_tf(object):
             vocab_size=9,
             scale_trainable=False,
             architecture="naive",
-            transfer_fct=tf.nn.softplus,
+            transfer_fct=tf.nn.relu,
             starting_learning_rate=0.002,
             decay_steps=1000,
             decay_rate=.9,
@@ -671,15 +671,15 @@ class MLP(nn.Module):
     def __init__(self, n_input_units, n_output_units):
         super(MLP, self).__init__()
         self.fc = nn.Linear(n_input_units, n_output_units)
-        self.softplus = nn.Softplus()
+        self.relu = nn.relu()
         self.bn = nn.BatchNorm1d(n_output_units)
 
     def forward(self, x):
-        return self.bn(self.softplus(self.fc(x)))
+        return self.bn(self.relu(self.fc(x)))
 
 class MLP_with_skip(MLP):
     def forward(self, x):
-        return self.bn(x + self.softplus(self.fc(x)))
+        return self.bn(x + self.relu(self.fc(x)))
 
 class Encoder(nn.Module):
     def __init__(self, n_hidden_units, n_hidden_layers, architecture, n_topics=4, vocab_size=9, use_scale=False, skip_connections=False):
@@ -688,7 +688,7 @@ class Encoder(nn.Module):
         self.vocab_size = vocab_size
         self.n_topics = n_topics
         # setup the non-linearities
-        self.softplus = nn.Softplus()
+        self.relu = nn.relu()
         self.skip_connections = skip_connections
         # encoder Linear layers
         modules = []
