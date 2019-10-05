@@ -5,6 +5,7 @@ import numpy as np
 import torch
 from torch import autograd
 import torch.nn as nn
+import torch.nn.functional as F
 
 import pyro
 import pyro.distributions as dist
@@ -224,7 +225,8 @@ class VAE_tf(object):
 
     def _initialize_weights(self):
         all_weights = dict()
-        initializer = tf.contrib.layers.variance_scaling_initializer(2.0)
+        # initializer = tf.contrib.layers.variance_scaling_initializer(2.0)
+        initializer = tf.keras.initializers.he_normal(seed=0)
         with tf.variable_scope("recognition_network"):
             all_weights["weights_recog"] = {
                 "out_mean": tf.get_variable("out_mean", [self.n_hidden_units, self.n_topics], initializer=initializer),
@@ -671,7 +673,7 @@ class MLP(nn.Module):
     def __init__(self, n_input_units, n_output_units):
         super(MLP, self).__init__()
         self.fc = nn.Linear(n_input_units, n_output_units)
-        self.relu = nn.relu()
+        self.relu = F.relu()
         self.bn = nn.BatchNorm1d(n_output_units)
 
     def forward(self, x):
@@ -688,7 +690,7 @@ class Encoder(nn.Module):
         self.vocab_size = vocab_size
         self.n_topics = n_topics
         # setup the non-linearities
-        self.relu = nn.relu()
+        self.relu = F.relu()
         self.skip_connections = skip_connections
         # encoder Linear layers
         modules = []
