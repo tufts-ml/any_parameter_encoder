@@ -166,6 +166,9 @@ def train(
                         valid_summary = tf.Summary(value=[tf.Summary.Value(tag="valid_loss", simple_value=valid_cost)])
                         valid_writer.add_summary(valid_summary, epoch)
                         valid_writer.flush()
+            if num_steps % save_iter == 0:
+                vae.saver.save(vae.sess, os.path.join(vae.results_dir, vae.model_name + '_tf'), vae.global_step)
+                vae.save()
         # print the cost per epoch
         print(
             "Epoch: %04d" % (epoch + 1),
@@ -180,9 +183,6 @@ def train(
             X, topics = unzip_X_and_topics(batch_xs[:10])
             plot_side_by_side_docs(np.concatenate([X, recreated_docs]), os.path.join(results_dir, 'recreated_docs_{}.pdf'.format(str(epoch).zfill(2))))
 
-        if (epoch + 1) % save_iter == 0:
-            vae.saver.save(vae.sess, os.path.join(vae.results_dir, vae.model_name + '_tf'), vae.global_step)
-            vae.save()
     return vae
 
 
