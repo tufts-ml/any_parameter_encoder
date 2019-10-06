@@ -30,6 +30,7 @@ from common import (
 from visualization.reconstructions import plot_side_by_side_docs, plot_saved_samples
 from visualization.posterior import plot_posterior, plot_posterior_v2, plot_posterior_v3
 from visualization.ranking import plot_svi_vs_vae_elbo_v1
+from visualization.times import plot_times
 from evaluation.evaluate_posterior import evaluate_log_predictive_density
 from utils import softmax, unzip_X_and_topics, normalize1d
 from training.train_vae import find_lr
@@ -462,3 +463,5 @@ if args.evaluate:
     vae.load_state_dict(state_dict)
     get_elbo_csv(vae, vae_single, results_dir)
     plot_svi_vs_vae_elbo_v1(results_dir)
+
+    plot_times(results_dir)
