@@ -154,16 +154,10 @@ def get_elbo_vs_m(vae, dataset_names, datasets, results_dir, distances):
 
 def get_elbo_csv(vae, vae_single, results_dir, restart=True):
     dataset_names = ['train', 'valid', 'test']
-    try:
-        train_topics = np.load(os.path.join(results_dir, 'train_topics.npy'))
-        valid_topics = np.load(os.path.join(results_dir, 'valid_topics.npy'))
-        test_topics = np.load(os.path.join(results_dir, 'test_topics.npy'))
-        documents = np.load(os.path.join(results_dir, 'documents.npy'))
-    except:
-        train_topics = np.load(os.path.join('experiments', 'train_topics.npy'))
-        valid_topics = np.load(os.path.join('experiments', 'valid_topics.npy'))
-        test_topics = np.load(os.path.join('experiments', 'test_topics.npy'))
-        documents = np.load(os.path.join('experiments', 'documents.npy'))
+    train_topics = np.load(os.path.join(results_dir, 'train_topics.npy'))[:10]
+    valid_topics = np.load(os.path.join(results_dir, 'valid_topics.npy'))
+    test_topics = np.load(os.path.join(results_dir, 'test_topics.npy'))
+    documents = np.load(os.path.join(results_dir, 'documents.npy'))
     num_topics_by_data = {}
     num_topics_by_data['train'] = len(train_topics)
     num_topics_by_data['valid'] = len(valid_topics)
