@@ -176,17 +176,16 @@ def get_elbo_csv(vae, vae_single, results_dir, restart=True):
     with open(os.path.join(results_dir, 'elbos.csv'), 'w') as f:
         writer = csv.writer(f, delimiter=',')
         writer.writerow(['Dataset', 'Topic index', 'SVI ELBO', 'Decoder-aware encoder ELBO', 'Standard encoder ELBO'])
-        for data_name, topics_and_data in zip(dataset_names, datasets):
-            topics, data = unzip_X_and_topics(topics_and_data)
-            data = torch.from_numpy(data.astype(np.float32))
+        for data_name, topics in zip(dataset_names, [train_topics, valid_topics, test_topics]):
+            data = torch.from_numpy(documents.astype(np.float32))
             topics = torch.from_numpy(topics.astype(np.float32))
             pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .1}, 'step_size': 10000, 'gamma': 0.95})
             num_topics = num_topics_by_data[data_name]
 
             for i in range(num_topics):
                 print('topics set', i)
-                data_i = data[i * num_docs: (i + 1) * num_docs]
-                topics_i = topics[i * num_docs: (i + 1) * num_docs]
+                data_i = data
+                topics_i = topics[i].repeat(num_docs, 1, 1)
                 vae_elbo = Trace_ELBO()
                 start = time.time()
                 vae_svi = SVI(vae.model, vae.encoder_guide, pyro_scheduler, loss=vae_elbo, num_steps=0, num_samples=100)
