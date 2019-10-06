@@ -63,7 +63,7 @@ def run_posterior_evaluation(inference, inference_name, data, data_name, topics,
     start = time.time()
     # we might have to restart a few times to get the best results
     if 'svi' in inference_name:
-        inference, _ = run_svi(vae, data, topics, plot=True, results_dir=model_config['results_dir'], name=data_name)
+        inference, _ = run_svi(vae, data, topics, plot=True, results_dir=model_config['results_dir'], name=data_name, record=True)
     posterior = inference.run(data, topics)
     end = time.time()
     save_speed_to_csv(model_config, end - start)
@@ -203,7 +203,7 @@ def get_elbo_csv(vae, vae_single, results_dir, restart=True):
                 writer.writerow([data_name, i, svi_loss, vae_loss, vae_single_loss])
                 pyro.clear_param_store()
 
-def run_svi(vae, data, topics, plot=False, results_dir=None, name=''):
+def run_svi(vae, data, topics, plot=False, results_dir=None, name='', record=False):
     num_steps = 700
     loss = np.nan
     lrs = [.1, .05, .01, .05]
@@ -223,11 +223,16 @@ def run_svi(vae, data, topics, plot=False, results_dir=None, name=''):
         )
         svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=svi_elbo, num_samples=100)
         losses = []
+        times = []
+        start = time.time()
         for _ in range(num_steps):
             loss = -svi.step(data, topics)
+            end = time.time()
             if not torch_isnan(loss):
                 svi_loss = loss
                 losses.append(loss)
+                times.append(end - start)
+                start = end
             else:
                 pyro.clear_param_store()
                 break
@@ -238,6 +243,11 @@ def run_svi(vae, data, topics, plot=False, results_dir=None, name=''):
                 os.mkdir(plots_dir)
             plt.savefig(os.path.join(plots_dir, 'svi_losses_{}_{}.png'.format(name, n_runs)))
             plt.close()
+        if record:
+            with open(os.path.join(results_dir, 'svi_loss_curve.csv'), 'a') as f:
+                csv_writer = csv.writer(f)
+                for i, loss, runtime in enumerate(zip(losses, times)):
+                    csv_writer.writerow([name, i, loss, runtime])
         n_runs += 1
         svi_losses.append(svi_loss)
         svis.append(svi)
