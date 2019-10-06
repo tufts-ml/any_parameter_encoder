@@ -463,5 +463,7 @@ if args.evaluate:
     vae.load_state_dict(state_dict)
     get_elbo_csv(vae, vae_single, results_dir)
     plot_svi_vs_vae_elbo_v1(results_dir)
+    get_elbo_csv(vae, vae_single, results_dir, posterior_predictive=True)
+    plot_svi_vs_vae_elbo_v1(results_dir, posterior_predictive=True)
 
     plot_times(results_dir)

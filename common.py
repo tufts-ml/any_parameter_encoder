@@ -152,7 +152,7 @@ def get_elbo_vs_m(vae, dataset_names, datasets, results_dir, distances):
                 pyro.clear_param_store()
 
 
-def get_elbo_csv(vae, vae_single, results_dir, restart=True):
+def get_elbo_csv(vae, vae_single, results_dir, restart=True, posterior_predictive=False):
     dataset_names = ['train', 'valid', 'test']
     train_topics = np.load(os.path.join(results_dir, 'train_topics.npy'))[:10]
     valid_topics = np.load(os.path.join(results_dir, 'valid_topics.npy'))
@@ -167,7 +167,11 @@ def get_elbo_csv(vae, vae_single, results_dir, restart=True):
     test = list(itertools.product(test_topics, documents))
     datasets = [train, valid, test]
     num_docs = len(documents)
-    with open(os.path.join(results_dir, 'elbos.csv'), 'w') as f:
+    if posterior_predictive:
+        csv_file = 'posterior_predictives.csv'
+    else:
+        csv_file = 'elbos.csv'
+    with open(os.path.join(results_dir, csv_file), 'w') as f:
         writer = csv.writer(f, delimiter=',')
         writer.writerow(['Dataset', 'Topic index', 'SVI ELBO', 'Decoder-aware encoder ELBO', 'Standard encoder ELBO'])
         for data_name, topics in zip(dataset_names, [train_topics, valid_topics, test_topics]):
@@ -183,22 +187,31 @@ def get_elbo_csv(vae, vae_single, results_dir, restart=True):
                 vae_elbo = Trace_ELBO()
                 start = time.time()
                 vae_svi = SVI(vae.model, vae.encoder_guide, pyro_scheduler, loss=vae_elbo, num_steps=0, num_samples=100)
-                # vae_posterior = vae_svi.run(data_i, topics_i)
-                vae_loss = -vae_svi.evaluate_loss(data_i, topics_i)
+                if posterior_predictive:
+                    vae_posterior = vae_svi.run(data_i, topics_i)
+                    vae_loss = get_posterior_predictive_density(data_i, topics_i, vae.model, vae_posterior)
+                else:
+                    vae_loss = -vae_svi.evaluate_loss(data_i, topics_i)
                 end = time.time()
                 logger.info('Decoder-aware VAE inference time: {}'.format(end - start))
                 print('Decoder-aware VAE inference time: {}'.format(end - start))
 
                 start = time.time()
                 vae_single_svi = SVI(vae_single.model, vae_single.encoder_guide, pyro_scheduler, loss=vae_elbo, num_steps=0, num_samples=100)
-                # vae_single_posterior = vae_single_svi.run(data_i, topics_i)
-                vae_single_loss = -vae_single_svi.evaluate_loss(data_i, topics_i)
+                if posterior_predictive:
+                    vae_single_posterior = vae_single_svi.run(data_i, topics_i)
+                    vae_single_loss = get_posterior_predictive_density(data_i, topics_i, vae_single.model, vae_single_posterior)
+                else:
+                    vae_single_loss = -vae_single_svi.evaluate_loss(data_i, topics_i)
                 end = time.time()
                 logger.info('Standard VAE inference time: {}'.format(end - start))
                 print('Standard VAE inference time: {}'.format(end - start))
 
                 start = time.time()
                 svi, svi_loss = run_svi(vae, data_i, topics_i, plot=True, results_dir=results_dir, name=i)
+                if posterior_predictive:
+                    svi_posterior = svi.run(data_i, topics_i)
+                    svi_loss = get_posterior_predictive_density(data_i, topics_i, vae.model, svi_posterior)
                 end = time.time()
                 logger.info('SVI inference time: {}'.format(end - start))
                 print('SVI inference time: {}'.format(end - start))
@@ -273,13 +286,16 @@ def run_svi(vae, data, topics, plot=False, results_dir=None, name='', record=Fal
     svi.num_steps = 0
     return svi, svi_loss
 
-
-def save_loglik_to_csv(data, topics, model, posterior, model_config, num_samples=10):
+def get_posterior_predictive_density(data, topics, model, posterior, num_samples=10):
     posterior_predictive = TracePredictive(model, posterior, num_samples=num_samples)
     posterior_predictive_traces = posterior_predictive.run(data, topics)
     # get the posterior predictive log likelihood
     posterior_predictive_density = evaluate_log_predictive_density(posterior_predictive_traces)
     posterior_predictive_density = float(posterior_predictive_density.detach().numpy())
+    return posterior_predictive_density
+
+def save_loglik_to_csv(data, topics, model, posterior, model_config, num_samples=10):
+    posterior_predictive_density = get_posterior_predictive_density(data, topics, model, posterior, num_samples)
     results_dir = model_config['results_dir']
     inference = model_config['inference']
     model_name = model_config['model_name']
