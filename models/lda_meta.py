@@ -104,6 +104,7 @@ class VAE_tf(object):
             num_batches=None,
             seed=0,
             skip_connections=False,
+            gpu_mem=None,
             **kwargs
     ):
         self.n_hidden_units = n_hidden_units
@@ -190,7 +191,11 @@ class VAE_tf(object):
         self._create_network()
         self._create_loss_optimizer()
         init = tf.global_variables_initializer()
-        self.sess = tf.Session()
+        if gpu_mem:
+            gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=gpu_mem)
+            self.sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
+        else:
+            self.sess = tf.Session()
         self.saver = tf.train.Saver()
         meta_file = glob.glob(os.path.join(self.results_dir, self.model_name + '_tf*.meta'))
         if meta_file:
