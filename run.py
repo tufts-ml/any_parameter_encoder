@@ -60,8 +60,8 @@ shutil.copy(os.path.abspath(__file__), os.path.join(results_dir, 'run_simple.py'
 # sample_idx = list(range(10, 20, 2)) + list(range(90, 100, 2))
 sample_idx = [0, 1, 52, 53, 104, 105, 156, 157, 208, 209]
 # sample_idx = list(range(10))
-num_documents = 500
-num_train_topics = 50
+num_documents = 50
+num_train_topics = 5
 num_valid_topics = 10
 num_test_topics = 10
 num_combinations_to_evaluate = 300
@@ -287,7 +287,7 @@ if args.train:
     logging.info('Finished train')
 if args.train_single:
     logging.info('Starting training single')
-    single_train = (documents, [train_topics[random_topics_idx]])
+    single_train = (documents, np.array([train_topics[random_topics_idx]]))
     valid = (documents[:2], valid_topics)
     train_save_VAE(
         single_train, valid, model_config_single,
