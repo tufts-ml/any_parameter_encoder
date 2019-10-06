@@ -232,7 +232,7 @@ def run_svi(vae, data, topics, plot=False, results_dir=None, name='', record=Fal
                 svi_loss = loss
                 losses.append(loss)
                 times.append(end - start)
-                if (losses[-1] - losses[-2]) < -losses[-2] * .0001:
+                if len(losses > 1) and (losses[-1] - losses[-2]) < -losses[-2] * .0001:
                     pyro.clear_param_store()
                     break
             else:
