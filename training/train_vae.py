@@ -21,8 +21,8 @@ def create_minibatch(data, batch_size, shuffle=True, generate_train=False):
         num_topics = len(topics)
         num_combinations = num_docs * num_topics
         for i in range(int(num_combinations / batch_size)):
-            docs_idx = np.random.choice(list(range(num_docs)))
-            topics_idx = np.random.choice(list(range(num_topics)))
+            docs_idx = np.random.choice(list(range(num_docs)), size=batch_size)
+            topics_idx = np.random.choice(list(range(num_topics)), size=batch_size)
             docs_subset = docs[docs_idx]
             topics_subset = topics[topics_idx]
             yield zip(docs_subset, topics_subset)
