@@ -122,7 +122,7 @@ model_config = {
 
 model_config_single = model_config.copy()
 model_config_single.update({'model_name': 'lda_orig', 'architecture': 'standard', 'n_hidden_layers': 2})
-model_config_single.update({'starting_learning_rate': .01, 'tot_epochs': 400, 'batch_size': 150, 'decay_steps': 800})
+model_config_single.update({'starting_learning_rate': .01, 'tot_epochs': 4, 'batch_size': 150, 'decay_steps': 800})
 
 # toy bars data
 if args.use_cached and os.path.exists(os.path.join(results_dir, 'train_topics.npy')):
@@ -138,37 +138,14 @@ elif args.use_cached and os.path.exists(os.path.join('experiments', 'train_topic
     documents = np.load(os.path.join('experiments', 'documents.npy'))
 else:
     logging.info('Creating data')
+    train_betas = np.ones((n_topics, vocab_size))
+    valid_betas = np.ones((n_topics, vocab_size))
+    train_topics = generate_topics(n=num_train_topics, betas=train_betas, seed=0, shuffle=True)
+    valid_topics = generate_topics(n=num_valid_topics, betas=valid_betas, seed=1, shuffle=True)
     if args.mdreviews:
-        betas = []
-        orig_topics = np.load('resources/mdreviews_topics4.npy')
-        for i, topic in enumerate(orig_topics):
-            beta = np.ones(vocab_size)
-            # we take the top 100 words as the popular words
-            popular_words = np.argpartition(topic, -100)[-100:]
-            beta[popular_words] = 1000
-            beta = normalize1d(beta)
-            beta[popular_words] *= 50
-            betas.append(beta)
-    elif args.additive_topics:
-        betas = []
-        for i in range(n_topics):
-            beta = np.ones(vocab_size)
-            dim = math.sqrt(vocab_size)
-            if i < dim:
-                popular_words = [idx for idx in range(vocab_size) if idx % dim == i]
-            else:
-                popular_words = [idx for idx in range(vocab_size) if int(idx / dim) == i - dim]
-            random_additions = list(np.random.choice(range(vocab_size), 20))
-            beta[popular_words] = 1000
-            beta[random_additions] = 200
-            beta = normalize1d(beta)
-            beta[popular_words] *= 5
-            beta[random_additions] *= 2
-            betas.append(beta)
-    elif args.uniform_prior:
-        betas = np.ones((n_topics, vocab_size))
+        test_topics = np.load('datasets/mdreviews/test_topics_3k.npy')
     else:
-        betas = []
+        test_betas = []
         for i in range(n_topics):
             beta = np.ones(vocab_size)
             dim = math.sqrt(vocab_size)
@@ -179,10 +156,8 @@ else:
             beta[popular_words] = 1000
             beta = normalize1d(beta)
             beta[popular_words] *= 5
-            betas.append(beta)
-    train_topics = generate_topics(n=num_train_topics, betas=betas, seed=0, shuffle=True)
-    valid_topics = generate_topics(n=num_valid_topics, betas=betas, seed=1, shuffle=True)
-    test_topics = generate_topics(n=num_test_topics, betas=betas, seed=2, shuffle=True)
+            test_betas.append(beta)
+            test_topics = generate_topics(n=num_test_topics, betas=test_betas, seed=2, shuffle=True)
 
     if not args.mdreviews:
         for i, topics in zip(range(10), train_topics):
@@ -308,7 +283,7 @@ if args.train:
         train, valid, model_config,
         training_epochs=model_config['tot_epochs'], batch_size=model_config['batch_size'],
         hallucinations=False, tensorboard=True, shuffle=True, display_step=100,
-        n_topics=n_topics, vocab_size=vocab_size, recreate_docs=False, save_iter=10)
+        n_topics=n_topics, vocab_size=vocab_size, recreate_docs=False, save_iter=1000)
     logging.info('Finished train')
 if args.train_single:
     logging.info('Starting training single')
@@ -318,7 +293,7 @@ if args.train_single:
         single_train, valid, model_config_single,
         training_epochs=model_config_single['tot_epochs'], batch_size=model_config_single['batch_size'],
         hallucinations=False, tensorboard=True, shuffle=True, display_step=100,
-        n_topics=n_topics, vocab_size=vocab_size, recreate_docs=False, save_iter=30)
+        n_topics=n_topics, vocab_size=vocab_size, recreate_docs=False, save_iter=1000)
     logging.info('Finished training single')
 # load the VAE into pyro for evaluation
 if args.evaluate:
