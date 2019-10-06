@@ -13,12 +13,24 @@ from visualization.reconstructions import plot_side_by_side_docs
 
 logger = logging.getLogger()
 
-def create_minibatch(data, batch_size, shuffle=True):
+def create_minibatch(data, batch_size, shuffle=True, generate_train=False):
     rng = np.random.RandomState(10)
-    np.random.shuffle(data)
-    logger.info('Finished shuffling training data.')
-    for start_idx in range(0, len(data), batch_size):
-        yield data[start_idx: start_idx + batch_size]
+    if generate_train:
+        docs, topics = data
+        num_docs = len(docs)
+        num_topics = len(topics)
+        num_combinations = num_docs * num_topics
+        for i in range(int(num_combinations / batch_size)):
+            docs_idx = np.random.choice(list(range(num_docs)))
+            topics_idx = np.random.choice(list(range(num_topics)))
+            docs_subset = docs[docs_idx]
+            topics_subset = topics[topics_idx]
+            yield zip(docs_subset, topics_subset)
+    else:
+        np.random.shuffle(data)
+        logger.info('Finished shuffling training data.')
+        for start_idx in range(0, len(data), batch_size):
+            yield data[start_idx: start_idx + batch_size]
 
 # def train(
 #     train_data,
@@ -90,10 +102,12 @@ def train(
     vae_meta=True,
     shuffle=True,
     save_iter=100,
-    plot_valid_cost=True
+    plot_valid_cost=True,
+    generate_train=True
 ):
-    train_docs, train_topics = train_data
-    train_data = list(itertools.product(train_docs, train_topics))
+    if not generate_train:
+        train_docs, train_topics = train_data
+        train_data = list(itertools.product(train_docs, train_topics))
     logger.info('Train data created for training.')
     valid_docs, valid_topics = valid_data
     num_valid_topics = len(valid_topics)
@@ -114,7 +128,7 @@ def train(
         total_cost = 0.0
         num_batches = 0
         logger.info('Creating minibatches')
-        for batch_xs in create_minibatch(train_data, batch_size, shuffle=shuffle):
+        for batch_xs in create_minibatch(train_data, batch_size, shuffle=shuffle, generate_train=generate_train):
             num_steps += 1
             # Fit training using batch data
             cost = vae.partial_fit(batch_xs)

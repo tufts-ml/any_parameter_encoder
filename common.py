@@ -32,7 +32,7 @@ logger = logging.getLogger()
 
 def train_save_VAE(train_data, valid_data, model_config, training_epochs=120, batch_size=200,
                    tensorboard=True, hallucinations=False, shuffle=True, display_step=5, recreate_docs=True,
-                   vocab_size=100, n_topics=20, save_iter=100, plot_valid_cost=True):
+                   vocab_size=100, n_topics=20, save_iter=100, plot_valid_cost=True, generate_train=False):
     vae = VAE_tf(tensorboard=tensorboard, **model_config)
     tensorboard_logs_dir = os.path.join(
         model_config['results_dir'], model_config['model_name'],
@@ -44,7 +44,7 @@ def train_save_VAE(train_data, valid_data, model_config, training_epochs=120, ba
     else:
         vae = train(train_data, valid_data, vae, training_epochs=training_epochs, tensorboard=tensorboard, batch_size=batch_size,
             tensorboard_logs_dir=tensorboard_logs_dir, results_dir=model_config['results_dir'], display_step=display_step, save_iter=save_iter,
-            plot_valid_cost=plot_valid_cost)
+            plot_valid_cost=plot_valid_cost, generate_train=generate_train)
     if recreate_docs:
         for data_name, batch_xs in zip(['train', 'valid'], [train_data[:10], valid_data[:10]]):
             recreated_docs, _, _ = vae.recreate_input(batch_xs)

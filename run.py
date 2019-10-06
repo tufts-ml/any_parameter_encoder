@@ -87,7 +87,7 @@ logger.addHandler(fh)
 
 def get_memory_consumption():
     process = psutil.Process(os.getpid())
-    logger.info('{}'.format(process.memory_info()[0]))
+    logger.info('{}'.format(process.memory_info()[0] / 1e9))
 
 if args.run_mcmc:
     inference_names = ['mcmc', 'svi', 'svi_warmstart', 'vae', 'vae_single']
@@ -283,7 +283,7 @@ if args.train:
         train, valid, model_config,
         training_epochs=model_config['tot_epochs'], batch_size=model_config['batch_size'],
         hallucinations=False, tensorboard=True, shuffle=True, display_step=100,
-        n_topics=n_topics, vocab_size=vocab_size, recreate_docs=False, save_iter=1000)
+        n_topics=n_topics, vocab_size=vocab_size, recreate_docs=False, save_iter=1000, generate_train=True)
     logging.info('Finished train')
 if args.train_single:
     logging.info('Starting training single')
@@ -293,7 +293,7 @@ if args.train_single:
         single_train, valid, model_config_single,
         training_epochs=model_config_single['tot_epochs'], batch_size=model_config_single['batch_size'],
         hallucinations=False, tensorboard=True, shuffle=True, display_step=100,
-        n_topics=n_topics, vocab_size=vocab_size, recreate_docs=False, save_iter=1000)
+        n_topics=n_topics, vocab_size=vocab_size, recreate_docs=False, save_iter=1000, generate_train=True)
     logging.info('Finished training single')
 # load the VAE into pyro for evaluation
 if args.evaluate:
