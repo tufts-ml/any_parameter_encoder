@@ -8,7 +8,7 @@ def plot_times(results_dir):
     svi_times = pd.read_csv(os.path.join(results_dir, 'svi_loss_curve.csv'), header=None)
     svi_times.columns = ['data', 'step', 'loss', 'time']
     vae_times = pd.read_csv(os.path.join(results_dir, 'vae_times.csv'), header=None)
-    vae_times.columns = ['data', 'inference', 'loss', 'time']
+    vae_times.columns = ['data', 'inference', 'loss', 'time', 'n_runs']
     svi_test_times = svi_times[svi_times.data == 'test']
     vae_test_times = vae_times[(vae_times.data == 'test') & (vae_times.inference == 'vae')]
     plt.plot(svi_test_times.time, svi_test_times.loss)

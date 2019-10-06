@@ -240,9 +240,12 @@ def run_svi(vae, data, topics, plot=False, results_dir=None, name='', record=Fal
                 losses.append(loss)
                 times.append(end - start)
                 if loss_converged(losses):
+                    print('loss_converged')
                     pyro.clear_param_store()
+                    loss = np.nan
                     break
             else:
+                print('loss hit nan')
                 pyro.clear_param_store()
                 break
         if plot:
@@ -256,7 +259,7 @@ def run_svi(vae, data, topics, plot=False, results_dir=None, name='', record=Fal
             with open(os.path.join(results_dir, 'svi_loss_curve.csv'), 'a') as f:
                 csv_writer = csv.writer(f)
                 for i, (loss, runtime) in enumerate(zip(losses, times)):
-                    csv_writer.writerow([name, i, loss, runtime])
+                    csv_writer.writerow([name, i, loss, runtime, n_runs])
         n_runs += 1
         svi_losses.append(svi_loss)
         svis.append(svi)
