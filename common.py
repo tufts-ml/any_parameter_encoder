@@ -62,7 +62,7 @@ def run_posterior_evaluation(inference, inference_name, data, data_name, topics,
 
     start = time.time()
     # we might have to restart a few times to get the best results
-    if 'svi' in inference_name:
+    if inference_name == 'svi':
         inference, _ = run_svi(vae, data, topics, plot=True, results_dir=model_config['results_dir'], name=data_name, record=True)
     posterior = inference.run(data, topics)
     end = time.time()
@@ -205,10 +205,11 @@ def get_elbo_csv(vae, vae_single, results_dir, restart=True):
                 writer.writerow([data_name, i, svi_loss, vae_loss, vae_single_loss])
                 pyro.clear_param_store()
 
-def loss_converged(losses, window=50):
+def loss_converged(losses, window=30):
     last_three_avg = np.mean(losses[-window:])
     prev_three_avg = np.mean(losses[-window * 2:-window])
-    return (len(losses) > 100) and ((last_three_avg - prev_three_avg) <  -prev_three_avg * .0001)
+    return (len(losses) > 100) and ((last_three_avg - prev_three_avg) <  -prev_three_avg * .000001)
+
 
 def run_svi(vae, data, topics, plot=False, results_dir=None, name='', record=False):
     num_steps = 100000
@@ -231,6 +232,7 @@ def run_svi(vae, data, topics, plot=False, results_dir=None, name='', record=Fal
         svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=svi_elbo, num_samples=100)
         losses = []
         times = []
+        # smoothed = []
         start = time.time()
         for _ in range(num_steps):
             loss = -svi.step(data, topics)
@@ -242,13 +244,13 @@ def run_svi(vae, data, topics, plot=False, results_dir=None, name='', record=Fal
                 if loss_converged(losses):
                     print('loss_converged')
                     pyro.clear_param_store()
-                    loss = np.nan
                     break
             else:
                 print('loss hit nan')
                 pyro.clear_param_store()
                 break
         if plot:
+            print('plotting for : ', n_runs)
             plt.plot(range(len(losses)), losses)
             plots_dir = os.path.join(results_dir, 'svi_losses')
             if not os.path.exists(plots_dir):
@@ -258,12 +260,12 @@ def run_svi(vae, data, topics, plot=False, results_dir=None, name='', record=Fal
         if record:
             with open(os.path.join(results_dir, 'svi_loss_curve.csv'), 'a') as f:
                 csv_writer = csv.writer(f)
-                for i, (loss, runtime) in enumerate(zip(losses, times)):
-                    csv_writer.writerow([name, i, loss, runtime, n_runs])
+                for i, (loss_to_record, runtime) in enumerate(zip(losses, times)):
+                    csv_writer.writerow([name, i, loss_to_record, runtime, n_runs])
+        print('updating n_runs')
         n_runs += 1
         svi_losses.append(svi_loss)
         svis.append(svi)
-        # pyro.clear_param_store()
     best_idx = svi_losses.index(max(svi_losses))
     svi_loss = svi_losses[best_idx]
     svi = svis[best_idx]
