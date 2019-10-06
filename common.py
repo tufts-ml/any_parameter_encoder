@@ -68,6 +68,15 @@ def run_posterior_evaluation(inference, inference_name, data, data_name, topics,
     end = time.time()
     save_speed_to_csv(model_config, end - start)
 
+    # get vae inference time without tracelist creation
+    if 'vae' in inference_name:
+        start = time.time()
+        vae.encoder.forward(data, topics)
+        end = time.time()
+        with open(os.path.join(model_config['results_dir'], 'vae_times.csv'), 'a') as f:
+            csv_writer = csv.writer(f)
+            csv_writer.writerow([data_name, inference_name, end - start])
+
     save_reconstruction_array(vae, topics, posterior, sample_idx, model_config)
 
     # save the estimated posterior predictive log likelihood
@@ -203,6 +212,11 @@ def get_elbo_csv(vae, vae_single, results_dir, restart=True):
                 writer.writerow([data_name, i, svi_loss, vae_loss, vae_single_loss])
                 pyro.clear_param_store()
 
+def loss_converged(losses):
+    last_three_avg = np.mean(losses[-3:])
+    prev_three_avg = np.mean(losses[-6:-3])
+    return (len(losses) > 1) and ((last_three_avg - prev_three_avg) <  -prev_three_avg * .0001)
+
 def run_svi(vae, data, topics, plot=False, results_dir=None, name='', record=False):
     num_steps = 100000
     loss = np.nan
@@ -232,7 +246,7 @@ def run_svi(vae, data, topics, plot=False, results_dir=None, name='', record=Fal
                 svi_loss = loss
                 losses.append(loss)
                 times.append(end - start)
-                if (len(losses) > 1) and ((losses[-1] - losses[-2]) < -losses[-2] * .0001):
+                if loss_converged(losses):
                     pyro.clear_param_store()
                     break
             else:
