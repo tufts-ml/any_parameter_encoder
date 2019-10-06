@@ -246,7 +246,7 @@ def run_svi(vae, data, topics, plot=False, results_dir=None, name='', record=Fal
         if record:
             with open(os.path.join(results_dir, 'svi_loss_curve.csv'), 'a') as f:
                 csv_writer = csv.writer(f)
-                for i, loss, runtime in enumerate(zip(losses, times)):
+                for i, (loss, runtime) in enumerate(zip(losses, times)):
                     csv_writer.writerow([name, i, loss, runtime])
         n_runs += 1
         svi_losses.append(svi_loss)
