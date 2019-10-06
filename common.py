@@ -211,9 +211,9 @@ def get_elbo_csv(vae, vae_single, results_dir, restart=True):
                 writer.writerow([data_name, i, svi_loss, vae_loss, vae_single_loss])
                 pyro.clear_param_store()
 
-def loss_converged(losses):
-    last_three_avg = np.mean(losses[-3:])
-    prev_three_avg = np.mean(losses[-6:-3])
+def loss_converged(losses, window=10):
+    last_three_avg = np.mean(losses[-window:])
+    prev_three_avg = np.mean(losses[-window * 2:-window])
     return (len(losses) > 1) and ((last_three_avg - prev_three_avg) <  -prev_three_avg * .0001)
 
 def run_svi(vae, data, topics, plot=False, results_dir=None, name='', record=False):
