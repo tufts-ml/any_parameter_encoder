@@ -67,6 +67,8 @@ num_valid_topics = 10
 num_test_topics = 10
 num_combinations_to_evaluate = 300
 random_topics_idx = 2
+train_alpha = .1
+valid_alpha = .05
 
 # global params
 if args.mdreviews:
@@ -118,7 +120,8 @@ model_config = {
     'scale_type': 'mean',
     'tot_epochs': 300,
     'batch_size': 200,
-    'seed': 1
+    'seed': 1,
+    'gpu_mem': .33,
 }
 
 model_config_single = model_config.copy()
@@ -139,8 +142,8 @@ elif args.use_cached and os.path.exists(os.path.join('experiments', 'train_topic
     documents = np.load(os.path.join('experiments', 'documents.npy'))
 else:
     logging.info('Creating data')
-    train_betas = np.ones((n_topics, vocab_size))
-    valid_betas = np.ones((n_topics, vocab_size))
+    train_betas = np.ones((n_topics, vocab_size)) * train_alpha
+    valid_betas = np.ones((n_topics, vocab_size)) * valid_alpha
     train_topics = generate_topics(n=num_train_topics, betas=train_betas, seed=0, shuffle=True)
     valid_topics = generate_topics(n=num_valid_topics, betas=valid_betas, seed=1, shuffle=True)
     if args.mdreviews:
@@ -169,7 +172,7 @@ else:
             plot_side_by_side_docs(topics, os.path.join(results_dir, 'test_topics_{}.pdf'.format(str(i).zfill(3))))
 
     if args.mdreviews:
-        documents = np.load('datasets/mdreviews/train_3k_reviews.npy')
+        documents = np.load('datasets/mdreviews/train_3k_vocab.npy')
     else:
         documents, doc_topic_dists = generate_documents(test_topics[0], num_documents, n_topics, vocab_size, avg_num_words, alpha=.01, seed=0)
     if not args.mdreviews:
