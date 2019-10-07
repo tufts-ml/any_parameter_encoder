@@ -10,6 +10,10 @@ def plot_times(results_dir):
     vae_times = pd.read_csv(os.path.join(results_dir, 'vae_times.csv'), header=None)
     vae_times.columns = ['data', 'inference', 'loss', 'time']
     svi_test_times = svi_times[svi_times.data == 'test']
+    # find the time with the best run
+    best_run = svi_test_times.loc[svi_test_times.loss.idxmax()].n_runs
+    print(best_run)
+    svi_test_times = svi_test_times[svi_test_times.n_runs==best_run]
     vae_test_times = vae_times[(vae_times.data == 'test') & (vae_times.inference == 'vae')]
     plt.plot(svi_test_times.time, svi_test_times.loss)
     print(vae_test_times.loss.values[0])
@@ -20,4 +24,4 @@ def plot_times(results_dir):
     plt.savefig(os.path.join(results_dir, 'svi_vs_vae_times.pdf'))
 
 if __name__ == "__main__":
-    plot_times('experiments/test_save_restore')
+    plot_times('generalize3')
