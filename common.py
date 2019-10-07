@@ -71,7 +71,7 @@ def run_posterior_evaluation(inference, inference_name, data, data_name, topics,
     # get vae inference time without tracelist creation
     if 'vae' in inference_name:
         start = time.time()
-        loss = inference.evaluate_loss(data, topics)
+        loss = -inference.evaluate_loss(data, topics)
         end = time.time()
         with open(os.path.join(model_config['results_dir'], 'vae_times.csv'), 'a') as f:
             csv_writer = csv.writer(f)
