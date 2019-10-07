@@ -12,6 +12,7 @@ from pyro.optim import StepLR
 from pyro.infer import SVI, Trace_ELBO, TraceMeanField_ELBO
 from pyro.infer.mcmc import MCMC, NUTS
 from pyro.util import torch_isnan
+import pyro.poutine as poutine
 import pyro
 import tensorflow as tf
 import torch
@@ -248,7 +249,8 @@ def run_svi(vae, data, topics, plot=False, results_dir=None, name='', record=Fal
         # smoothed = []
         start = time.time()
         for _ in range(num_steps):
-            loss = -svi.step(data, topics)
+            with poutine.block():
+                loss = -svi.step(data, topics)
             end = time.time()
             if not torch_isnan(loss):
                 svi_loss = loss
