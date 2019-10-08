@@ -12,43 +12,52 @@ from utils import make_square
 from visualization.reconstructions import plot_side_by_side_docs
 
 
-filepath = os.path.abspath(__file__)
-base_path = '/'.join(filepath.split('/')[:-1])
-sparse = np.load(os.path.join(base_path, 'raw/X_csr_train.npz'))
-X_train = csr_matrix((sparse['data'], sparse['indices'], sparse['indptr']), shape=sparse['shape']).todense()
-X_train = np.squeeze(np.asarray(X_train))
-vocab_size = X_train.shape[1]
+# filepath = os.path.abspath(__file__)
+# base_path = '/'.join(filepath.split('/')[:-1])
+# sparse = np.load(os.path.join(base_path, 'raw/X_csr_train.npz'))
+# X_train = csr_matrix((sparse['data'], sparse['indices'], sparse['indptr']), shape=sparse['shape']).todense()
+# X_train = np.squeeze(np.asarray(X_train))
+# vocab_size = X_train.shape[1]
 
-sparse = np.load(os.path.join(base_path, 'raw/X_csr_valid.npz'))
-X_valid = csr_matrix((sparse['data'], sparse['indices'], sparse['indptr']), shape=sparse['shape']).todense()
-X_valid = np.squeeze(np.asarray(X_valid))
+# sparse = np.load(os.path.join(base_path, 'raw/X_csr_valid.npz'))
+# X_valid = csr_matrix((sparse['data'], sparse['indices'], sparse['indptr']), shape=sparse['shape']).todense()
+# X_valid = np.squeeze(np.asarray(X_valid))
 
-sparse = np.load(os.path.join(base_path, 'raw/X_csr_test.npz'))
-X_test = csr_matrix((sparse['data'], sparse['indices'], sparse['indptr']), shape=sparse['shape']).todense()
-X_test = np.squeeze(np.asarray(X_test))
+# sparse = np.load(os.path.join(base_path, 'raw/X_csr_test.npz'))
+# X_test = csr_matrix((sparse['data'], sparse['indices'], sparse['indptr']), shape=sparse['shape']).todense()
+# X_test = np.squeeze(np.asarray(X_test))
 
-filepath = os.path.dirname(__file__)
+# filepath = os.path.dirname(__file__)
 # np.save(os.path.join(filepath, 'train.npy'), X_train)
 # np.save(os.path.join(filepath, 'valid.npy'), X_valid)
 # np.save(os.path.join(filepath, 'test.npy'), X_test)
 
-X = np.concatenate([X_train, X_valid, X_test])
+# X = np.concatenate([X_train, X_valid, X_test])
+vocab_size = 3000
+num_topics = 30
+train_docs = np.load('datasets/mdreviews/train.npy')
+vocab_num_occurences = train_docs.sum(axis=0)
+top_idx = np.argpartition(vocab_num_occurences, -vocab_size)[-vocab_size:]
+new_train_docs = train_docs[:, top_idx]
+print(new_train_docs.shape)
 corpus = []
-for doc in X:
+for doc in new_train_docs:
 	corpus.append([(word_idx, count) for word_idx, count in enumerate(doc)])
 
 id2word = {}
 # with open('datasets/mdreviews/raw/X_colnames.txt', 'r') as f:
 #     for i, line in enumerate(f):
 #         id2word[i] = line.strip()
-
-a = [(0, '0.007*"book" + 0.005*"good" + 0.005*"great" + 0.005*"movie" + 0.004*"read" + 0.004*"work" + 0.004*"time" + 0.003*"i_was" + 0.003*"love" + 0.003*"make"'), (1, '0.007*"book" + 0.005*"good" + 0.005*"read" + 0.004*"great" + 0.004*"don\'t" + 0.004*"i_have" + 0.004*"time" + 0.003*"movie" + 0.003*"buy" + 0.003*"charact"'), (2, '0.008*"book" + 0.005*"great" + 0.005*"read" + 0.004*"good" + 0.004*"work" + 0.003*"i_have" + 0.003*"film" + 0.003*"time" + 0.003*"movie" + 0.003*"this_book"'), (3, '0.008*"book" + 0.004*"great" + 0.004*"movie" + 0.004*"read" + 0.004*"time" + 0.003*"if_you" + 0.003*"film" + 0.003*"good" + 0.003*"i_have" + 0.003*"work"'), (4, '0.008*"book" + 0.005*"time" + 0.005*"great" + 0.004*"read" + 0.004*"movie" + 0.004*"don\'t" + 0.004*"good" + 0.003*"work" + 0.003*"make" + 0.003*"this_book"'), (5, '0.008*"book" + 0.004*"good" + 0.004*"great" + 0.004*"movie" + 0.003*"read" + 0.003*"work" + 0.003*"if_you" + 0.003*"make" + 0.003*"this_book" + 0.003*"don\'t"'), (6, '0.007*"book" + 0.005*"great" + 0.005*"good" + 0.005*"read" + 0.004*"movie" + 0.004*"work" + 0.004*"this_book" + 0.004*"time" + 0.004*"don\'t" + 0.003*"i_have"'), (7, '0.007*"book" + 0.005*"good" + 0.004*"read" + 0.004*"movie" + 0.004*"great" + 0.004*"if_you" + 0.003*"work" + 0.003*"thing" + 0.003*"i_have" + 0.003*"time"'), (8, '0.006*"book" + 0.005*"movie" + 0.005*"good" + 0.005*"time" + 0.004*"great" + 0.004*"don\'t" + 0.003*"read" + 0.003*"work" + 0.003*"film" + 0.003*"this_book"'), (9, '0.008*"book" + 0.005*"great" + 0.004*"good" + 0.004*"read" + 0.004*"time" + 0.003*"movie" + 0.003*"film" + 0.003*"work" + 0.003*"this_book" + 0.003*"thing"'), (10, '0.006*"book" + 0.005*"good" + 0.004*"read" + 0.004*"don\'t" + 0.004*"time" + 0.004*"great" + 0.004*"movie" + 0.003*"i_have" + 0.003*"buy" + 0.003*"story"'), (11, '0.006*"book" + 0.005*"good" + 0.004*"movie" + 0.004*"great" + 0.004*"read" + 0.003*"this_book" + 0.003*"time" + 0.003*"i_have" + 0.003*"film" + 0.003*"work"'), (12, '0.006*"book" + 0.004*"good" + 0.004*"great" + 0.004*"work" + 0.004*"movie" + 0.004*"time" + 0.003*"film" + 0.003*"i_have" + 0.003*"this_book" + 0.003*"if_you"'), (13, '0.007*"book" + 0.005*"great" + 0.004*"good" + 0.004*"movie" + 0.004*"film" + 0.003*"time" + 0.003*"work" + 0.003*"read" + 0.003*"product" + 0.003*"i_have"'), (14, '0.006*"book" + 0.004*"make" + 0.004*"good" + 0.004*"work" + 0.004*"time" + 0.004*"great" + 0.003*"don\'t" + 0.003*"film" + 0.003*"read" + 0.003*"charact"'), (15, '0.006*"book" + 0.005*"great" + 0.005*"good" + 0.005*"movie" + 0.004*"don\'t" + 0.004*"time" + 0.003*"film" + 0.003*"i\'m" + 0.003*"read" + 0.003*"thing"'), (16, '0.008*"book" + 0.005*"great" + 0.004*"work" + 0.004*"good" + 0.004*"read" + 0.003*"movie" + 0.003*"this_book" + 0.003*"i_have" + 0.003*"and_i" + 0.003*"make"'), (17, '0.008*"book" + 0.005*"read" + 0.005*"work" + 0.005*"great" + 0.004*"if_you" + 0.004*"movie" + 0.003*"good" + 0.003*"film" + 0.003*"time" + 0.003*"product"'), (18, '0.008*"book" + 0.005*"good" + 0.005*"great" + 0.005*"time" + 0.004*"read" + 0.004*"work" + 0.004*"movie" + 0.003*"this_book" + 0.003*"film" + 0.003*"product"'), (19, '0.008*"book" + 0.006*"good" + 0.004*"movie" + 0.004*"great" + 0.004*"this_book" + 0.004*"work" + 0.003*"product" + 0.003*"read" + 0.003*"make" + 0.003*"buy"'), (20, '0.008*"book" + 0.004*"good" + 0.004*"work" + 0.004*"great" + 0.004*"read" + 0.004*"movie" + 0.004*"time" + 0.003*"don\'t" + 0.003*"make" + 0.003*"i_have"'), (21, '0.006*"book" + 0.005*"great" + 0.004*"movie" + 0.004*"work" + 0.003*"good" + 0.003*"i_have" + 0.003*"don\'t" + 0.003*"make" + 0.003*"time" + 0.003*"product"'), (22, '0.007*"book" + 0.006*"good" + 0.004*"great" + 0.004*"movie" + 0.004*"time" + 0.004*"work" + 0.003*"read" + 0.003*"film" + 0.003*"buy" + 0.003*"this_book"'), (23, '0.007*"book" + 0.005*"time" + 0.005*"good" + 0.004*"read" + 0.004*"movie" + 0.003*"don\'t" + 0.003*"great" + 0.003*"work" + 0.003*"i_have" + 0.003*"problem"'), (24, '0.008*"book" + 0.005*"great" + 0.005*"movie" + 0.004*"good" + 0.004*"time" + 0.004*"film" + 0.004*"read" + 0.003*"this_book" + 0.003*"i_have" + 0.003*"thing"'), (25, '0.008*"book" + 0.005*"great" + 0.004*"don\'t" + 0.004*"i_have" + 0.004*"movie" + 0.004*"good" + 0.004*"work" + 0.004*"make" + 0.003*"read" + 0.003*"time"'), (26, '0.008*"book" + 0.005*"great" + 0.005*"good" + 0.004*"movie" + 0.004*"work" + 0.003*"film" + 0.003*"time" + 0.003*"don\'t" + 0.003*"i_have" + 0.003*"this_book"'), (27, '0.006*"book" + 0.005*"good" + 0.005*"great" + 0.004*"movie" + 0.004*"read" + 0.003*"time" + 0.003*"i_have" + 0.003*"review" + 0.003*"don\'t" + 0.003*"work"'), (28, '0.007*"book" + 0.004*"read" + 0.004*"great" + 0.004*"time" + 0.004*"don\'t" + 0.004*"good" + 0.003*"work" + 0.003*"movie" + 0.003*"i_have" + 0.003*"review"'), (29, '0.008*"book" + 0.005*"movie" + 0.005*"great" + 0.004*"good" + 0.003*"time" + 0.003*"if_you" + 0.003*"this_book" + 0.003*"don\'t" + 0.003*"i_have" + 0.003*"read"')]
         
         
 
 with open('datasets/mdreviews/raw/vocab.txt', 'r') as f:
+    idx = 0
     for i, line in enumerate(f):
-        id2word[i] = line.strip()
+        if i in top_idx:
+            id2word[idx] = line.strip()
+            idx += 1
+print(len(id2word))
 path_to_mallet_binary = "/Users/lilyzhang/Documents/coding_projects/Mallet/bin/mallet"
 with open('topics.csv', 'w') as f:
     csv_writer = csv.writer(f)
