@@ -65,6 +65,9 @@ def run_posterior_evaluation(inference, inference_name, data, data_name, topics,
     # we might have to restart a few times to get the best results
     if inference_name == 'svi':
         inference, _ = run_svi(vae, data, topics, plot=True, results_dir=model_config['results_dir'], name=data_name, record=True)
+        print('finished inference')
+        print(pyro.get_param_store().get_param('z_loc'))
+        print(pyro.get_param_store().get_param('z_scale'))
     posterior = inference.run(data, topics)
     end = time.time()
     save_speed_to_csv(model_config, end - start)
@@ -153,7 +156,7 @@ def get_elbo_vs_m(vae, dataset_names, datasets, results_dir, distances):
                 pyro.clear_param_store()
 
 
-def get_elbo_csv(vae, vae_single, results_dir, restart=True, posterior_predictive=False):
+def get_elbo_csv(vae, vae_single, results_dir, restart=True, posterior_predictive=False, warmstart=False):
     dataset_names = ['train', 'valid', 'test']
     train_topics = np.load(os.path.join(results_dir, 'train_topics.npy'))[:10]
     valid_topics = np.load(os.path.join(results_dir, 'valid_topics.npy'))
@@ -209,7 +212,16 @@ def get_elbo_csv(vae, vae_single, results_dir, restart=True, posterior_predictiv
                 print('Standard VAE inference time: {}'.format(end - start))
 
                 start = time.time()
-                svi, svi_loss = run_svi(vae, data_i, topics_i, plot=True, results_dir=results_dir, name=i)
+                if warmstart:
+                    # svi, svi_loss = run_svi(vae_single, data_i, topics_i, plot=True, results_dir=results_dir, name=i, record=True, warmstart=True)
+                    svi_warmstart = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=600, num_samples=100)
+                    z_loc, z_scale = vae_single.encoder.forward(data_i, topics_i)
+                    pyro.clear_param_store()
+                    pyro.get_param_store().get_param('z_loc', init_tensor=z_loc.detach())
+                    pyro.get_param_store().get_param('z_scale', init_tensor=z_scale.detach())
+                    posterior = svi_warmstart.run(data_i, topics_i)
+                else:
+                    svi, svi_loss = run_svi(vae, data_i, topics_i, plot=True, results_dir=results_dir, name=i, record=True)
                 if posterior_predictive:
                     svi_posterior = svi.run(data_i, topics_i)
                     svi_loss = get_posterior_predictive_density(data_i, topics_i, vae.model, svi_posterior)
@@ -225,7 +237,12 @@ def loss_converged(losses, window=30):
     return (len(losses) > 100) and ((last_three_avg - prev_three_avg) <  -prev_three_avg * .000001)
 
 
-def run_svi(vae, data, topics, plot=False, results_dir=None, name='', record=False):
+def run_svi(vae, data, topics, plot=False, results_dir=None, name='', record=False, warmstart=False):
+    pyro.clear_param_store()
+    if warmstart:
+        z_loc, z_scale = vae.encoder.forward(data, topics)
+        pyro.get_param_store().get_param('z_loc', init_tensor=z_loc.detach())
+        pyro.get_param_store().get_param('z_scale', init_tensor=z_scale.detach())
     num_steps = 100000
     loss = np.nan
     lrs = [.1, .05, .01, .05]
@@ -235,6 +252,8 @@ def run_svi(vae, data, topics, plot=False, results_dir=None, name='', record=Fal
     svi_losses = []
     svi_elbo = Trace_ELBO()
     svis = []
+    z_locs = []
+    z_scales = []
     while torch_isnan(loss) and n_runs < 4:
         print(n_runs)
         pyro_scheduler = StepLR(
@@ -246,7 +265,6 @@ def run_svi(vae, data, topics, plot=False, results_dir=None, name='', record=Fal
         svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=svi_elbo, num_samples=100)
         losses = []
         times = []
-        # smoothed = []
         start = time.time()
         for _ in range(num_steps):
             with poutine.block():
@@ -258,11 +276,21 @@ def run_svi(vae, data, topics, plot=False, results_dir=None, name='', record=Fal
                 times.append(end - start)
                 if loss_converged(losses):
                     print('loss_converged')
+                    z_loc_to_save = pyro.get_param_store().get_param('z_loc')
+                    z_scale_to_save = pyro.get_param_store().get_param('z_scale')
                     pyro.clear_param_store()
+                    if warmstart:
+                        pyro.get_param_store().get_param('z_loc', init_tensor=z_loc.detach())
+                        pyro.get_param_store().get_param('z_scale', init_tensor=z_scale.detach())
                     break
             else:
                 print('loss hit nan')
+                z_loc_to_save = pyro.get_param_store().get_param('z_loc')
+                z_scale_to_save = pyro.get_param_store().get_param('z_scale')
                 pyro.clear_param_store()
+                if warmstart:
+                    pyro.get_param_store().get_param('z_loc', init_tensor=z_loc.detach())
+                    pyro.get_param_store().get_param('z_scale', init_tensor=z_scale.detach())
                 break
         if plot:
             print('plotting for : ', n_runs)
@@ -276,15 +304,22 @@ def run_svi(vae, data, topics, plot=False, results_dir=None, name='', record=Fal
             with open(os.path.join(results_dir, 'svi_loss_curve.csv'), 'a') as f:
                 csv_writer = csv.writer(f)
                 for i, (loss_to_record, runtime) in enumerate(zip(losses, times)):
+                    print('writing row: {},{},{},{}'.format(name, i, loss_to_record, runtime, n_runs))
                     csv_writer.writerow([name, i, loss_to_record, runtime, n_runs])
         print('updating n_runs')
         n_runs += 1
         svi_losses.append(svi_loss)
         svis.append(svi)
+        z_locs.append(z_loc_to_save)
+        z_scales.append(z_scale_to_save)
     best_idx = svi_losses.index(max(svi_losses))
     svi_loss = svi_losses[best_idx]
     svi = svis[best_idx]
+    best_zloc = z_locs[best_idx]
+    best_zscale = z_scales[best_idx]
     # no more steps after we leave this function
+    pyro.get_param_store().get_param('z_loc', init_tensor=best_zloc)
+    pyro.get_param_store().get_param('z_scale', init_tensor=best_zscale)
     svi.num_steps = 0
     return svi, svi_loss
 
