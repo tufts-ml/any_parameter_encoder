@@ -747,12 +747,12 @@ class Encoder(nn.Module):
             z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
         elif self.architecture == 'template':
             x_and_topics = torch.einsum("ab,abc->ac", (x, torch.transpose(topics, 1, 2)))
-            x_and_topics = torch.div(x_and_topics, torch.sum(x_and_topics, axis=1).reshape((-1, 1)))
+            x_and_topics = torch.div(x_and_topics, torch.sum(x_and_topics, dim=1).reshape((-1, 1)))
             z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
             z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
         elif self.architecture == 'template_plus_topics':
             x_and_topics = torch.einsum("ab,abc->ac", (x, torch.transpose(topics, 1, 2)))
-            x_and_topics = torch.div(x_and_topics, torch.sum(x_and_topics, axis=1).reshape((-1, 1)))
+            x_and_topics = torch.div(x_and_topics, torch.sum(x_and_topics, dim=1).reshape((-1, 1)))
             x_and_topics = torch.cat((x_and_topics, topics.reshape(-1, self.n_topics * self.vocab_size)), dim=1)
             z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
             z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
