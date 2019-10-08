@@ -296,15 +296,19 @@ class VAE_tf(object):
                 layer = tf.contrib.layers.batch_norm(self.transfer_fct(
                     tf.add(tf.matmul(x_and_topics, weights["h1"]), biases["b1"])))
             elif self.architecture == "template":
-                layer = tf.einsum("ab,abc->ac", self.x, tf.transpose(self.topics, perm=[0, 2, 1]))
-                # template_output = tf.einsum("ab,abc->ac", self.x, tf.transpose(self.topics, perm=[0, 2, 1]))
-                # layer = tf.math.divide(template_output, tf.reshape(tf.reduce_sum(template_output, axis=1), (-1, 1)))
+                # layer = tf.einsum("ab,abc->ac", self.x, tf.transpose(self.topics, perm=[0, 2, 1]))
+
+                template_output = tf.einsum("ab,abc->ac", self.x, tf.transpose(self.topics, perm=[0, 2, 1]))
+                layer = tf.math.divide(template_output, tf.reshape(tf.reduce_sum(template_output, axis=1), (-1, 1)))
+
                 layer = tf.contrib.layers.batch_norm(self.transfer_fct(
                     tf.add(tf.matmul(layer, weights["h1"]), biases["b1"])))
             elif self.architecture == "template_plus_topics":
-                layer = tf.einsum("ab,abc->ac", self.x, tf.transpose(self.topics, perm=[0, 2, 1]))
-                # template_output = tf.einsum("ab,abc->ac", self.x, tf.transpose(self.topics, perm=[0, 2, 1]))
-                # layer = tf.math.divide(template_output, tf.reshape(tf.reduce_sum(template_output, axis=1), (-1, 1)))
+                # layer = tf.einsum("ab,abc->ac", self.x, tf.transpose(self.topics, perm=[0, 2, 1]))
+
+                template_output = tf.einsum("ab,abc->ac", self.x, tf.transpose(self.topics, perm=[0, 2, 1]))
+                layer = tf.math.divide(template_output, tf.reshape(tf.reduce_sum(template_output, axis=1), (-1, 1)))
+
                 layer = tf.concat([layer, tf.reshape(self.topics, (-1, self.n_topics * self.vocab_size))], axis=1)
                 layer = tf.contrib.layers.batch_norm(self.transfer_fct(
                     tf.add(tf.matmul(layer, weights["h1"]), biases["b1"])))
@@ -743,10 +747,12 @@ class Encoder(nn.Module):
             z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
         elif self.architecture == 'template':
             x_and_topics = torch.einsum("ab,abc->ac", (x, torch.transpose(topics, 1, 2)))
+            x_and_topics = torch.divide(x_and_topics, torch.sum(x_and_topics, axis=1).reshape((-1, 1)))
             z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
             z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
         elif self.architecture == 'template_plus_topics':
             x_and_topics = torch.einsum("ab,abc->ac", (x, torch.transpose(topics, 1, 2)))
+            x_and_topics = torch.divide(x_and_topics, torch.sum(x_and_topics, axis=1).reshape((-1, 1)))
             x_and_topics = torch.cat((x_and_topics, topics.reshape(-1, self.n_topics * self.vocab_size)), dim=1)
             z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
             z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
