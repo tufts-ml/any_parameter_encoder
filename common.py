@@ -68,6 +68,10 @@ def run_posterior_evaluation(inference, inference_name, data, data_name, topics,
         print('finished inference')
         print(pyro.get_param_store().get_param('z_loc'))
         print(pyro.get_param_store().get_param('z_scale'))
+    if 'vae' in inference_name:
+        z_loc, z_scale = vae.encoder.forward(data, topics)
+        print(z_loc)
+        print(z_scale)
     posterior = inference.run(data, topics)
     end = time.time()
     save_speed_to_csv(model_config, end - start)
@@ -156,20 +160,25 @@ def get_elbo_vs_m(vae, dataset_names, datasets, results_dir, distances):
                 pyro.clear_param_store()
 
 
-def get_elbo_csv(vae, vae_single, results_dir, restart=True, posterior_predictive=False, warmstart=False):
-    dataset_names = ['train', 'valid', 'test']
-    train_topics = np.load(os.path.join(results_dir, 'train_topics.npy'))[:10]
-    valid_topics = np.load(os.path.join(results_dir, 'valid_topics.npy'))
-    test_topics = np.load(os.path.join(results_dir, 'test_topics.npy'))
-    documents = np.load(os.path.join(results_dir, 'documents.npy'))
-    num_topics_by_data = {}
-    num_topics_by_data['train'] = len(train_topics)
-    num_topics_by_data['valid'] = len(valid_topics)
-    num_topics_by_data['test'] = len(test_topics)
-    train = list(itertools.product(train_topics, documents))
-    valid = list(itertools.product(valid_topics, documents))
-    test = list(itertools.product(test_topics, documents))
-    datasets = [train, valid, test]
+def get_elbo_csv(vae, vae_single, results_dir, restart=True, posterior_predictive=False, warmstart=False, test_only=False):
+    if test_only:
+        dataset_names = ['test']
+        test_topics = np.load(os.path.join(results_dir, 'test_topics.npy'))
+        documents = np.load(os.path.join(results_dir, 'documents.npy'))[:300]
+        num_topics_by_data = {}
+        num_topics_by_data['test'] = len(test_topics)
+        topics = [test_topics]
+    else:    
+        dataset_names = ['train', 'valid', 'test']
+        train_topics = np.load(os.path.join(results_dir, 'train_topics.npy'))[:10]
+        valid_topics = np.load(os.path.join(results_dir, 'valid_topics.npy'))
+        test_topics = np.load(os.path.join(results_dir, 'test_topics.npy'))
+        documents = np.load(os.path.join(results_dir, 'documents.npy'))
+        num_topics_by_data = {}
+        num_topics_by_data['train'] = len(train_topics)
+        num_topics_by_data['valid'] = len(valid_topics)
+        num_topics_by_data['test'] = len(test_topics)
+        topics = [train_topics, valid_topics, test_topics]
     num_docs = len(documents)
     if posterior_predictive:
         csv_file = 'posterior_predictives.csv'
@@ -178,7 +187,7 @@ def get_elbo_csv(vae, vae_single, results_dir, restart=True, posterior_predictiv
     with open(os.path.join(results_dir, csv_file), 'w') as f:
         writer = csv.writer(f, delimiter=',')
         writer.writerow(['Dataset', 'Topic index', 'SVI ELBO', 'Decoder-aware encoder ELBO', 'Standard encoder ELBO'])
-        for data_name, topics in zip(dataset_names, [train_topics, valid_topics, test_topics]):
+        for data_name, topics in zip(dataset_names, topics):
             data = torch.from_numpy(documents.astype(np.float32))
             topics = torch.from_numpy(topics.astype(np.float32))
             pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .1}, 'step_size': 10000, 'gamma': 0.95})
@@ -221,7 +230,7 @@ def get_elbo_csv(vae, vae_single, results_dir, restart=True, posterior_predictiv
                     pyro.get_param_store().get_param('z_scale', init_tensor=z_scale.detach())
                     posterior = svi_warmstart.run(data_i, topics_i)
                 else:
-                    svi, svi_loss = run_svi(vae, data_i, topics_i, plot=True, results_dir=results_dir, name=i, record=True)
+                    svi, svi_loss = run_svi(vae, data_i, topics_i, plot=True, results_dir=results_dir, name=i, record=True, restart=False)
                 if posterior_predictive:
                     svi_posterior = svi.run(data_i, topics_i)
                     svi_loss = get_posterior_predictive_density(data_i, topics_i, vae.model, svi_posterior)
@@ -237,7 +246,7 @@ def loss_converged(losses, window=30):
     return (len(losses) > 100) and ((last_three_avg - prev_three_avg) <  -prev_three_avg * .000001)
 
 
-def run_svi(vae, data, topics, plot=False, results_dir=None, name='', record=False, warmstart=False):
+def run_svi(vae, data, topics, plot=False, results_dir=None, name='', record=False, warmstart=False, restart=True):
     pyro.clear_param_store()
     if warmstart:
         z_loc, z_scale = vae.encoder.forward(data, topics)
@@ -245,16 +254,22 @@ def run_svi(vae, data, topics, plot=False, results_dir=None, name='', record=Fal
         pyro.get_param_store().get_param('z_scale', init_tensor=z_scale.detach())
     num_steps = 100000
     loss = np.nan
-    lrs = [.1, .05, .01, .05]
-    step_sizes = [10000, 10000, 5000, 5000]
-    gammas = [.95, .7, .5, .5]
+    if restart:
+        lrs = [.1, .05, .01, .05]
+        step_sizes = [10000, 10000, 5000, 5000]
+        gammas = [.95, .7, .5, .5]
+    else:
+        lrs = [.05]
+        step_sizes = [10000]
+        gammas = [.7]
+    total_runs = len(lrs)
     n_runs = 0
     svi_losses = []
     svi_elbo = Trace_ELBO()
     svis = []
     z_locs = []
     z_scales = []
-    while torch_isnan(loss) and n_runs < 4:
+    while torch_isnan(loss) and n_runs < total_runs:
         print(n_runs)
         pyro_scheduler = StepLR(
             {'optimizer': torch.optim.Adam,
@@ -304,9 +319,7 @@ def run_svi(vae, data, topics, plot=False, results_dir=None, name='', record=Fal
             with open(os.path.join(results_dir, 'svi_loss_curve.csv'), 'a') as f:
                 csv_writer = csv.writer(f)
                 for i, (loss_to_record, runtime) in enumerate(zip(losses, times)):
-                    print('writing row: {},{},{},{}'.format(name, i, loss_to_record, runtime, n_runs))
                     csv_writer.writerow([name, i, loss_to_record, runtime, n_runs])
-        print('updating n_runs')
         n_runs += 1
         svi_losses.append(svi_loss)
         svis.append(svi)
