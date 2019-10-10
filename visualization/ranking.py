@@ -15,6 +15,39 @@ def plot_svi_vs_vae_elbo(results_dir):
     plt.savefig(os.path.join(results_dir, 'elbo_ranking_single.png'))
 
 
+def plot_svi_vs_vae_elbo_v2(toy_results_dir, real_results_dir):
+    df_toy = pd.read_csv(os.path.join(toy_results_dir, 'posterior_predictives.csv'))
+    df_toy = df_toy[df_toy['Dataset']=='test']
+    df_real = pd.read_csv(os.path.join(real_results_dir, 'posterior_predictives.csv'))
+    min_x = min(df_toy['SVI ELBO'].min(), df_real['SVI ELBO'].min())
+    max_x = max(df_toy['SVI ELBO'].max(), df_real['SVI ELBO'].max())
+    fig, axes = plt.subplots(1, 2, sharex=True, sharey=True, figsize=(8, 4), tight_layout=True)
+
+    axes[0].scatter(x=df_toy['Standard encoder ELBO'], y=df_toy['SVI ELBO'], color='red', label='Standard encoder')
+    axes[0].scatter(x=df_toy['Decoder-aware encoder ELBO'], y=df_toy['SVI ELBO'], color='blue', label='Decoder-aware encoder')
+    x = np.linspace(df_toy['SVI ELBO'].min(), df_toy['SVI ELBO'].max(), 100)
+    axes[0].plot(x, x, '--')
+    axes[0].set_title('Toy')
+
+    axes[1].scatter(x=df_real['Standard encoder ELBO'], y=df_real['SVI ELBO'], color='red', label='Standard encoder')
+    axes[1].scatter(x=df_real['Decoder-aware encoder ELBO'], y=df_real['SVI ELBO'], color='blue', label='Decoder-aware encoder')
+    x = np.linspace(df_real['SVI ELBO'].min(), df_real['SVI ELBO'].max(), 100)
+    axes[1].set_title('Real')
+    axes[1].plot(x, x, '--')
+    # plt.axis([min_elbo, max_elbo, min_elbo, max_elbo])
+    plt.ticklabel_format(style='sci', axis='both', scilimits=(0,0))
+    xlabel = 'Encoder likelihood'
+    ylabel = 'VI likelihood'
+    axes[0].set_xlabel(xlabel)
+    axes[1].set_xlabel(xlabel)
+    # fig.text(0.55, -.005, xlabel, ha='center')
+    axes[0].set_ylabel(ylabel)
+    axes[1].set_ylabel(ylabel)
+    plt.legend()
+    final_filename = 'posterior_predictive_ranking.pdf'
+    plt.savefig(final_filename, bbox_inches="tight")
+
+
 def plot_svi_vs_vae_elbo_v1(results_dir, posterior_predictive=False):
     if posterior_predictive:
         df = pd.read_csv(os.path.join(results_dir, 'posterior_predictives.csv'))
@@ -61,4 +94,4 @@ def plot_svi_vs_vae_elbo_v1(results_dir, posterior_predictive=False):
 
 
 if __name__ == "__main__":
-    plot_svi_vs_vae_elbo_v1('experiments/final/r6_test1')
+    plot_svi_vs_vae_elbo_v2('generalize3', 'generalize3')
