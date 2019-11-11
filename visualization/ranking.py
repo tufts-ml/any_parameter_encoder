@@ -15,27 +15,31 @@ def plot_svi_vs_vae_elbo(results_dir):
     plt.savefig(os.path.join(results_dir, 'elbo_ranking_single.png'))
 
 
-def plot_svi_vs_vae_elbo_v2(toy_results_dir, real_results_dir):
-    df_toy = pd.read_csv(os.path.join(toy_results_dir, 'posterior_predictives.csv'))
+def plot_svi_vs_vae_elbo_v2(toy_results_dir, real_results_dir, posterior_predictive=True):
+    if posterior_predictive:
+        filename = 'posterior_predictives.csv'
+    else:
+        filename = 'elbos.csv'
+    df_toy = pd.read_csv(os.path.join(toy_results_dir, filename))
     df_toy = df_toy[df_toy['Dataset']=='test']
-    df_real = pd.read_csv(os.path.join(real_results_dir, 'posterior_predictives.csv'))
+    df_real = pd.read_csv(os.path.join(real_results_dir, filename))
     min_x = min(df_toy['SVI ELBO'].min(), df_real['SVI ELBO'].min())
     max_x = max(df_toy['SVI ELBO'].max(), df_real['SVI ELBO'].max())
-    fig, axes = plt.subplots(1, 2, sharex=True, sharey=True, figsize=(8, 4), tight_layout=True)
+    fig, axes = plt.subplots(1, 2, sharex=False, sharey=False, figsize=(11, 4), tight_layout=True)
 
     axes[0].scatter(x=df_toy['Standard encoder ELBO'], y=df_toy['SVI ELBO'], color='red', label='Standard encoder')
-    axes[0].scatter(x=df_toy['Decoder-aware encoder ELBO'], y=df_toy['SVI ELBO'], color='blue', label='Decoder-aware encoder')
+    axes[0].scatter(x=df_toy['Decoder-aware encoder ELBO'], y=df_toy['SVI ELBO'], label='Any-parameter encoder')
     x = np.linspace(df_toy['SVI ELBO'].min(), df_toy['SVI ELBO'].max(), 100)
-    axes[0].plot(x, x, '--')
-    axes[0].set_title('Toy')
+    axes[0].plot(x, x, '--', label='One-to-one performance', color='grey', alpha=.5)
+    axes[0].set_title('Synthetic Data')
 
     axes[1].scatter(x=df_real['Standard encoder ELBO'], y=df_real['SVI ELBO'], color='red', label='Standard encoder')
-    axes[1].scatter(x=df_real['Decoder-aware encoder ELBO'], y=df_real['SVI ELBO'], color='blue', label='Decoder-aware encoder')
+    axes[1].scatter(x=df_real['Decoder-aware encoder ELBO'], y=df_real['SVI ELBO'], label='Any-parameter encoder')
     x = np.linspace(df_real['SVI ELBO'].min(), df_real['SVI ELBO'].max(), 100)
-    axes[1].set_title('Real')
-    axes[1].plot(x, x, '--')
-    # plt.axis([min_elbo, max_elbo, min_elbo, max_elbo])
-    plt.ticklabel_format(style='sci', axis='both', scilimits=(0,0))
+    axes[1].set_title('Real Data')
+    axes[1].plot(x, x, '--', label='One-to-one performance', color='grey', alpha=.5)
+    axes[0].ticklabel_format(style='sci', axis='both', scilimits=(0,0))
+    axes[1].ticklabel_format(style='sci', axis='both', scilimits=(0,0))
     xlabel = 'Encoder likelihood'
     ylabel = 'VI likelihood'
     axes[0].set_xlabel(xlabel)
@@ -43,8 +47,46 @@ def plot_svi_vs_vae_elbo_v2(toy_results_dir, real_results_dir):
     # fig.text(0.55, -.005, xlabel, ha='center')
     axes[0].set_ylabel(ylabel)
     axes[1].set_ylabel(ylabel)
-    plt.legend()
-    final_filename = 'posterior_predictive_ranking.pdf'
+    plt.legend(bbox_to_anchor=(1.1, 0.9))
+    if posterior_predictive:
+        final_filename = 'posterior_predictive_ranking.pdf'
+    else:
+        final_filename = 'elbo_ranking.pdf'
+    plt.savefig(final_filename, bbox_inches="tight")
+
+
+def plot_svi_vs_vae_elbo_v3(toy_results_dir, real_results_dir, posterior_predictive=True):
+    if posterior_predictive:
+        filename = 'posterior_predictives.csv'
+    else:
+        filename = 'elbos.csv'
+    df_toy = pd.read_csv(os.path.join(toy_results_dir, filename))
+    df_toy = df_toy[df_toy['Dataset']=='test']
+    df_real = pd.read_csv(os.path.join(real_results_dir, filename))
+    fig, axes = plt.subplots(1, 2, tight_layout=True, figsize=(8, 4), sharey=True)
+    for i, df in enumerate([df_toy, df_real]):
+        print(df["SVI ELBO"] - df['Decoder-aware encoder ELBO'])
+        ax = sns.distplot( df["SVI ELBO"] - df['Decoder-aware encoder ELBO'], color="red", label="APE", ax=axes[i], kde=True, hist=False, rug=True)
+        ax = sns.distplot( df["SVI ELBO"] - df['Standard encoder ELBO'], color="blue", label="Standard", ax=axes[i], kde=True, hist=False, rug=True)
+        if i == 0:
+            title = 'Synthetic Data'
+        else:
+            title = 'Product Reviews'
+        ax.set_title(title)
+        xlabel = 'Error from VI ELBO'
+        ax.set_xlabel(xlabel)
+        if i == 0:
+            ax.set_xlim([0, 200000])
+        else:
+            ax.set_xlim([0, 60000])
+        if i == 1:
+            ax.get_legend().remove()
+        plt.yticks([])
+    # plt.legend(bbox_to_anchor=(1.1, 0.9))
+    if posterior_predictive:
+        final_filename = 'posterior_predictive_ranking.pdf'
+    else:
+        final_filename = 'elbo_ranking.pdf'
     plt.savefig(final_filename, bbox_inches="tight")
 
 
@@ -72,7 +114,8 @@ def plot_svi_vs_vae_elbo_v1(results_dir, posterior_predictive=False):
     axes[1].set_title('Test')
     axes[1].plot(x, x, '--')
     # plt.axis([min_elbo, max_elbo, min_elbo, max_elbo])
-    plt.ticklabel_format(style='sci', axis='both', scilimits=(0,0))
+    axes[0].ticklabel_format(style='sci', axis='both', scilimits=(0,0))
+    axes[1].ticklabel_format(style='sci', axis='both', scilimits=(0,0))
     if posterior_predictive:
         xlabel = 'Posterior predictive log-likelihood (encoder)'
         ylabel = 'Posterior predictive log-likelihood (SVI)'
@@ -94,4 +137,8 @@ def plot_svi_vs_vae_elbo_v1(results_dir, posterior_predictive=False):
 
 
 if __name__ == "__main__":
-    plot_svi_vs_vae_elbo_v2('generalize3', 'generalize3')
+    sns.set_style("ticks") # or 'white' or 'whitegrid'
+    sns.set_context("notebook", font_scale=1.6) # magnify fonts by 2x
+    plt.rcParams["font.family"] = "serif"
+    plt.rcParams["font.serif"] = "Times New Roman"
+    plot_svi_vs_vae_elbo_v3('generalize3', 'experiments/amazon_uniform4', posterior_predictive=False)

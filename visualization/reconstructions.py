@@ -6,14 +6,14 @@ from utils import normalize
 from datasets.load import load_toy_bars
 
 
-def plot_side_by_side_docs(docs, name, ncols=10, intensity=10):
+def plot_side_by_side_docs(docs, name, ncols=10, intensity=10, **kwargs):
     """Plot recreated docs side by side (num_docs x num_methods)"""
     docs = np.asarray(docs, dtype=np.float32)
     # normalize each row so values are on a similar scale
     # (the first counts row is very different from the "recreated docs" rows)
     docs = normalize(docs, axis=1)
     vmax = np.mean(np.sum(docs, axis=1))
-    show_square_images(docs * intensity, vmin=0, vmax=vmax, ncols=ncols, max_n_images=100)
+    show_square_images(docs * intensity, vmin=0, vmax=vmax, ncols=ncols, max_n_images=100, **kwargs)
     plt.tight_layout()
     plt.savefig(name)
     plt.clf()
