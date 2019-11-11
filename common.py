@@ -258,6 +258,10 @@ def run_svi(vae, data, topics, plot=False, results_dir=None, name='', record=Fal
         lrs = [.1, .05, .01, .05]
         step_sizes = [10000, 10000, 5000, 5000]
         gammas = [.95, .7, .5, .5]
+    elif restart and warmstart:
+        lrs = [.005, .001, .0005, .0001]
+        step_sizes = [10000, 10000, 5000, 5000]
+        gammas = [.95, .7, .5, .5]
     else:
         lrs = [.05]
         step_sizes = [10000]
