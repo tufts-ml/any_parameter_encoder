@@ -37,12 +37,14 @@ from training.train_vae import find_lr
 
 parser = argparse.ArgumentParser(description='Results summary')
 parser.add_argument('results_dir', type=str, help='directory of results')
+parser.add_argument('architecture', type=str, help='directory of results')
 parser.add_argument('--find_lr', help='find best learning rate', action='store_true')
 parser.add_argument('--evaluate_svi_convergence', help='run SVI to see if it converges', action='store_true')
 parser.add_argument('--evaluate_svi_convergence_with_vae_init', help='run SVI to see if it converges', action='store_true')
 parser.add_argument('--train', help='train the model in tf', action='store_true')
 parser.add_argument('--train_single', help='train the model in tf', action='store_true')
 parser.add_argument('--evaluate', help='evaluate posteriors in pyro', action='store_true')
+parser.add_argument('--run_svi', help='run mcmc', action='store_true')
 parser.add_argument('--run_mcmc', help='run mcmc', action='store_true')
 parser.add_argument('--use_cached', help='run mcmc', action='store_true')
 parser.add_argument('--mdreviews', help='run mdreviews data', action='store_true')
@@ -104,11 +106,11 @@ model_config = {
     'results_file': results_file,
     'inference': 'vae',
     'model_name': 'lda_meta',
-    'architecture': 'template_plus_topics',
+    'architecture': args.architecture,
     'scale_trainable': True,
     'n_hidden_layers': 2,
     'n_hidden_units': 100,
-    'n_samples': 100,
+    'n_samples': 1,
     'decay_rate': .8,
     'decay_steps': 5000,
     'starting_learning_rate': .01,
@@ -118,10 +120,10 @@ model_config = {
     'use_adamw': False,
     'alpha': .01,
     'scale_type': 'mean',
-    'tot_epochs': 300,
+    'tot_epochs': 2,
     'batch_size': 200,
     'seed': 1,
-    'gpu_mem': .33,
+    'gpu_mem': .9,
 }
 
 model_config_single = model_config.copy()
@@ -359,72 +361,73 @@ if args.evaluate:
         del vae_svi_single
         get_memory_consumption()
 
-        logging.info('Starting SVI warmstart evaluation')
-        pyro.clear_param_store()
-        svi_warmstart = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=600, num_samples=100)
-        z_loc, z_scale = vae_single.encoder.forward(data, topics)
-        pyro.clear_param_store()
-        pyro.get_param_store().get_param('z_loc', init_tensor=z_loc.detach())
-        pyro.get_param_store().get_param('z_scale', init_tensor=z_scale.detach())
-        svi_warmstart = posterior_eval(svi_warmstart, 'svi_warmstart')
-        get_memory_consumption()
-        logging.info('Deleting svi_warmstart')
-        del svi_warmstart
-        get_memory_consumption()
-
-        logging.info('Starting SVI evaluation')
-        pyro.clear_param_store()
-        svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=600, num_samples=100)
-        svi = posterior_eval(svi, 'svi')
-        if args.run_mcmc:
-            logging.info('Starting MCMC evaluation')
-            nuts_kernel = NUTS(vae.model, adapt_step_size=True)
-            nuts_kernel.initial_trace = svi.exec_traces[-1]
-            get_memory_consumption()
-            logging.info('Deleting svi')
-            del svi
-            get_memory_consumption()
+        if args.run_svi:
+            logging.info('Starting SVI warmstart evaluation')
             pyro.clear_param_store()
-            mcmc = MCMC(nuts_kernel, num_samples=100, warmup_steps=100)
-            mcmc = posterior_eval(mcmc, 'mcmc')
-        else:
+            svi_warmstart = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=600, num_samples=100)
+            z_loc, z_scale = vae_single.encoder.forward(data, topics)
+            pyro.clear_param_store()
+            pyro.get_param_store().get_param('z_loc', init_tensor=z_loc.detach())
+            pyro.get_param_store().get_param('z_scale', init_tensor=z_scale.detach())
+            svi_warmstart = posterior_eval(svi_warmstart, 'svi_warmstart')
             get_memory_consumption()
-            logging.info('Deleting svi')
-            del svi
+            logging.info('Deleting svi_warmstart')
+            del svi_warmstart
             get_memory_consumption()
-        
-        logging.info('Starting SVI under time constraint')
-        start = time.time()
-        num_steps_to_try = [3, 4, 5]
-        lrs = [.1, .2, .5]
-        svi_stats = []
-        for num_steps in num_steps_to_try:
-            for lr in lrs:
-                pyro.clear_param_store()
-                start = time.time()
-                pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": lr}, 'step_size': 10000, 'gamma': 0.95})
-                svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=Trace_ELBO(), num_samples=100)
-                for _ in range(num_steps):
-                    loss = -svi.step(data, topics)
-                end = time.time()
-                posterior = svi.run(data, topics)
-                posterior_predictive = TracePredictive(vae.model, posterior, num_samples=10)
-                posterior_predictive_traces = posterior_predictive.run(data, topics)
-                # get the posterior predictive log likelihood
-                posterior_predictive_density = evaluate_log_predictive_density(posterior_predictive_traces)
-                posterior_predictive_density = float(posterior_predictive_density.detach().numpy())
-                svi_stats.append([data_name, num_steps, lr, end - start, posterior_predictive_density])
-                del svi
-        get_memory_consumption()
-        with open(os.path.join(results_dir, 'short_svi.csv'), 'a') as f:
-            csv_writer = csv.writer(f)
-            csv_writer.writerow(['data', 'num_steps', 'lr', 'time', 'posterior_predictive'])
-            for row in svi_stats:
-                csv_writer.writerow(row)
 
-        # save kl between MCMC and the others
-        # if args.run_mcmc:
-        #     save_kl_to_csv(results_dir, data_name)
+            logging.info('Starting SVI evaluation')
+            pyro.clear_param_store()
+            svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=600, num_samples=100)
+            svi = posterior_eval(svi, 'svi')
+            if args.run_mcmc:
+                logging.info('Starting MCMC evaluation')
+                nuts_kernel = NUTS(vae.model, adapt_step_size=True)
+                nuts_kernel.initial_trace = svi.exec_traces[-1]
+                get_memory_consumption()
+                logging.info('Deleting svi')
+                del svi
+                get_memory_consumption()
+                pyro.clear_param_store()
+                mcmc = MCMC(nuts_kernel, num_samples=100, warmup_steps=100)
+                mcmc = posterior_eval(mcmc, 'mcmc')
+            else:
+                get_memory_consumption()
+                logging.info('Deleting svi')
+                del svi
+                get_memory_consumption()
+            
+            logging.info('Starting SVI under time constraint')
+            start = time.time()
+            num_steps_to_try = [3, 4, 5]
+            lrs = [.1, .2, .5]
+            svi_stats = []
+            for num_steps in num_steps_to_try:
+                for lr in lrs:
+                    pyro.clear_param_store()
+                    start = time.time()
+                    pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": lr}, 'step_size': 10000, 'gamma': 0.95})
+                    svi = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=Trace_ELBO(), num_samples=100)
+                    for _ in range(num_steps):
+                        loss = -svi.step(data, topics)
+                    end = time.time()
+                    posterior = svi.run(data, topics)
+                    posterior_predictive = TracePredictive(vae.model, posterior, num_samples=10)
+                    posterior_predictive_traces = posterior_predictive.run(data, topics)
+                    # get the posterior predictive log likelihood
+                    posterior_predictive_density = evaluate_log_predictive_density(posterior_predictive_traces)
+                    posterior_predictive_density = float(posterior_predictive_density.detach().numpy())
+                    svi_stats.append([data_name, num_steps, lr, end - start, posterior_predictive_density])
+                    del svi
+            get_memory_consumption()
+            with open(os.path.join(results_dir, 'short_svi.csv'), 'a') as f:
+                csv_writer = csv.writer(f)
+                csv_writer.writerow(['data', 'num_steps', 'lr', 'time', 'posterior_predictive'])
+                for row in svi_stats:
+                    csv_writer.writerow(row)
+
+            # save kl between MCMC and the others
+            # if args.run_mcmc:
+            #     save_kl_to_csv(results_dir, data_name)
 
     # plot the posteriors
     logging.info('Plotting posteriors')
