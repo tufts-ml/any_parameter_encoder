@@ -120,7 +120,7 @@ class Decoder(nn.Module):
 
 
 class VAE(nn.Module):
-    def __init__(self, n_hidden_units=100, n_hidden_layers=2, model_name=None, results_dir=None,
+    def __init__(self, n_hidden_units=100, n_hidden_layers=2, results_dir=None,
                  alpha=.1, vocab_size=9, n_topics=4, use_cuda=False, architecture='naive', scale_type='sample', skip_connections=False, **kwargs):
         super(VAE, self).__init__()
 
@@ -163,7 +163,6 @@ class VAE(nn.Module):
         self.n_topics = n_topics
         self.n_hidden_layers = n_hidden_layers
         self.n_hidden_units = n_hidden_units
-        self.model_name = model_name
         self.results_dir = results_dir
         self.architecture = architecture
 

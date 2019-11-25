@@ -63,7 +63,7 @@ def create_toy_bar_docs(doc_file, n_topics, vocab_size):
 
 
 class ToyBarsDataset(data.Dataset):
-    def __init__(self, doc_file, num_models, n_topics, vocab_size, alpha, use_cuda):
+    def __init__(self, doc_file, num_models, n_topics, vocab_size, alpha, use_cuda, training=True):
         if not os.path.exists(doc_file):
             create_toy_bar_docs(doc_file, n_topics, vocab_size)
         self.documents = np.load(doc_file) 
@@ -73,6 +73,7 @@ class ToyBarsDataset(data.Dataset):
         self.vocab_size = vocab_size
         self.alpha = alpha
         self.use_cuda = use_cuda
+        self.training = training
 
     def __len__(self):
         """ Denotes the total number of samples """
@@ -80,6 +81,11 @@ class ToyBarsDataset(data.Dataset):
 
     def __getitem__(self, index):
         """ Generates one sample of data """
+        if self.training:
+            seed = index
+        else:
+            seed = index + self.num_models * self.num_docs
+        np.random.seed(seed)
         topics = np.random.dirichlet(np.ones(self.vocab_size), size=self.n_topics)
         document = self.documents[index % self.num_docs]
 
