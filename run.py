@@ -3,11 +3,17 @@ import torch
 from torch.utils import data
 from pyro.optim import ExponentialLR
 
-from pyro.infer import SVI, Trace_ELBO
+from pyro.infer import SVI, Trace_ELBO, NUTS, MCMC
 
 from dataset import ToyBarsDataset
 from model import VAE
 from train import train
+
+from multiprocessing import set_start_method
+try:
+    set_start_method('spawn')
+except RuntimeError:
+    pass
 
 parser = argparse.ArgumentParser(description='Results summary')
 parser.add_argument('results_dir', type=str, help='directory of results')
@@ -15,6 +21,7 @@ parser.add_argument('architecture', type=str, help='encoder architecture')
 args = parser.parse_args()
 
 use_cuda = torch.cuda.is_available()
+print(use_cuda)
 
 model_config = {
     'n_hidden_units': 100,
@@ -58,3 +65,11 @@ if __name__ == "__main__":
     training_generator = data.DataLoader(training_set, **loader_config)
     validation_generator = data.DataLoader(validation_set, **loader_config)
     vae_svi = train(vae_svi, training_generator, validation_generator, **train_config)
+
+    svi = SVI(vae_svi.model, vae.mean_field_guide, pyro_scheduler, loss=Trace_ELBO(), num_samples=100)
+    nuts_kernel = NUTS(vae.model, adapt_step_size=True)
+    mcmc = MCMC(nuts_kernel, num_samples=100, warmup_steps=100)
+
+    evaluate_likelihood(vae_svi)
+    evaluate_likelihood(svi)
+    evaluate_likelihood(mcmc)
