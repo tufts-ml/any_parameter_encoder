@@ -3,7 +3,8 @@ import torch
 from torch.utils import data
 from pyro.optim import ExponentialLR
 
-from pyro.infer import SVI, Trace_ELBO, NUTS, MCMC
+from pyro.infer import SVI, Trace_ELBO
+from pyro.infer.mcmc import MCMC, NUTS
 
 from dataset import ToyBarsDataset
 from model import VAE
