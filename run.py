@@ -11,7 +11,7 @@ from model import VAE
 from train import train
 
 import wandb
-wandb.init(sync_tensorboard=True, project="any_parameter_encoder")
+wandb.init(sync_tensorboard=True, project="any_parameter_encoder", entity="lily")
 
 from multiprocessing import set_start_method
 try:
