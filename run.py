@@ -43,7 +43,6 @@ model_config = {
 
 data_config = {
     'doc_file': 'data/toy_bar_docs.npy',
-    'num_models': 50000,
     'n_topics': 20,
     'vocab_size': 100,
     'alpha': .1,
@@ -53,7 +52,7 @@ data_config = {
 loader_config = {
     'batch_size': 200,
     'shuffle': True,
-    'num_workers': 16}        
+    'num_workers': 6}
 
 train_config = {
     'epochs': 2,
@@ -69,8 +68,8 @@ if __name__ == "__main__":
 
     pyro_scheduler = ExponentialLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, 'gamma': 0.95})
     vae_svi = SVI(vae.model, vae.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_samples=100)
-    training_set = ToyBarsDataset(training=True, **data_config)
-    validation_set = ToyBarsDataset(training=False, **data_config)
+    training_set = ToyBarsDataset(training=True, num_models=50000, **data_config)
+    validation_set = ToyBarsDataset(training=False, num_models=500, **data_config)
     training_generator = data.DataLoader(training_set, **loader_config)
     validation_generator = data.DataLoader(validation_set, **loader_config)
     vae_svi = train(vae_svi, training_generator, validation_generator, **train_config)

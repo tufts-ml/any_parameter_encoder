@@ -33,7 +33,7 @@ def train(vae_svi, training_generator, validation_generator, epochs=1, use_cuda=
                         # Transfer to GPU
                         if use_cuda:
                             document, topics = document.to(device), topics.to(device)
-                        val_loss += vae_svi.evaluate(document, topics)
+                        val_loss += vae_svi.evaluate_loss(document, topics)
                         num_val_batches += 1
                 print("Step {n}: {loss}".format(n=step, loss=val_loss / num_val_batches))
                 writer.add_scalar('validation loss', val_loss / num_val_batches, step)
