@@ -150,15 +150,17 @@ class VAE(nn.Module):
             # calling cuda() here will put all the parameters of
             # the encoder and decoder networks into gpu memory
             self.cuda()
+            device = 'cuda:0'
+        else:
+            device = 'cpu'
         self.use_cuda = use_cuda
         self.n_topics = n_topics
         alpha_vec = alpha * np.ones((1, n_topics)).astype(np.float32)
-        self.z_loc = torch.from_numpy((np.log(alpha_vec).T - np.mean(np.log(alpha_vec), 1)).T)
+        self.z_loc = torch.from_numpy((np.log(alpha_vec).T - np.mean(np.log(alpha_vec), 1)).T).float().to(device)
         self.z_scale = torch.from_numpy((
             ((1.0 / alpha_vec) * (1 - (2.0 / n_topics))).T +
             (1.0 / (n_topics * n_topics)) * np.sum(1.0 / alpha_vec, 1)
-        ).T)
-        self.alpha = alpha * np.ones(n_topics).astype(np.float32)
+        ).T).float().to(device)
 
         self.n_topics = n_topics
         self.n_hidden_layers = n_hidden_layers
