@@ -38,6 +38,8 @@ from training.train_vae import find_lr
 parser = argparse.ArgumentParser(description='Results summary')
 parser.add_argument('results_dir', type=str, help='directory of results')
 parser.add_argument('architecture', type=str, help='directory of results')
+parser.add_argument('n_hidden_layers', type=int, help='directory of results')
+parser.add_argument('n_hidden_units', type=int, help='directory of results')
 parser.add_argument('--find_lr', help='find best learning rate', action='store_true')
 parser.add_argument('--evaluate_svi_convergence', help='run SVI to see if it converges', action='store_true')
 parser.add_argument('--evaluate_svi_convergence_with_vae_init', help='run SVI to see if it converges', action='store_true')
@@ -110,8 +112,8 @@ model_config = {
     'model_name': 'lda_meta',
     'architecture': args.architecture,
     'scale_trainable': True,
-    'n_hidden_layers': 0,
-    'n_hidden_units': 100,
+    'n_hidden_layers': args.n_hidden_layers,
+    'n_hidden_units': args.n_hidden_units,
     'n_samples': 1,
     'decay_rate': .8,
     'decay_steps': 5000,
