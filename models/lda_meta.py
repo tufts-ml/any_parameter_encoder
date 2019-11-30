@@ -140,6 +140,8 @@ class VAE_tf(object):
         else:
             self.global_step = tf.Variable(0, trainable=False, name='global_step')
         self.summaries = []
+        if self.architecture == "template_baseline" and self.n_hidden_layers != 0:
+            raise ValueError("Baseline must have 0 layers")
         """----------------Inputs----------------"""
         # def generate_batches(data_name):
         #     topics = np.load(os.path.join(results_dir, '{}_topics.npy'.format(data_name)))
@@ -233,16 +235,24 @@ class VAE_tf(object):
         # initializer = tf.contrib.layers.variance_scaling_initializer(2.0)
         initializer = tf.keras.initializers.he_normal(seed=0)
         with tf.variable_scope("recognition_network"):
-            all_weights["weights_recog"] = {
-                "out_mean": tf.get_variable("out_mean", [self.n_hidden_units, self.n_topics], initializer=initializer),
-                "out_log_sigma": tf.get_variable("out_log_sigma", [self.n_hidden_units, self.n_topics], initializer=initializer),
-            }
+            if self.architecture == "template_baseline":
+                all_weights["weights_recog"] = {
+                    "out_log_sigma": tf.get_variable("out_log_sigma", [self.n_topics, self.n_topics], initializer=initializer),
+                }
+                all_weights["biases_recog"] = {
+                    "out_log_sigma": tf.get_variable("out_log_sigma_b", [self.n_topics], initializer=tf.zeros_initializer()),
+                }
+            else:
+                all_weights["weights_recog"] = {
+                    "out_mean": tf.get_variable("out_mean", [self.n_hidden_units, self.n_topics], initializer=initializer),
+                    "out_log_sigma": tf.get_variable("out_log_sigma", [self.n_hidden_units, self.n_topics], initializer=initializer),
+                }
 
-            all_weights["biases_recog"] = {
-                "b1": tf.get_variable("b1", [self.n_hidden_units], initializer=tf.zeros_initializer()),
-                "out_mean": tf.get_variable("out_mean_b", [self.n_topics], initializer=tf.zeros_initializer()),
-                "out_log_sigma": tf.get_variable("out_log_sigma_b", [self.n_topics], initializer=tf.zeros_initializer()),
-            }
+                all_weights["biases_recog"] = {
+                    "b1": tf.get_variable("b1", [self.n_hidden_units], initializer=tf.zeros_initializer()),
+                    "out_mean": tf.get_variable("out_mean_b", [self.n_topics], initializer=tf.zeros_initializer()),
+                    "out_log_sigma": tf.get_variable("out_log_sigma_b", [self.n_topics], initializer=tf.zeros_initializer()),
+                }
 
             # add more layers
             if self.n_hidden_layers > 1:
@@ -280,6 +290,8 @@ class VAE_tf(object):
                     "b1_mu": tf.get_variable("b1_mu", [self.n_hidden_units], initializer=tf.zeros_initializer())}, initializer=initializer)
                 all_weights["biases_recog"].update({
                     "b1_sigma": tf.get_variable("b1_sigma", [self.n_hidden_units], initializer=tf.zeros_initializer())}, initializer=initializer)
+            elif self.architecture == "template_baseline":
+                pass
             else:
                 raise ValueError("architecture must be either 'naive' or 'template'")
 
@@ -295,14 +307,14 @@ class VAE_tf(object):
                     ], axis=1), (-1, (1 + self.n_topics) * self.vocab_size))
                 layer = tf.contrib.layers.batch_norm(self.transfer_fct(
                     tf.add(tf.matmul(x_and_topics, weights["h1"]), biases["b1"])))
-            elif self.architecture == "template":
+            elif self.architecture == "template" or self.architecture == "template_baseline":
                 # layer = tf.einsum("ab,abc->ac", self.x, tf.transpose(self.topics, perm=[0, 2, 1]))
 
                 template_output = tf.einsum("ab,abc->ac", self.x, tf.transpose(self.topics, perm=[0, 2, 1]))
                 layer = tf.math.divide(template_output, tf.reshape(tf.reduce_sum(template_output, axis=1), (-1, 1)))
-
-                layer = tf.contrib.layers.batch_norm(self.transfer_fct(
-                    tf.add(tf.matmul(layer, weights["h1"]), biases["b1"])))
+                if self.architecture == "template":
+                    layer = tf.contrib.layers.batch_norm(self.transfer_fct(
+                        tf.add(tf.matmul(layer, weights["h1"]), biases["b1"])))
             elif self.architecture == "template_plus_topics":
                 # layer = tf.einsum("ab,abc->ac", self.x, tf.transpose(self.topics, perm=[0, 2, 1]))
 
@@ -326,21 +338,22 @@ class VAE_tf(object):
             else:
                 raise ValueError("architecture must be either 'naive' or 'template'")
 
-            for i in range(2, self.n_hidden_layers + 1):
-                if self.skip_connections and i % 2 == 0:
-                    layer = layer + self.transfer_fct(
-                        tf.add(tf.matmul(layer, weights["h{}".format(i)]),
-                            biases["b{}".format(i)])
-                    )
-                else:
-                    layer = self.transfer_fct(
-                        tf.add(tf.matmul(layer, weights["h{}".format(i)]),
-                            biases["b{}".format(i)])
-                    )
-                if self.use_dropout:
-                    layer = tf.contrib.layers.batch_norm(tf.nn.dropout(layer, self.keep_prob))
-                else:
-                    layer = tf.contrib.layers.batch_norm(layer)
+            if self.architecture != "template_baseline":
+                for i in range(2, self.n_hidden_layers + 1):
+                    if self.skip_connections and i % 2 == 0:
+                        layer = layer + self.transfer_fct(
+                            tf.add(tf.matmul(layer, weights["h{}".format(i)]),
+                                biases["b{}".format(i)])
+                        )
+                    else:
+                        layer = self.transfer_fct(
+                            tf.add(tf.matmul(layer, weights["h{}".format(i)]),
+                                biases["b{}".format(i)])
+                        )
+                    if self.use_dropout:
+                        layer = tf.contrib.layers.batch_norm(tf.nn.dropout(layer, self.keep_prob))
+                    else:
+                        layer = tf.contrib.layers.batch_norm(layer)
             if self.architecture == "naive_separated":
                 z_mean = tf.contrib.layers.batch_norm(
                     tf.add(tf.matmul(layer_mu, weights["out_mean"]), biases["out_mean"])
@@ -348,6 +361,13 @@ class VAE_tf(object):
                 z_log_sigma_sq = tf.contrib.layers.batch_norm(
                     tf.add(
                         tf.matmul(layer_sigma, weights["out_log_sigma"]), biases["out_log_sigma"]
+                    )
+                )
+            elif self.architecture == "template_baseline":
+                z_mean = layer
+                z_log_sigma_sq = tf.contrib.layers.batch_norm(
+                    tf.add(
+                        tf.matmul(layer, weights["out_log_sigma"]), biases["out_log_sigma"]
                     )
                 )
             else:
@@ -604,73 +624,83 @@ class VAE_tf(object):
             os.system('mkdir -p ' + self.results_dir)
         file_name = '_'.join([self.model_name, str(self.n_hidden_layers), str(self.n_hidden_units)]) + '.h5'
         h5f = h5py.File(os.path.join(self.results_dir, file_name), 'w')
-        for i in range(self.n_hidden_layers):
-            if self.architecture == 'naive_separated':
-                for j in ['mu', 'sigma']:
-                    weights = self.sess.graph.get_tensor_by_name('recognition_network/h{}_{}:0'.format(i + 1, j)).eval(session=self.sess)
-                    biases = self.sess.graph.get_tensor_by_name('recognition_network/b{}_{}:0'.format(i + 1, j)).eval(session=self.sess)
-                    h5f.create_dataset("weights_{}_{}".format(i + 1, j) , data=weights)
-                    h5f.create_dataset("biases_{}_{}".format(i + 1, j), data=biases)
-                    # TODO: fix the hack here
-                    if j == 'mu':
+        if self.architecture != "template_baseline":
+            for i in range(self.n_hidden_layers):
+                if self.architecture == 'naive_separated':
+                    for j in ['mu', 'sigma']:
+                        weights = self.sess.graph.get_tensor_by_name('recognition_network/h{}_{}:0'.format(i + 1, j)).eval(session=self.sess)
+                        biases = self.sess.graph.get_tensor_by_name('recognition_network/b{}_{}:0'.format(i + 1, j)).eval(session=self.sess)
+                        h5f.create_dataset("weights_{}_{}".format(i + 1, j) , data=weights)
+                        h5f.create_dataset("biases_{}_{}".format(i + 1, j), data=biases)
+                        # TODO: fix the hack here
+                        if j == 'mu':
+                            beta = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm/beta:0').eval(session=self.sess)
+                            running_mean = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm/moving_mean:0').eval(session=self.sess)
+                            running_var = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm/moving_variance:0').eval(session=self.sess)
+                        elif j == 'sigma':
+                            beta = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/beta:0'.format(1)).eval(session=self.sess)
+                            running_mean = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/moving_mean:0'.format(1)).eval(session=self.sess)
+                            running_var = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/moving_variance:0'.format(1)).eval(session=self.sess)
+                        h5f.create_dataset("beta_{}_{}".format(i + 1, j), data=beta)
+                        h5f.create_dataset("running_mean_{}_{}".format(i + 1, j), data=running_mean)
+                        h5f.create_dataset("running_var_{}_{}".format(i + 1, j), data=running_var)
+
+                else:
+                    weights = self.sess.graph.get_tensor_by_name('recognition_network/h{}:0'.format(i + 1)).eval(session=self.sess)
+                    biases = self.sess.graph.get_tensor_by_name('recognition_network/b{}:0'.format(i + 1)).eval(session=self.sess)
+                    h5f.create_dataset("weights_{}".format(i + 1) , data=weights)
+                    h5f.create_dataset("biases_{}".format(i + 1), data=biases)
+                    if i == 0:
                         beta = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm/beta:0').eval(session=self.sess)
                         running_mean = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm/moving_mean:0').eval(session=self.sess)
                         running_var = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm/moving_variance:0').eval(session=self.sess)
-                    elif j == 'sigma':
-                        beta = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/beta:0'.format(1)).eval(session=self.sess)
-                        running_mean = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/moving_mean:0'.format(1)).eval(session=self.sess)
-                        running_var = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/moving_variance:0'.format(1)).eval(session=self.sess)
-                    h5f.create_dataset("beta_{}_{}".format(i + 1, j), data=beta)
-                    h5f.create_dataset("running_mean_{}_{}".format(i + 1, j), data=running_mean)
-                    h5f.create_dataset("running_var_{}_{}".format(i + 1, j), data=running_var)
-
-            else:
-                weights = self.sess.graph.get_tensor_by_name('recognition_network/h{}:0'.format(i + 1)).eval(session=self.sess)
-                biases = self.sess.graph.get_tensor_by_name('recognition_network/b{}:0'.format(i + 1)).eval(session=self.sess)
-                h5f.create_dataset("weights_{}".format(i + 1) , data=weights)
-                h5f.create_dataset("biases_{}".format(i + 1), data=biases)
-                if i == 0:
-                    beta = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm/beta:0').eval(session=self.sess)
-                    running_mean = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm/moving_mean:0').eval(session=self.sess)
-                    running_var = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm/moving_variance:0').eval(session=self.sess)
-                else:
-                    beta = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/beta:0'.format(i)).eval(session=self.sess)
-                    running_mean = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/moving_mean:0'.format(i)).eval(session=self.sess)
-                    running_var = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/moving_variance:0'.format(i)).eval(session=self.sess)
-                h5f.create_dataset("beta_{}".format(i + 1), data=beta)
-                h5f.create_dataset("running_mean_{}".format(i + 1), data=running_mean)
-                h5f.create_dataset("running_var_{}".format(i + 1), data=running_var)
+                    else:
+                        beta = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/beta:0'.format(i)).eval(session=self.sess)
+                        running_mean = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/moving_mean:0'.format(i)).eval(session=self.sess)
+                        running_var = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/moving_variance:0'.format(i)).eval(session=self.sess)
+                    h5f.create_dataset("beta_{}".format(i + 1), data=beta)
+                    h5f.create_dataset("running_mean_{}".format(i + 1), data=running_mean)
+                    h5f.create_dataset("running_var_{}".format(i + 1), data=running_var)
 
         # out_mean and out_sigma
-        weights_out_mean = self.sess.graph.get_tensor_by_name('recognition_network/out_mean:0').eval(session=self.sess)
-        weights_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/out_log_sigma:0').eval(session=self.sess)
-        biases_out_mean = self.sess.graph.get_tensor_by_name('recognition_network/out_mean_b:0').eval(session=self.sess)
-        biases_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/out_log_sigma_b:0').eval(session=self.sess)
         if self.architecture == 'naive_separated':
             offset = 1
         else:
             offset = 0
-        beta_out_mean = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/beta:0'.format(self.n_hidden_layers + offset)).eval(session=self.sess)
-        beta_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/beta:0'.format(self.n_hidden_layers + offset + 1)).eval(session=self.sess)
-        running_mean_out_mean = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/moving_mean:0'.format(self.n_hidden_layers + offset)).eval(
-            session=self.sess)
-        running_mean_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/moving_mean:0'.format(self.n_hidden_layers + offset + 1)).eval(
-            session=self.sess)
-        running_var_out_mean = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/moving_variance:0'.format(self.n_hidden_layers + offset)).eval(
-            session=self.sess)
-        running_var_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/moving_variance:0'.format(self.n_hidden_layers + offset + 1)).eval(
-            session=self.sess)
+        if self.architecture != "template_baseline":
+            weights_out_mean = self.sess.graph.get_tensor_by_name('recognition_network/out_mean:0').eval(session=self.sess)
+            biases_out_mean = self.sess.graph.get_tensor_by_name('recognition_network/out_mean_b:0').eval(session=self.sess)
+            beta_out_mean = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/beta:0'.format(self.n_hidden_layers + offset)).eval(session=self.sess)
+            running_mean_out_mean = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/moving_mean:0'.format(self.n_hidden_layers + offset)).eval(
+                session=self.sess)
+            running_var_out_mean = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/moving_variance:0'.format(self.n_hidden_layers + offset)).eval(
+                session=self.sess)
 
+            h5f.create_dataset("weights_out_mean", data=weights_out_mean)
+            h5f.create_dataset("biases_out_mean", data=biases_out_mean)
+            h5f.create_dataset("beta_out_mean", data=beta_out_mean)
+            h5f.create_dataset("running_mean_out_mean", data=running_mean_out_mean)
+            h5f.create_dataset("running_var_out_mean", data=running_var_out_mean)
 
-        h5f.create_dataset("weights_out_mean", data=weights_out_mean)
+        weights_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/out_log_sigma:0').eval(session=self.sess)
+        biases_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/out_log_sigma_b:0').eval(session=self.sess)
+        if self.architecture == "template_baseline":
+            beta_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm/beta:0').eval(session=self.sess)
+            running_mean_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm/moving_mean:0').eval(
+                session=self.sess)
+            running_var_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm/moving_variance:0').eval(
+                session=self.sess)
+        else:
+            beta_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/beta:0'.format(self.n_hidden_layers + offset + 1)).eval(session=self.sess)
+            running_mean_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/moving_mean:0'.format(self.n_hidden_layers + offset + 1)).eval(
+                session=self.sess)
+            running_var_out_log_sigma = self.sess.graph.get_tensor_by_name('recognition_network/BatchNorm_{}/moving_variance:0'.format(self.n_hidden_layers + offset + 1)).eval(
+                session=self.sess)
+
         h5f.create_dataset("weights_out_log_sigma", data=weights_out_log_sigma)
-        h5f.create_dataset("biases_out_mean", data=biases_out_mean)
         h5f.create_dataset("biases_out_log_sigma", data=biases_out_log_sigma)
-        h5f.create_dataset("beta_out_mean", data=beta_out_mean)
         h5f.create_dataset("beta_out_log_sigma", data=beta_out_log_sigma)
-        h5f.create_dataset("running_mean_out_mean", data=running_mean_out_mean)
         h5f.create_dataset("running_mean_out_log_sigma", data=running_mean_out_log_sigma)
-        h5f.create_dataset("running_var_out_mean", data=running_var_out_mean)
         h5f.create_dataset("running_var_out_log_sigma", data=running_var_out_log_sigma)
 
         # scale
@@ -714,6 +744,8 @@ class Encoder(nn.Module):
             modules.append(MLP(n_topics * (1 + vocab_size), n_hidden_units))
         elif architecture == 'standard':
             modules.append(MLP(vocab_size, n_hidden_units))
+        elif architecture == 'template_baseline':
+            pass
         else:
             raise ValueError('Invalid architecture')
         for i in range(self.n_hidden_layers - 1):
@@ -727,9 +759,12 @@ class Encoder(nn.Module):
             self.enc_layers_sigma = nn.Sequential(*modules)
         else:
             self.enc_layers = nn.Sequential(*modules)
-        self.fcmu = nn.Linear(n_hidden_units, n_topics)
-        self.fcsigma = nn.Linear(n_hidden_units, n_topics)
-        self.bnmu = nn.BatchNorm1d(n_topics)
+        if self.architecture == "template_baseline":
+            self.fcsigma = nn.Linear(n_topics, n_topics)
+        else:
+            self.fcmu = nn.Linear(n_hidden_units, n_topics)
+            self.bnmu = nn.BatchNorm1d(n_topics)
+            self.fcsigma = nn.Linear(n_hidden_units, n_topics)
         self.bnsigma = nn.BatchNorm1d(n_topics)
         self.use_scale = use_scale
         if self.use_scale:
@@ -745,10 +780,13 @@ class Encoder(nn.Module):
             # each of size batch_size x n_topics
             z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
             z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
-        elif self.architecture == 'template':
+        elif self.architecture == 'template' or self.architecture == "template_baseline":
             x_and_topics = torch.einsum("ab,abc->ac", (x, torch.transpose(topics, 1, 2)))
             x_and_topics = torch.div(x_and_topics, torch.sum(x_and_topics, dim=1).reshape((-1, 1)))
-            z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
+            if self.architecture == "template_baseline":
+                z_loc = x_and_topics
+            else:
+                z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
             z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
         elif self.architecture == 'template_plus_topics':
             x_and_topics = torch.einsum("ab,abc->ac", (x, torch.transpose(topics, 1, 2)))
@@ -890,35 +928,37 @@ class VAE_pyro(nn.Module):
         state_dict = {}
         file_name = '_'.join([self.model_name, str(self.n_hidden_layers), str(self.n_hidden_units)]) + '.h5'
         h5f = h5py.File(os.path.join(self.results_dir, file_name), 'r')
-        for i in range(self.n_hidden_layers):
-            if self.architecture == 'naive_separated':
-                for j in ['mu', 'sigma']:
-                    state_dict['encoder.enc_layers_{}.{}.fc.weight'.format(j, i)] = torch.from_numpy(h5f['weights_{}_{}'.format(i + 1, j)][()]).t()
-                    state_dict['encoder.enc_layers_{}.{}.fc.bias'.format(j, i)] = torch.from_numpy(h5f['biases_{}_{}'.format(i + 1, j)][()])
-                    state_dict['encoder.enc_layers_{}.{}.bn.bias'.format(j, i)] = torch.from_numpy(h5f['beta_{}_{}'.format(i + 1, j)][()])
-                    state_dict['encoder.enc_layers_{}.{}.bn.weight'.format(j, i)] = torch.ones(self.n_hidden_units)
-                    state_dict['encoder.enc_layers_{}.{}.bn.running_mean'.format(j, i)] = torch.from_numpy(h5f['running_mean_{}_{}'.format(i + 1, j)][()])
-                    state_dict['encoder.enc_layers_{}.{}.bn.running_var'.format(j, i)] = torch.from_numpy(h5f['running_var_{}_{}'.format(i + 1, j)][()])
-            else:
-                state_dict['encoder.enc_layers.{}.fc.weight'.format(i)] = torch.from_numpy(h5f['weights_{}'.format(i + 1)][()]).t()
-                state_dict['encoder.enc_layers.{}.fc.bias'.format(i)] = torch.from_numpy(h5f['biases_{}'.format(i + 1)][()])
-                state_dict['encoder.enc_layers.{}.bn.bias'.format(i)] = torch.from_numpy(h5f['beta_{}'.format(i + 1)][()])
-                state_dict['encoder.enc_layers.{}.bn.weight'.format(i)] = torch.ones(self.n_hidden_units)
-                state_dict['encoder.enc_layers.{}.bn.running_mean'.format(i)] = torch.from_numpy(h5f['running_mean_{}'.format(i + 1)][()])
-                state_dict['encoder.enc_layers.{}.bn.running_var'.format(i)] = torch.from_numpy(h5f['running_var_{}'.format(i + 1)][()])
+        if self.architecture != "template_baseline":
+            for i in range(self.n_hidden_layers):
+                if self.architecture == 'naive_separated':
+                    for j in ['mu', 'sigma']:
+                        state_dict['encoder.enc_layers_{}.{}.fc.weight'.format(j, i)] = torch.from_numpy(h5f['weights_{}_{}'.format(i + 1, j)][()]).t()
+                        state_dict['encoder.enc_layers_{}.{}.fc.bias'.format(j, i)] = torch.from_numpy(h5f['biases_{}_{}'.format(i + 1, j)][()])
+                        state_dict['encoder.enc_layers_{}.{}.bn.bias'.format(j, i)] = torch.from_numpy(h5f['beta_{}_{}'.format(i + 1, j)][()])
+                        state_dict['encoder.enc_layers_{}.{}.bn.weight'.format(j, i)] = torch.ones(self.n_hidden_units)
+                        state_dict['encoder.enc_layers_{}.{}.bn.running_mean'.format(j, i)] = torch.from_numpy(h5f['running_mean_{}_{}'.format(i + 1, j)][()])
+                        state_dict['encoder.enc_layers_{}.{}.bn.running_var'.format(j, i)] = torch.from_numpy(h5f['running_var_{}_{}'.format(i + 1, j)][()])
+                else:
+                    state_dict['encoder.enc_layers.{}.fc.weight'.format(i)] = torch.from_numpy(h5f['weights_{}'.format(i + 1)][()]).t()
+                    state_dict['encoder.enc_layers.{}.fc.bias'.format(i)] = torch.from_numpy(h5f['biases_{}'.format(i + 1)][()])
+                    state_dict['encoder.enc_layers.{}.bn.bias'.format(i)] = torch.from_numpy(h5f['beta_{}'.format(i + 1)][()])
+                    state_dict['encoder.enc_layers.{}.bn.weight'.format(i)] = torch.ones(self.n_hidden_units)
+                    state_dict['encoder.enc_layers.{}.bn.running_mean'.format(i)] = torch.from_numpy(h5f['running_mean_{}'.format(i + 1)][()])
+                    state_dict['encoder.enc_layers.{}.bn.running_var'.format(i)] = torch.from_numpy(h5f['running_var_{}'.format(i + 1)][()])
 
-        state_dict['encoder.fcmu.weight'] = torch.from_numpy(h5f['weights_out_mean'][()]).t()
+        if self.architecture != "template_baseline":
+            state_dict['encoder.fcmu.weight'] = torch.from_numpy(h5f['weights_out_mean'][()]).t()
+            state_dict['encoder.fcmu.bias'] = torch.from_numpy(h5f['biases_out_mean'][()])
+            state_dict['encoder.bnmu.bias'] = torch.from_numpy(h5f['beta_out_mean'][()])
+            state_dict['encoder.bnmu.weight'] = torch.ones(self.n_topics)
+            state_dict['encoder.bnmu.running_mean'] = torch.from_numpy(h5f['running_mean_out_mean'][()])
+            state_dict['encoder.bnmu.running_var'] = torch.from_numpy(h5f['running_var_out_mean'][()])
+
         state_dict['encoder.fcsigma.weight'] = torch.from_numpy(h5f['weights_out_log_sigma'][()]).t()
-        state_dict['encoder.fcmu.bias'] = torch.from_numpy(h5f['biases_out_mean'][()])
         state_dict['encoder.fcsigma.bias'] = torch.from_numpy(h5f['biases_out_log_sigma'][()])
-
-        state_dict['encoder.bnmu.bias'] = torch.from_numpy(h5f['beta_out_mean'][()])
         state_dict['encoder.bnsigma.bias'] = torch.from_numpy(h5f['beta_out_log_sigma'][()])
-        state_dict['encoder.bnmu.weight'] = torch.ones(self.n_topics)
         state_dict['encoder.bnsigma.weight'] = torch.ones(self.n_topics)
-        state_dict['encoder.bnmu.running_mean'] = torch.from_numpy(h5f['running_mean_out_mean'][()])
         state_dict['encoder.bnsigma.running_mean'] = torch.from_numpy(h5f['running_mean_out_log_sigma'][()])
-        state_dict['encoder.bnmu.running_var'] = torch.from_numpy(h5f['running_var_out_mean'][()])
         state_dict['encoder.bnsigma.running_var'] = torch.from_numpy(h5f['running_var_out_log_sigma'][()])
 
         if self.scale_type == 'sample':
