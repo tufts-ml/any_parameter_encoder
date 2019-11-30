@@ -51,9 +51,9 @@ data_config = {
 }
 
 loader_config = {
-    'batch_size': 200,
+    'batch_size': 500,
     'shuffle': True,
-    'num_workers': 6}
+    'num_workers': 0}
 
 train_config = {
     'epochs': 2,

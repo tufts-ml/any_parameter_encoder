@@ -66,7 +66,9 @@ class ToyBarsDataset(data.Dataset):
     def __init__(self, doc_file, n_topics, vocab_size, alpha, use_cuda, topics_file=None, num_models=None, training=True, generate=True):
         if not os.path.exists(doc_file):
             create_toy_bar_docs(doc_file, n_topics, vocab_size)
-        self.documents = np.load(doc_file)
+        device = torch.device("cuda:0" if use_cuda else "cpu")
+        dtype = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
+        self.documents = torch.from_numpy(np.load(doc_file)).type(dtype)
         self.num_docs = len(self.documents)
         self.n_topics = n_topics
         self.vocab_size = vocab_size
@@ -77,11 +79,11 @@ class ToyBarsDataset(data.Dataset):
         if generate:
             self.num_models = num_models
         else:
-            self.topics = np.load(os.path.join(topics_file))
-            self.topics = self.topics.to(device)
+            self.topics = torch.from_numpy(np.load(os.path.join(topics_file)))
+            self.topics = self.topics.to(device).type(dtype)
             self.num_models = len(self.topics)
-        device = torch.device("cuda:0" if use_cuda else "cpu")
         self.documents = self.documents.to(device)
+        
 
     def __len__(self):
         """ Denotes the total number of samples """
@@ -99,7 +101,7 @@ class ToyBarsDataset(data.Dataset):
         else:
             topics = self.topics[index % self.num_models]
         document = self.documents[index % self.num_docs]
-        dtype = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
-        document = torch.from_numpy(document.astype(np.float32)).type(dtype)
-        topics = torch.from_numpy(topics.astype(np.float32)).type(dtype)
+        # dtype = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
+        # document = torch.from_numpy(document.astype(np.float32)).type(dtype)
+        # topics = torch.from_numpy(topics.astype(np.float32)).type(dtype)
         return document, topics
