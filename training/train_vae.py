@@ -17,6 +17,7 @@ def create_minibatch(data, batch_size, shuffle=True, generate_train=False):
     rng = np.random.RandomState(10)
     if generate_train:
         docs, topics = data
+        docs = np.array(docs)
         num_docs = len(docs)
         num_topics = len(topics)
         num_combinations = num_docs * num_topics

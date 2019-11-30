@@ -44,12 +44,14 @@ parser.add_argument('--evaluate_svi_convergence_with_vae_init', help='run SVI to
 parser.add_argument('--train', help='train the model in tf', action='store_true')
 parser.add_argument('--train_single', help='train the model in tf', action='store_true')
 parser.add_argument('--evaluate', help='evaluate posteriors in pyro', action='store_true')
+parser.add_argument('--run_standard_vae', help='run mcmc', action='store_true')
 parser.add_argument('--run_svi', help='run mcmc', action='store_true')
 parser.add_argument('--run_mcmc', help='run mcmc', action='store_true')
 parser.add_argument('--use_cached', help='run mcmc', action='store_true')
 parser.add_argument('--mdreviews', help='run mdreviews data', action='store_true')
 parser.add_argument('--additive_topics', help='run mdreviews data', action='store_true')
 parser.add_argument('--uniform_prior', help='run mdreviews data', action='store_true')
+parser.add_argument('--plot', help='run mdreviews data', action='store_true')
 args = parser.parse_args()
 
 # where to write the results
@@ -108,7 +110,7 @@ model_config = {
     'model_name': 'lda_meta',
     'architecture': args.architecture,
     'scale_trainable': True,
-    'n_hidden_layers': 2,
+    'n_hidden_layers': 0,
     'n_hidden_units': 100,
     'n_samples': 1,
     'decay_rate': .8,
@@ -307,10 +309,6 @@ if args.evaluate:
     state_dict = vae.load()
     vae.load_state_dict(state_dict)
 
-    vae_single = VAE_pyro(**model_config_single)
-    state_dict = vae_single.load()
-    vae_single.load_state_dict(state_dict)
-
     if model_config['scale_type'] == 'mean':
         print(vae.encoder.scale)
     elif model_config['scale_type'] == 'sample':
@@ -337,9 +335,6 @@ if args.evaluate:
         posterior_eval = partial(
             run_posterior_evaluation,
             data=data, data_name=data_name, topics=topics, vae=vae, sample_idx=sample_idx, model_config=model_config)
-        single_vae_posterior_eval = partial(
-            run_posterior_evaluation,
-            data=data, data_name=data_name, topics=topics, vae=vae_single, sample_idx=sample_idx, model_config=model_config_single)
 
         pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .1}, 'step_size': 10000, 'gamma': 0.95})
         # Note: pyro scheduler doesn't have any effect in the VAE case since we never take any optimization steps
@@ -352,14 +347,21 @@ if args.evaluate:
         del vae_svi
         get_memory_consumption()
 
-        logging.info('Starting VAE single evaluation')
-        pyro.clear_param_store()
-        vae_svi_single = SVI(vae_single.model, vae_single.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=0, num_samples=100)
-        vae_svi_single = single_vae_posterior_eval(vae_svi_single, 'vae_single')
-        get_memory_consumption()
-        logging.info('Deleting vae_svi_single')
-        del vae_svi_single
-        get_memory_consumption()
+        if args.run_standard_vae:
+            logging.info('Starting VAE single evaluation')
+            pyro.clear_param_store()
+            vae_single = VAE_pyro(**model_config_single)
+            state_dict = vae_single.load()
+            vae_single.load_state_dict(state_dict)
+            single_vae_posterior_eval = partial(
+                run_posterior_evaluation,
+                data=data, data_name=data_name, topics=topics, vae=vae_single, sample_idx=sample_idx, model_config=model_config_single)
+            vae_svi_single = SVI(vae_single.model, vae_single.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=0, num_samples=100)
+            vae_svi_single = single_vae_posterior_eval(vae_svi_single, 'vae_single')
+            get_memory_consumption()
+            logging.info('Deleting vae_svi_single')
+            del vae_svi_single
+            get_memory_consumption()
 
         if args.run_svi:
             logging.info('Starting SVI warmstart evaluation')
@@ -461,15 +463,16 @@ if args.evaluate:
             plot_name = os.path.join(results_dir, data_name + '_vae_reconstructions.pdf')
             plot_saved_samples(np.array(data)[sample_idx], filenames, plot_name, vocab_size=vocab_size, intensity=10)
     
-    logging.info('Plotting SVI vs VAE ELBOs')
-    pyro.clear_param_store()
-    # reload vae to be able to take in different-sized batches
-    vae = VAE_pyro(**model_config)
-    state_dict = vae.load()
-    vae.load_state_dict(state_dict)
-    get_elbo_csv(vae, vae_single, results_dir)
-    plot_svi_vs_vae_elbo_v1(results_dir)
-    get_elbo_csv(vae, vae_single, results_dir, posterior_predictive=True)
-    plot_svi_vs_vae_elbo_v1(results_dir, posterior_predictive=True)
+    if args.plot:
+        logging.info('Plotting SVI vs VAE ELBOs')
+        pyro.clear_param_store()
+        # reload vae to be able to take in different-sized batches
+        vae = VAE_pyro(**model_config)
+        state_dict = vae.load()
+        vae.load_state_dict(state_dict)
+        get_elbo_csv(vae, vae_single, results_dir)
+        plot_svi_vs_vae_elbo_v1(results_dir)
+        get_elbo_csv(vae, vae_single, results_dir, posterior_predictive=True)
+        plot_svi_vs_vae_elbo_v1(results_dir, posterior_predictive=True)
 
-    plot_times(results_dir)
+        plot_times(results_dir)
