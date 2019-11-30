@@ -78,7 +78,10 @@ class ToyBarsDataset(data.Dataset):
             self.num_models = num_models
         else:
             self.topics = np.load(os.path.join(topics_file))
+            self.topics = self.topics.to(device)
             self.num_models = len(self.topics)
+        device = torch.device("cuda:0" if use_cuda else "cpu")
+        self.documents = self.documents.to(device)
 
     def __len__(self):
         """ Denotes the total number of samples """
