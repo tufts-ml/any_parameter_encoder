@@ -94,7 +94,7 @@ class ToyBarsDataset(data.Dataset):
             np.random.seed(seed)
             topics = np.random.dirichlet(np.ones(self.vocab_size), size=self.n_topics)
         else:
-            topics = self.topics[index % self.num_topics]
+            topics = self.topics[index % self.num_models]
         document = self.documents[index % self.num_docs]
         dtype = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
         document = torch.from_numpy(document.astype(np.float32)).type(dtype)
