@@ -75,10 +75,10 @@ class ToyBarsDataset(data.Dataset):
         self.training = training
         self.generate = generate
         if generate:
+            self.num_models = num_models
+        else:
             self.topics = np.load(os.path.join(topics_file))
             self.num_models = len(self.topics)
-        else:
-            self.num_models = num_models
 
     def __len__(self):
         """ Denotes the total number of samples """
