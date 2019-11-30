@@ -43,10 +43,12 @@ model_config = {
 
 data_config = {
     'doc_file': 'data/toy_bar_docs.npy',
+    'doc_file': 'data/train_topics.npy',
     'n_topics': 20,
     'vocab_size': 100,
     'alpha': .1,
-    'use_cuda': use_cuda
+    'use_cuda': use_cuda,
+    'generate': False
 }
 
 loader_config = {

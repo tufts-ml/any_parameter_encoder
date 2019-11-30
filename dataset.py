@@ -63,17 +63,19 @@ def create_toy_bar_docs(doc_file, n_topics, vocab_size):
 
 
 class ToyBarsDataset(data.Dataset):
-    def __init__(self, doc_file, num_models, n_topics, vocab_size, alpha, use_cuda, training=True):
+    def __init__(self, doc_file, topics_file, n_topics, vocab_size, alpha, use_cuda, training=True, generate=True):
         if not os.path.exists(doc_file):
             create_toy_bar_docs(doc_file, n_topics, vocab_size)
-        self.documents = np.load(doc_file) 
+        self.documents = np.load(doc_file)
+        self.topics = np.load(os.path.join(topics_file))
         self.num_docs = len(self.documents)
-        self.num_models = num_models
+        self.num_models = len(self.topics)
         self.n_topics = n_topics
         self.vocab_size = vocab_size
         self.alpha = alpha
         self.use_cuda = use_cuda
         self.training = training
+        self.generate = generate
 
     def __len__(self):
         """ Denotes the total number of samples """
@@ -81,14 +83,16 @@ class ToyBarsDataset(data.Dataset):
 
     def __getitem__(self, index):
         """ Generates one sample of data """
-        if self.training:
-            seed = index
+        if self.generate:
+            if self.training:
+                seed = index
+            else:
+                seed = index + self.num_models * self.num_docs
+            np.random.seed(seed)
+            topics = np.random.dirichlet(np.ones(self.vocab_size), size=self.n_topics)
         else:
-            seed = index + self.num_models * self.num_docs
-        np.random.seed(seed)
-        topics = np.random.dirichlet(np.ones(self.vocab_size), size=self.n_topics)
+            topics = self.topics[index % self.num_topics]
         document = self.documents[index % self.num_docs]
-
         dtype = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
         document = torch.from_numpy(document.astype(np.float32)).type(dtype)
         topics = torch.from_numpy(topics.astype(np.float32)).type(dtype)
