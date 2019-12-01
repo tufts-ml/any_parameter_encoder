@@ -366,18 +366,19 @@ if args.evaluate:
             get_memory_consumption()
 
         if args.run_svi:
-            logging.info('Starting SVI warmstart evaluation')
-            pyro.clear_param_store()
-            svi_warmstart = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=600, num_samples=100)
-            z_loc, z_scale = vae_single.encoder.forward(data, topics)
-            pyro.clear_param_store()
-            pyro.get_param_store().get_param('z_loc', init_tensor=z_loc.detach())
-            pyro.get_param_store().get_param('z_scale', init_tensor=z_scale.detach())
-            svi_warmstart = posterior_eval(svi_warmstart, 'svi_warmstart')
-            get_memory_consumption()
-            logging.info('Deleting svi_warmstart')
-            del svi_warmstart
-            get_memory_consumption()
+            if args.run_standard_vae:
+                logging.info('Starting SVI warmstart evaluation')
+                pyro.clear_param_store()
+                svi_warmstart = SVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=Trace_ELBO(), num_steps=600, num_samples=100)
+                z_loc, z_scale = vae_single.encoder.forward(data, topics)
+                pyro.clear_param_store()
+                pyro.get_param_store().get_param('z_loc', init_tensor=z_loc.detach())
+                pyro.get_param_store().get_param('z_scale', init_tensor=z_scale.detach())
+                svi_warmstart = posterior_eval(svi_warmstart, 'svi_warmstart')
+                get_memory_consumption()
+                logging.info('Deleting svi_warmstart')
+                del svi_warmstart
+                get_memory_consumption()
 
             logging.info('Starting SVI evaluation')
             pyro.clear_param_store()
