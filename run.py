@@ -310,7 +310,7 @@ if args.train_single:
 if args.evaluate:
     vae = VAE_pyro(**model_config)
     if args.new_model_path:
-        vae.load_state_dict(torch.load(os.path.join(results_dir, 'ape.dict')))
+        vae.load_state_dict(torch.load(os.path.join(results_dir, 'ape.dict')), map_location="cpu")
     else:
         state_dict = vae.load()
         vae.load_state_dict(state_dict)
