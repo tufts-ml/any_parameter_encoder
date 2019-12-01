@@ -310,7 +310,7 @@ if args.train_single:
 if args.evaluate:
     vae = VAE_pyro(**model_config)
     if args.new_model_path:
-        vae.load_state_dict(torch.load(''))
+        vae.load_state_dict(torch.load('ape.dict'))
     else:
         state_dict = vae.load()
         vae.load_state_dict(state_dict)
