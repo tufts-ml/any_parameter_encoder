@@ -40,6 +40,7 @@ parser.add_argument('results_dir', type=str, help='directory of results')
 parser.add_argument('architecture', type=str, help='directory of results')
 parser.add_argument('n_hidden_layers', type=int, help='directory of results')
 parser.add_argument('n_hidden_units', type=int, help='directory of results')
+parser.add_argument('--new_model_path', help='use model from ape repo', action='store_true')
 parser.add_argument('--find_lr', help='find best learning rate', action='store_true')
 parser.add_argument('--evaluate_svi_convergence', help='run SVI to see if it converges', action='store_true')
 parser.add_argument('--evaluate_svi_convergence_with_vae_init', help='run SVI to see if it converges', action='store_true')
@@ -308,8 +309,11 @@ if args.train_single:
 # load the VAE into pyro for evaluation
 if args.evaluate:
     vae = VAE_pyro(**model_config)
-    state_dict = vae.load()
-    vae.load_state_dict(state_dict)
+    if args.new_model_path:
+        vae.load_state_dict(torch.load(''))
+    else:
+        state_dict = vae.load()
+        vae.load_state_dict(state_dict)
 
     if model_config['scale_type'] == 'mean':
         print(vae.encoder.scale)
