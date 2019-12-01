@@ -62,7 +62,8 @@ path_to_mallet_binary = "/Users/lilyzhang/Documents/coding_projects/Mallet/bin/m
 with open('topics.csv', 'w') as f:
     csv_writer = csv.writer(f)
     test_topics = []
-    for i in range(1, 1001, 100):
+    # for i in range(1, 1001, 100):
+    for i in [1000] * 10:
         lda = LdaMallet(path_to_mallet_binary, corpus=corpus, id2word=id2word, num_topics=30, iterations=i, alpha=.01)
         topic_printout = lda.show_topics(num_topics=30, num_words=10)
         for topic in topic_printout:
@@ -75,7 +76,7 @@ with open('topics.csv', 'w') as f:
         test_topics.append(lda.get_topics())
     # np.save('resources/mdreviews_topics3.npy', topics)
     # lda.save('lda_gibbs.gensim3')
-    np.save('datasets/mdreviews/test_topics_3k.npy', np.array(test_topics))
+    np.save('datasets/mdreviews/test_topics_3k_new.npy', np.array(test_topics))
 # topics = np.load('true_topics.npy')
 # take the inverse softmax
 

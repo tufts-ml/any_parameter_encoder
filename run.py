@@ -153,7 +153,7 @@ else:
     train_topics = generate_topics(n=num_train_topics, betas=train_betas, seed=0, shuffle=True)
     valid_topics = generate_topics(n=num_valid_topics, betas=valid_betas, seed=1, shuffle=True)
     if args.mdreviews:
-        test_topics = np.load('datasets/mdreviews/test_topics_3k.npy')
+        test_topics = np.load('datasets/mdreviews/test_topics_3k_new.npy')
     else:
         test_betas = []
         for i in range(n_topics):
