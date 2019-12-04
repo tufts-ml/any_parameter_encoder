@@ -12,7 +12,6 @@ from model import VAE
 from train import train
 
 import wandb
-wandb.init(sync_tensorboard=True, project="any_parameter_encoder", entity="lily")
 
 from multiprocessing import set_start_method
 try:
@@ -21,8 +20,9 @@ except RuntimeError:
     pass
 
 parser = argparse.ArgumentParser(description='Results summary')
-parser.add_argument('results_dir', type=str, help='directory of results')
-parser.add_argument('architecture', type=str, help='encoder architecture')
+parser.add_argument('--results_dir', type=str, help='directory of results')
+parser.add_argument('--architecture', type=str, help='encoder architecture')
+parser.add_argument('--name', type=str, help='run name')
 args = parser.parse_args()
 
 use_cuda = torch.cuda.is_available()
@@ -62,6 +62,7 @@ train_config = {
 }
 
 if __name__ == "__main__":
+    wandb.init(sync_tensorboard=True, project="any_parameter_encoder", entity="lily", name=args.name)
     vae = VAE(**model_config)
     model_path = os.path.join(args.results_dir, 'ape.dict')
     if os.path.exists(model_path):
@@ -82,6 +83,6 @@ if __name__ == "__main__":
     nuts_kernel = NUTS(vae.model, adapt_step_size=True)
     mcmc = MCMC(nuts_kernel, num_samples=100, warmup_steps=100)
 
-    evaluate_likelihood(vae_svi)
-    evaluate_likelihood(svi)
-    evaluate_likelihood(mcmc)
+    # evaluate_likelihood(vae_svi)
+    # evaluate_likelihood(svi)
+    # evaluate_likelihood(mcmc)
