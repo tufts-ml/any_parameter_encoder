@@ -36,7 +36,7 @@ model_config = {
     'n_topics': 20,
     'use_cuda': use_cuda,
     'architecture': args.architecture,
-    'scale_type': 'name',
+    'scale_type': 'mean',
     'skip_connections': False,
 }
 
