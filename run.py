@@ -22,7 +22,6 @@ except RuntimeError:
 parser = argparse.ArgumentParser(description='Results summary')
 parser.add_argument('--results_dir', type=str, help='directory of results')
 parser.add_argument('--architecture', type=str, help='encoder architecture')
-parser.add_argument('--name', type=str, help='run name')
 args = parser.parse_args()
 
 use_cuda = torch.cuda.is_available()
@@ -62,7 +61,7 @@ train_config = {
 }
 
 if __name__ == "__main__":
-    wandb.init(sync_tensorboard=True, project="any_parameter_encoder", entity="lily", name=args.name)
+    wandb.init(sync_tensorboard=True, project="any_parameter_encoder", entity="lily", name=args.results_dir)
     vae = VAE(**model_config)
     model_path = os.path.join(args.results_dir, 'ape.dict')
     if os.path.exists(model_path):
