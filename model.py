@@ -1,6 +1,5 @@
 import os
 import glob
-import h5py
 import numpy as np
 import torch
 from torch import autograd

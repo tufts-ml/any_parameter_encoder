@@ -2,7 +2,6 @@ import math
 import numpy as np
 
 
-
 def normalize1d(logits):
     return np.array([el/sum(logits) for el in logits])
 
