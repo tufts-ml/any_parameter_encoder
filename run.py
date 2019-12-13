@@ -48,7 +48,8 @@ model_config = {
     'n_topics': 20,
     'use_cuda': use_cuda,
     'architecture': args.architecture,
-    'scale_type': 'mean',
+    # 'scale_type': 'mean',
+    'scale_type': 'sample',
     'skip_connections': False,
 }
 
@@ -87,25 +88,28 @@ if __name__ == "__main__":
     if args.run_avi:
         model_path = os.path.join(args.results_dir, 'ape.dict')
         if os.path.exists(model_path):
-            vae.load_state_dict(torch.load(model_path))
+            device = torch.device("cuda:0" if use_cuda else "cpu")
+            vae.load_state_dict(torch.load(model_path, map_location=device))
 
         pyro_scheduler = ExponentialLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, 'gamma': 0.95})
-        avi = TimedAVI(vae.model, vae.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_samples=100)
-        training_set = ToyBarsDataset(training=True, topics_file='data/train_topics.npy', num_models=50000, **data_config)
-        validation_set = ToyBarsDataset(training=False, topics_file='data/valid_topics.npy', num_models=500, **data_config)
-        training_generator = data.DataLoader(training_set, **loader_config)
-        validation_generator = data.DataLoader(validation_set, **loader_config)
-        avi = train(avi, training_generator, validation_generator, **train_config)
+        avi = TimedAVI(vae.model, vae.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_samples=100, encoder=vae.encoder)
 
-        # we only save the model to use in downstream inference
-        torch.save(vae.state_dict(), model_path)
+        if not os.path.exists(model_path):
+            training_set = ToyBarsDataset(training=True, topics_file='data/train_topics.npy', num_models=50000, **data_config)
+            validation_set = ToyBarsDataset(training=False, topics_file='data/valid_topics.npy', num_models=500, **data_config)
+            training_generator = data.DataLoader(training_set, **loader_config)
+            validation_generator = data.DataLoader(validation_set, **loader_config)
+            avi = train(avi, training_generator, validation_generator, **train_config)
+
+            # we only save the model to use in downstream inference
+            torch.save(vae.state_dict(), model_path)
 
         names.append('avi')
         inferences.append(avi)
 
     if args.run_svi:
         # hyperparameters have been optimized
-        pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .05}, 'step_size': 4000, 'gamma': 0.95})
+        pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .05}, 'step_size': 200, 'gamma': 0.95})
         print(pyro_scheduler)
         svi = TimedSVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=Trace_ELBO(), num_samples=100) #, num_steps=100000)
         training_set = ToyBarsDataset(training=True, topics_file='data/test_topics.npy', num_models=10, **data_config)

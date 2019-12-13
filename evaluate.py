@@ -38,7 +38,7 @@ class TimedSVI(SVI):
     
 
 class TimedAVI(SVI):
-    def __init__(self, encoder, *args, **kwargs):
+    def __init__(self, *args, encoder=None, **kwargs):
         self.run_times = []
         self.encoder = encoder
         super(TimedAVI, self).__init__(*args, **kwargs)
@@ -59,10 +59,8 @@ class TimedMCMC(MCMC):
         super(TimedMCMC, self).__init__(*args, **kwargs)
 
     def run(self, *args, **kwargs):
-        # we do not include tracelist generation in the time
-        # since the posterior is already fully specified before then
         start = time.time()
-        posterior = super(MCMC, self).run(*args, **kwargs)
+        posterior = super(TimedMCMC, self).run(*args, **kwargs)
         end = time.time()
         self.run_times.append(end - start)
         return posterior
