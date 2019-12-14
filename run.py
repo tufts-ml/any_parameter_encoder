@@ -154,7 +154,7 @@ else:
     train_topics = generate_topics(n=num_train_topics, betas=train_betas, seed=0, shuffle=True)
     valid_topics = generate_topics(n=num_valid_topics, betas=valid_betas, seed=1, shuffle=True)
     if args.mdreviews:
-        test_topics = np.load('datasets/mdreviews/test_topics_3k_new.npy')
+        test_topics = np.load('datasets/mdreviews/test_topics_3k.npy')
     else:
         test_betas = []
         for i in range(n_topics):
@@ -447,7 +447,7 @@ if args.evaluate:
     # for i in sample_idx:
     #     plot_posterior(results_dir, i, dataset_names, inference_names, scale=scale)
     # plot_posterior_v2(results_dir, sample_idx, ['train', 'valid', 'test'], inference_names, scale)
-    plot_posterior_v3(results_dir, sample_idx, ['train', 'valid', 'test'], inference_names, scale)
+    # plot_posterior_v3(results_dir, sample_idx, ['train', 'valid', 'test'], inference_names, scale)
 
     # plot the reconstructions
     if not args.mdreviews:
@@ -479,7 +479,7 @@ if args.evaluate:
         vae.load_state_dict(state_dict)
         get_elbo_csv(vae, vae_single, results_dir)
         plot_svi_vs_vae_elbo_v1(results_dir)
-        get_elbo_csv(vae, vae_single, results_dir, posterior_predictive=True)
-        plot_svi_vs_vae_elbo_v1(results_dir, posterior_predictive=True)
+        # get_elbo_csv(vae, vae_single, results_dir, posterior_predictive=True)
+        # plot_svi_vs_vae_elbo_v1(results_dir, posterior_predictive=True)
 
         plot_times(results_dir)
