@@ -1,4 +1,4 @@
-## VAE Topic Models
+## Any-Parameter Encoder (APE)
 
 This is the code used to generate the results in the paper.
 
