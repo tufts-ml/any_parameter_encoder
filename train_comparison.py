@@ -91,10 +91,10 @@ if __name__ == "__main__":
     ape_pyro_scheduler = ExponentialLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, 'gamma': 0.95})
 
     # train APE_VAE from scratch
-    # ape_vae = APE_VAE(**model_config)
-    # ape_vae_avi = TimedAVI(ape_vae.model, ape_vae.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_samples=100, encoder=ape_vae.encoder)
-    # ape_vae_avi = train_from_scratch(ape_vae_avi, training_generator, validation_generator, name='ape_vae', **train_config)
-    # torch.save(ape_vae.state_dict(), os.path.join(args.results_dir, 'ape_vae.dict'))
+    ape_vae = APE_VAE(**model_config)
+    ape_vae_avi = TimedAVI(ape_vae.model, ape_vae.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_samples=100, encoder=ape_vae.encoder)
+    ape_vae_avi = train_from_scratch(ape_vae_avi, training_generator, validation_generator, name='ape_vae', **train_config)
+    torch.save(ape_vae.state_dict(), os.path.join(args.results_dir, 'ape_vae.dict'))
     print('ape_vae finished')
     
     # train APE
