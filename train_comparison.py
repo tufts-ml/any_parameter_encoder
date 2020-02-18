@@ -94,11 +94,13 @@ if __name__ == "__main__":
     ape_vae = APE_VAE(**model_config)
     ape_vae_avi = TimedAVI(ape_vae.model, ape_vae.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_samples=100, encoder=ape_vae.encoder)
     ape_vae_avi = train_from_scratch(ape_vae_avi, training_generator, validation_generator, name='ape_vae', **train_config)
+    torch.save(ape_vae.state_dict(), os.path.join(args.results_dir, 'ape_vae.dict'))
     
     # train APE
     ape = APE(**model_config)
     ape_avi = TimedAVI(ape.model, ape.encoder_guide, ape_pyro_scheduler, loss=Trace_ELBO(), num_samples=100, encoder=ape.encoder)
     ape_avi = train(ape_avi, ape_training_generator, ape_validation_generator, name='ape', **train_config)
+    torch.save(ape.state_dict(), os.path.join(args.results_dir, 'ape.dict'))
 
     pretrained_dict = ape.state_dict()
     
@@ -112,3 +114,4 @@ if __name__ == "__main__":
 
     ape_vae_init_avi = TimedAVI(ape_vae_init.model, ape_vae_init.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_samples=100, encoder=ape_vae_init.encoder)
     ape_vae_init_avi = train_from_scratch(ape_vae_init_avi, training_generator, validation_generator, name='ape_vae_init', **train_config)
+    torch.save(ape_vae_init.state_dict(), os.path.join(args.results_dir, 'ape_vae_init.dict'))
