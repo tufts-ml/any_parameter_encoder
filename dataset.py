@@ -41,8 +41,7 @@ def get_true_topics(n_topics, vocab_size):
     topics = generate_topics(betas=betas, seed=0, shuffle=True)
     return topics
 
-def generate_documents(topics, n_topics, vocab_size, avg_num_words, alpha=.05, seed=0):
-    num_docs = 50
+def generate_documents(topics, n_topics, vocab_size, avg_num_words, alpha=.05, seed=0, num_docs=50):
     np.random.seed(seed)
     doc_topic_dists = np.random.dirichlet([alpha] * n_topics, size=num_docs)
     documents = []
@@ -56,9 +55,9 @@ def generate_documents(topics, n_topics, vocab_size, avg_num_words, alpha=.05, s
         documents.append(doc.astype(np.float32))
     return documents, doc_topic_dists
 
-def create_toy_bar_docs(doc_file, n_topics, vocab_size):
+def create_toy_bar_docs(doc_file, n_topics, vocab_size, num_docs=50):
     true_topics = get_true_topics(n_topics, vocab_size)
-    docs, _ = generate_documents(true_topics, n_topics, vocab_size, 50)
+    docs, _ = generate_documents(true_topics, n_topics, vocab_size, 50, num_docs=num_docs)
     np.save(doc_file, docs)
 
 
@@ -105,3 +104,42 @@ class ToyBarsDataset(data.Dataset):
         # document = torch.from_numpy(document.astype(np.float32)).type(dtype)
         # topics = torch.from_numpy(topics.astype(np.float32)).type(dtype)
         return document, topics
+
+
+
+class ToyBarsDocsDataset(data.Dataset):
+    def __init__(self, doc_file, n_topics, vocab_size, alpha, use_cuda, training=True, generate=True):
+        if not os.path.exists(doc_file):
+            create_toy_bar_docs(doc_file, n_topics, vocab_size, num_docs=10)
+        device = torch.device("cuda:0" if use_cuda else "cpu")
+        dtype = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
+        self.documents = torch.from_numpy(np.load(doc_file)).type(dtype)
+        self.num_docs = len(self.documents)
+        self.vocab_size = vocab_size
+        self.alpha = alpha
+        self.use_cuda = use_cuda
+        self.training = training
+        self.generate = generate
+        self.documents = self.documents.to(device)
+        
+
+    def __len__(self):
+        """ Denotes the total number of samples """
+        if self.training:
+            return int(self.num_docs * .8)
+        else:
+            return int(self.num_docs * .2)
+
+    def __getitem__(self, index):
+        """ Generates one sample of data """
+        num_train = self.num_docs * .8
+        if self.training:
+            idx = int(index % num_train)
+        else:
+            idx = int(index + num_train)
+
+        document = self.documents[idx]
+        # dtype = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
+        # document = torch.from_numpy(document.astype(np.float32)).type(dtype)
+        # topics = torch.from_numpy(topics.astype(np.float32)).type(dtype)
+        return document

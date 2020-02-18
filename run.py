@@ -10,7 +10,7 @@ from pyro.infer import Trace_ELBO
 from pyro.infer.mcmc import NUTS
 
 from dataset import ToyBarsDataset
-from model import VAE
+from model import APE
 from train import train
 from evaluate import TimedSVI, TimedMCMC, TimedAVI
 from evaluate import get_posterior_predictive_density
@@ -83,7 +83,7 @@ if __name__ == "__main__":
     names = []
     inferences = []
 
-    vae = VAE(**model_config)
+    vae = APE(**model_config)
 
     if args.run_avi:
         model_path = os.path.join(args.results_dir, 'ape.dict')

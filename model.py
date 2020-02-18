@@ -118,10 +118,10 @@ class Decoder(nn.Module):
         return torch.squeeze(word_probs, 1)
 
 
-class VAE(nn.Module):
+class APE(nn.Module):
     def __init__(self, n_hidden_units=100, n_hidden_layers=2, results_dir=None,
                  alpha=.1, vocab_size=9, n_topics=4, use_cuda=False, architecture='naive', scale_type='sample', skip_connections=False, **kwargs):
-        super(VAE, self).__init__()
+        super(APE, self).__init__()
 
         # create the encoder and decoder networks
         self.scale_type = scale_type
@@ -199,3 +199,80 @@ class VAE(nn.Module):
         with pyro.plate("data", x.shape[0]):
             z_loc = pyro.param("z_loc", self.z_loc)
             pyro.sample("latent", dist.Delta(z_loc).to_event(1))
+
+
+
+class APE_VAE(nn.Module):
+    """
+    The difference between APE and APE_VAE is that APE takes in topics during the training process, while APE_VAE learns topics via gradient descent.
+    """
+    def __init__(self, n_hidden_units=100, n_hidden_layers=2, results_dir=None,
+                 alpha=.1, vocab_size=9, n_topics=4, use_cuda=False, architecture='naive', scale_type='sample', skip_connections=False, **kwargs):
+        super(APE, self).__init__()
+
+        # create the encoder and decoder networks
+        self.scale_type = scale_type
+        if self.scale_type == 'sample':
+            self.encoder = Encoder(
+                n_hidden_units,
+                n_hidden_layers,
+                architecture,
+                n_topics=n_topics,
+                vocab_size=vocab_size,
+                use_scale=False,
+                skip_connections=skip_connections)
+            self.decoder = Decoder(use_scale=True)
+        elif self.scale_type == 'mean':
+            self.encoder = Encoder(
+                n_hidden_units,
+                n_hidden_layers,
+                architecture,
+                n_topics=n_topics,
+                vocab_size=vocab_size,
+                use_scale=True,
+                skip_connections=skip_connections)
+            self.decoder = Decoder(use_scale=False)
+        if use_cuda:
+            # calling cuda() here will put all the parameters of
+            # the encoder and decoder networks into gpu memory
+            self.cuda()
+            device = 'cuda:0'
+        else:
+            device = 'cpu'
+        self.use_cuda = use_cuda
+        self.n_topics = n_topics
+        alpha_vec = alpha * np.ones((1, n_topics)).astype(np.float32)
+        self.z_loc = torch.from_numpy((np.log(alpha_vec).T - np.mean(np.log(alpha_vec), 1)).T).float().to(device)
+        self.z_scale = torch.from_numpy((
+            ((1.0 / alpha_vec) * (1 - (2.0 / n_topics))).T +
+            (1.0 / (n_topics * n_topics)) * np.sum(1.0 / alpha_vec, 1)
+        ).T).float().to(device)
+
+        self.n_topics = n_topics
+        self.n_hidden_layers = n_hidden_layers
+        self.n_hidden_units = n_hidden_units
+        self.results_dir = results_dir
+        self.architecture = architecture
+        self.topics = torch.tensor(n_topics, vocab_size, requires_grad=True)
+        torch.nn.init.xavier_normal_(self.topics, gain=1.0)
+
+    def model(self, x):
+        # register PyTorch module `decoder` with Pyro
+        pyro.module("decoder", self.decoder)
+        with pyro.plate("data", x.shape[0]):
+            z = pyro.sample("latent",
+                            dist.Normal(self.z_loc, self.z_scale).to_event(1))
+            word_probs = self.decoder.forward(z, self.topics)
+            return pyro.sample("doc_words",
+                        dist.Multinomial(probs=word_probs),
+                        obs=x)
+
+    def encoder_guide(self, x):
+        # register PyTorch module `encoder` with Pyro
+        pyro.module("encoder", self.encoder)
+        with pyro.plate("data", x.shape[0]):
+            # use the encoder to get the parameters used to define q(z|x)
+            z_loc, z_scale = self.encoder.forward(x, self.topics)
+            # sample the latent code z
+            pyro.sample("latent",
+                        dist.Normal(z_loc, z_scale).to_event(1))
