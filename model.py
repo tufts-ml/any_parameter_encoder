@@ -114,8 +114,8 @@ class Decoder(nn.Module):
     def forward(self, z, topics):
         if self.use_scale:
             z = torch.mul(autograd.Variable(self.scale), z)
-        word_probs = torch.bmm(self.softmax(z).unsqueeze(1), topics)
-        return torch.squeeze(word_probs, 1)
+        word_probs = torch.matmul(self.softmax(z), topics)
+        return word_probs
 
 
 class APE(nn.Module):
@@ -201,6 +201,47 @@ class APE(nn.Module):
             pyro.sample("latent", dist.Delta(z_loc).to_event(1))
 
 
+class Encoder_APE_VAE(Encoder):
+    def __init__(self, n_hidden_units, n_hidden_layers, architecture, **kwargs):
+        super(Encoder_APE_VAE, self).__init__(n_hidden_units, n_hidden_layers, architecture, **kwargs)
+    
+    def forward(self, x, topics):
+        # define the forward computation on the image x
+        # first shape the mini-batch to have pixels in the rightmost dimension
+        x = x.reshape(-1, self.vocab_size)
+        if self.architecture == 'naive':
+            x_and_topics = torch.cat((x, topics.reshape(-1, self.n_topics * self.vocab_size)), dim=1)
+            # then return a mean vector and a (positive) square root covariance
+            # each of size batch_size x n_topics
+            z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
+            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+        elif self.architecture == 'template':
+            x_and_topics = torch.matmul(x, torch.transpose(topics, 0, 1))
+            print(x_and_topics.shape)
+            x_and_topics = torch.div(x_and_topics, torch.sum(x_and_topics, dim=1).reshape((-1, 1)))
+            z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
+            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+        elif self.architecture == 'template_plus_topics':
+            x_and_topics = torch.matmul(x, torch.transpose(topics, 0, 1))
+            x_and_topics = torch.div(x_and_topics, torch.sum(x_and_topics, dim=1).reshape((-1, 1)))
+            x_and_topics = torch.cat((x_and_topics, topics.reshape(-1, self.n_topics * self.vocab_size)), dim=1)
+            z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
+            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+        elif self.architecture == 'standard':
+            z_loc = self.bnmu(self.fcmu(self.enc_layers(x)))
+            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x)))))
+        elif self.architecture == 'naive_separated':
+            x_and_topics = torch.cat((x, topics.reshape(-1, self.n_topics * self.vocab_size)), dim=1)
+            # then return a mean vector and a (positive) square root covariance
+            # each of size batch_size x n_topics
+            z_loc = self.bnmu(self.fcmu(self.enc_layers_mu(x_and_topics)))
+            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers_sigma(x_and_topics)))))
+        else:
+            raise ValueError('Invalid architecture')
+        if self.use_scale:
+            z_loc = torch.mul(self.scale, z_loc)
+        return z_loc, z_scale
+
 
 class APE_VAE(nn.Module):
     """
@@ -208,12 +249,12 @@ class APE_VAE(nn.Module):
     """
     def __init__(self, n_hidden_units=100, n_hidden_layers=2, results_dir=None,
                  alpha=.1, vocab_size=9, n_topics=4, use_cuda=False, architecture='naive', scale_type='sample', skip_connections=False, **kwargs):
-        super(APE, self).__init__()
+        super(APE_VAE, self).__init__()
 
         # create the encoder and decoder networks
         self.scale_type = scale_type
         if self.scale_type == 'sample':
-            self.encoder = Encoder(
+            self.encoder = Encoder_APE_VAE(
                 n_hidden_units,
                 n_hidden_layers,
                 architecture,
@@ -253,7 +294,7 @@ class APE_VAE(nn.Module):
         self.n_hidden_units = n_hidden_units
         self.results_dir = results_dir
         self.architecture = architecture
-        self.topics = torch.tensor(n_topics, vocab_size, requires_grad=True)
+        self.topics = torch.empty(n_topics, vocab_size, requires_grad=True)
         torch.nn.init.xavier_normal_(self.topics, gain=1.0)
 
     def model(self, x):

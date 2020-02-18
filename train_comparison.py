@@ -29,7 +29,7 @@ except RuntimeError:
 
 parser = argparse.ArgumentParser(description='Results summary')
 parser.add_argument('--results_dir', type=str, help='directory of results')
-parser.add_argument('--architecture', type=str, help='encoder architecture')
+parser.add_argument('--architecture', type=str, help='encoder architecture', default='template')
 args = parser.parse_args()
 
 use_cuda = torch.cuda.is_available()
@@ -84,23 +84,25 @@ if __name__ == "__main__":
     validation_generator = data.DataLoader(validation_set, **loader_config)
     pyro_scheduler = ExponentialLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, 'gamma': 0.95})
     
-    ape_training_set = ToyBarsDataset(training=True, doc_file='data/toy_bar_docs.npy', topics_file='data/train_topics.npy', num_models=50000, **data_config)
-    ape_validation_set = ToyBarsDataset(training=False, doc_file='data/toy_bar_docs.npy', topics_file='data/valid_topics.npy', num_models=500, **data_config)
+    ape_training_set = ToyBarsDataset(training=True, doc_file='data/toy_bar_docs.npy', topics_file='data/train_topics.npy', num_models=5, **data_config)
+    ape_validation_set = ToyBarsDataset(training=False, doc_file='data/toy_bar_docs.npy', topics_file='data/valid_topics.npy', num_models=5, **data_config)
     ape_training_generator = data.DataLoader(ape_training_set, **loader_config)
     ape_validation_generator = data.DataLoader(ape_validation_set, **loader_config)
     ape_pyro_scheduler = ExponentialLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, 'gamma': 0.95})
 
     # train APE_VAE from scratch
-    ape_vae = APE_VAE(**model_config)
-    ape_vae_avi = TimedAVI(ape_vae.model, ape_vae.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_samples=100, encoder=ape_vae.encoder)
-    ape_vae_avi = train_from_scratch(ape_vae_avi, training_generator, validation_generator, name='ape_vae', **train_config)
-    torch.save(ape_vae.state_dict(), os.path.join(args.results_dir, 'ape_vae.dict'))
+    # ape_vae = APE_VAE(**model_config)
+    # ape_vae_avi = TimedAVI(ape_vae.model, ape_vae.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_samples=100, encoder=ape_vae.encoder)
+    # ape_vae_avi = train_from_scratch(ape_vae_avi, training_generator, validation_generator, name='ape_vae', **train_config)
+    # torch.save(ape_vae.state_dict(), os.path.join(args.results_dir, 'ape_vae.dict'))
+    print('ape_vae finished')
     
     # train APE
     ape = APE(**model_config)
     ape_avi = TimedAVI(ape.model, ape.encoder_guide, ape_pyro_scheduler, loss=Trace_ELBO(), num_samples=100, encoder=ape.encoder)
     ape_avi = train(ape_avi, ape_training_generator, ape_validation_generator, name='ape', **train_config)
     torch.save(ape.state_dict(), os.path.join(args.results_dir, 'ape.dict'))
+    print('ape finished')
 
     pretrained_dict = ape.state_dict()
     
@@ -115,3 +117,4 @@ if __name__ == "__main__":
     ape_vae_init_avi = TimedAVI(ape_vae_init.model, ape_vae_init.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_samples=100, encoder=ape_vae_init.encoder)
     ape_vae_init_avi = train_from_scratch(ape_vae_init_avi, training_generator, validation_generator, name='ape_vae_init', **train_config)
     torch.save(ape_vae_init.state_dict(), os.path.join(args.results_dir, 'ape_vae_init.dict'))
+    print('ape_vae_init finished')
