@@ -217,7 +217,6 @@ class Encoder_APE_VAE(Encoder):
             z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
         elif self.architecture == 'template':
             x_and_topics = torch.matmul(x, torch.transpose(topics, 0, 1))
-            print(x_and_topics.shape)
             x_and_topics = torch.div(x_and_topics, torch.sum(x_and_topics, dim=1).reshape((-1, 1)))
             z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
             z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
