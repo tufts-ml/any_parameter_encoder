@@ -115,7 +115,6 @@ class ToyBarsDocsDataset(data.Dataset):
         dtype = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
         self.documents = torch.from_numpy(np.load(doc_file)).type(dtype)
         self.num_docs = len(self.documents)
-        print('self.num_docs', self.num_docs)
         self.vocab_size = vocab_size
         self.alpha = alpha
         self.use_cuda = use_cuda

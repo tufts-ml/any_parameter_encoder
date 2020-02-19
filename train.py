@@ -1,9 +1,10 @@
+import numpy as np
 import torch
 from torch.utils import data
 from torch.utils.tensorboard import SummaryWriter
 
 
-def train(vae_svi, training_generator, validation_generator, epochs=1, use_cuda=True, results_dir=None, name=''):
+def train(vae_svi, training_generator, validation_generator, scheduler, epochs=1, use_cuda=True, results_dir=None, name=''):
     """ Specifically to train APE using topics/document combinations """
     writer = SummaryWriter(results_dir)
     # CUDA for PyTorch
@@ -25,6 +26,8 @@ def train(vae_svi, training_generator, validation_generator, epochs=1, use_cuda=
             num_batches += 1
             step += 1
             writer.add_scalar(f'{name} training loss', epoch_loss / num_batches, step)
+            lr = list(scheduler.optim_objs.values())[0].get_lr()
+            writer.add_scalar(f'{name} lr', np.array(lr), step)
             if step % 30 == 0:
                 # Validation
                 with torch.set_grad_enabled(False):
@@ -40,7 +43,7 @@ def train(vae_svi, training_generator, validation_generator, epochs=1, use_cuda=
     return vae_svi
 
 
-def train_from_scratch(vae_svi, training_generator, validation_generator, epochs=1, use_cuda=True, results_dir=None, name=''):
+def train_from_scratch(vae_svi, training_generator, validation_generator, scheduler, epochs=1, use_cuda=True, results_dir=None, name=''):
     writer = SummaryWriter(results_dir)
     # CUDA for PyTorch
     device = torch.device("cuda:0" if use_cuda else "cpu")
@@ -61,6 +64,8 @@ def train_from_scratch(vae_svi, training_generator, validation_generator, epochs
             num_batches += 1
             step += 1
             writer.add_scalar(f'{name} training loss', epoch_loss / num_batches, step)
+            lr = list(scheduler.optim_objs.values())[0].get_lr()
+            writer.add_scalar(f'{name} lr', np.array(lr), step)
             if step % 30 == 0:
                 # Validation
                 with torch.set_grad_enabled(False):
