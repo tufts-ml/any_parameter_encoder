@@ -84,7 +84,7 @@ if __name__ == "__main__":
     training_generator = data.DataLoader(training_set, **loader_config)
     validation_generator = data.DataLoader(validation_set, **loader_config)
     # pyro_scheduler = ExponentialLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, 'gamma': 0.95})
-    pyro_scheduler = ReduceLROnPlateau({'optimizer': torch.optim.Adam, 'optim_args': {"patience": 1}, 'gamma': 0.95})
+    pyro_scheduler = ReduceLROnPlateau({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, "patience": 1})
     pyro_scheduler1 = deepcopy(pyro_scheduler)
     pyro_scheduler2 = deepcopy(pyro_scheduler)
     
@@ -93,7 +93,7 @@ if __name__ == "__main__":
     ape_training_generator = data.DataLoader(ape_training_set, **loader_config)
     ape_validation_generator = data.DataLoader(ape_validation_set, **loader_config)
     # ape_pyro_scheduler = ExponentialLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, 'gamma': 0.95})
-    ape_pyro_scheduler = ReduceLROnPlateau({'optimizer': torch.optim.Adam, 'optim_args': {"patience": 1}, 'gamma': 0.95})
+    ape_pyro_scheduler = ReduceLROnPlateau({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, "patience": 1})
 
     # # train APE_VAE from scratch
     ape_vae = APE_VAE(**model_config)
