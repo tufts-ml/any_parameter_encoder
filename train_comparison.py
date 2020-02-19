@@ -108,8 +108,6 @@ if __name__ == "__main__":
     vae_avi = train_from_scratch(vae_avi, training_generator, validation_generator, pyro_scheduler1, name='vae', **train_config)
     torch.save(vae.state_dict(), os.path.join(args.results_dir, 'vae.dict'))
     print('vae finished')
-    
-    import sys; sys.exit()
 
     # train APE
     ape = APE(**model_config)
