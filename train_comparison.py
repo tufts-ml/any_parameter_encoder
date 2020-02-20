@@ -6,7 +6,7 @@ from copy import deepcopy
 import torch
 from torch.utils import data
 import pyro
-from pyro.optim import ExponentialLR, StepLR, ReduceLROnPlateau
+from pyro.optim import ExponentialLR, StepLR, ReduceLROnPlateau, CosineAnnealingWarmRestarts
 from pyro.infer import Trace_ELBO
 from pyro.infer.mcmc import NUTS
 
@@ -64,7 +64,7 @@ loader_config = {
     'num_workers': 0}
 
 train_config = {
-    'epochs': 10,
+    'epochs': 100,
     'use_cuda': use_cuda,
     'results_dir': args.results_dir,
 }
@@ -85,9 +85,8 @@ if __name__ == "__main__":
     validation_generator = data.DataLoader(validation_set, **loader_config)
     # pyro_scheduler = ExponentialLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, 'gamma': 0.95})
     # pyro_scheduler = ReduceLROnPlateau({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, "patience": 1})
-    pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, "step_size": 250, "gamma": .5})
-    pyro_scheduler1 = deepcopy(pyro_scheduler)
-    pyro_scheduler2 = deepcopy(pyro_scheduler)
+    # pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, "step_size": 250, "gamma": .5})
+    pyro_scheduler = CosineAnnealingWarmRestarts({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .005}})
     
     ape_training_set = ToyBarsDataset(training=True, doc_file='data/toy_bar_docs.npy', topics_file='data/train_topics.npy', num_models=20000, **data_config)
     ape_validation_set = ToyBarsDataset(training=False, doc_file='data/toy_bar_docs.npy', topics_file='data/valid_topics.npy', num_models=50, **data_config)
@@ -95,23 +94,30 @@ if __name__ == "__main__":
     ape_validation_generator = data.DataLoader(ape_validation_set, **loader_config)
     # ape_pyro_scheduler = ExponentialLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, 'gamma': 0.95})
     # ape_pyro_scheduler = ReduceLROnPlateau({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, "patience": 1})
-    ape_pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, "step_size": 250, "gamma": .5})
+    # ape_pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, "step_size": 250, "gamma": .5})
+    ape_pyro_scheduler = CosineAnnealingWarmRestarts({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .005}})
 
-    # # train APE_VAE from scratch
+    # train APE_VAE from scratch
     ape_vae = APE_VAE(**model_config)
     ape_vae_avi = TimedAVI(ape_vae.model, ape_vae.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_samples=100, encoder=ape_vae.encoder)
     ape_vae_avi = train_from_scratch(ape_vae_avi, training_generator, validation_generator, pyro_scheduler, name='ape_vae', **train_config)
     torch.save(ape_vae.state_dict(), os.path.join(args.results_dir, 'ape_vae.dict'))
     print('ape_vae finished')
+    del ape_vae
+    del ape_vae_avi
 
-    # # train VAE from scratch
+    # train VAE from scratch
     standard_model_config = deepcopy(model_config)
     standard_model_config['architecture'] = 'standard'
     vae = APE_VAE(**standard_model_config)
-    vae_avi = TimedAVI(vae.model, vae.encoder_guide, pyro_scheduler1, loss=Trace_ELBO(), num_samples=100, encoder=vae.encoder)
-    vae_avi = train_from_scratch(vae_avi, training_generator, validation_generator, pyro_scheduler1, name='vae', **train_config)
+    # vae_pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .0001}, "step_size": 250, "gamma": .5})
+    vae_pyro_scheduler = CosineAnnealingWarmRestarts({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .0001}})
+    vae_avi = TimedAVI(vae.model, vae.encoder_guide, vae_pyro_scheduler, loss=Trace_ELBO(), num_samples=100, encoder=vae.encoder)
+    vae_avi = train_from_scratch(vae_avi, training_generator, validation_generator, vae_pyro_scheduler, name='vae', **train_config)
     torch.save(vae.state_dict(), os.path.join(args.results_dir, 'vae.dict'))
     print('vae finished')
+    del vae
+    del vae_avi
 
     # train APE
     ape = APE(**model_config)
@@ -123,6 +129,8 @@ if __name__ == "__main__":
     print('ape finished')
 
     pretrained_dict = ape.state_dict()
+    del ape
+    del ape_avi
     
     # train APE_VAE using learned weights from APE
     ape_vae_init = APE_VAE(**model_config)
@@ -132,7 +140,8 @@ if __name__ == "__main__":
     model_dict.update(pretrained_dict)
     ape_vae_init.load_state_dict(pretrained_dict)
 
-    ape_vae_init_avi = TimedAVI(ape_vae_init.model, ape_vae_init.encoder_guide, pyro_scheduler2, loss=Trace_ELBO(), num_samples=100, encoder=ape_vae_init.encoder)
-    ape_vae_init_avi = train_from_scratch(ape_vae_init_avi, training_generator, validation_generator, pyro_scheduler2, name='ape_vae_init', **train_config)
+    ape_vae_init_pyro_scheduler = CosineAnnealingWarmRestarts({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .0001}})
+    ape_vae_init_avi = TimedAVI(ape_vae_init.model, ape_vae_init.encoder_guide, ape_vae_init_pyro_scheduler, loss=Trace_ELBO(), num_samples=100, encoder=ape_vae_init.encoder)
+    ape_vae_init_avi = train_from_scratch(ape_vae_init_avi, training_generator, validation_generator, ape_vae_init_pyro_scheduler, name='ape_vae_init', **train_config)
     torch.save(ape_vae_init.state_dict(), os.path.join(args.results_dir, 'ape_vae_init.dict'))
     print('ape_vae_init finished')
