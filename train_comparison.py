@@ -87,8 +87,10 @@ if __name__ == "__main__":
     # pyro_scheduler = ReduceLROnPlateau({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, "patience": 1})
     # pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, "step_size": 250, "gamma": .5})
     
-    ape_training_set = ToyBarsDataset(training=True, doc_file='data/toy_bar_docs_large.npy', topics_file='data/train_topics.npy', num_models=20000, subset_docs=80000, **data_config)
-    ape_validation_set = ToyBarsDataset(training=False, doc_file='data/toy_bar_docs_large.npy', topics_file='data/valid_topics.npy', num_models=50, subset_docs=80000, **data_config)
+    # ape_training_set = ToyBarsDataset(training=True, doc_file='data/toy_bar_docs_large.npy', topics_file='data/train_topics.npy', num_models=20000, subset_docs=80000, **data_config)
+    # ape_validation_set = ToyBarsDataset(training=False, doc_file='data/toy_bar_docs_large.npy', topics_file='data/valid_topics.npy', num_models=50, subset_docs=80000, **data_config)
+    ape_training_set = ToyBarsDataset(training=True, doc_file='data/toy_bar_docs.npy', topics_file='data/train_topics.npy', num_models=20000, **data_config)
+    ape_validation_set = ToyBarsDataset(training=False, doc_file='data/toy_bar_docs.npy', topics_file='data/valid_topics.npy', num_models=50, **data_config)
     ape_training_generator = data.DataLoader(ape_training_set, **loader_config)
     ape_validation_generator = data.DataLoader(ape_validation_set, **loader_config)
     # ape_pyro_scheduler = ExponentialLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, 'gamma': 0.95})
