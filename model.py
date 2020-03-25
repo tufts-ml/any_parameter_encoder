@@ -104,23 +104,31 @@ class Encoder(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, use_scale=False):
+    def __init__(self, use_scale=False, model_type='avitm'):
         super(Decoder, self).__init__()
         self.use_scale = use_scale
         if self.use_scale:
             self.scale = nn.Parameter(torch.ones([]), requires_grad=False)
         self.softmax = nn.Softmax(dim=1)
+        self.model_type = model_type
 
     def forward(self, z, topics):
         if self.use_scale:
             z = torch.mul(autograd.Variable(self.scale), z)
-        word_probs = torch.matmul(self.softmax(z), topics)
+        if self.model_type == 'avitm':
+            word_probs = torch.matmul(self.softmax(z), topics)
+        elif self.model_type == 'nvdm':
+            bias = torch.zeros(topics.size()[1], requires_grad=True)
+            word_probs = self.softmax(torch.matmul(z, topics).add(bias))
+        else:
+            raise ValueError('Passed unsupported model_type: ', self.model_type)
         return word_probs
 
 
 class APE(nn.Module):
     def __init__(self, n_hidden_units=100, n_hidden_layers=2, results_dir=None,
-                 alpha=.1, vocab_size=9, n_topics=4, use_cuda=False, architecture='naive', scale_type='sample', skip_connections=False, **kwargs):
+                 alpha=.1, vocab_size=9, n_topics=4, use_cuda=False, architecture='naive', 
+                 scale_type='sample', skip_connections=False, model_type='avitm', **kwargs):
         super(APE, self).__init__()
 
         # create the encoder and decoder networks
@@ -247,7 +255,8 @@ class APE_VAE(nn.Module):
     The difference between APE and APE_VAE is that APE takes in topics during the training process, while APE_VAE learns topics via gradient descent.
     """
     def __init__(self, n_hidden_units=100, n_hidden_layers=2, results_dir=None,
-                 alpha=.1, vocab_size=9, n_topics=4, use_cuda=False, architecture='naive', scale_type='sample', skip_connections=False, **kwargs):
+                 alpha=.1, vocab_size=9, n_topics=4, use_cuda=False, architecture='naive',
+                 scale_type='sample', skip_connections=False, model_type='avitm', **kwargs):
         super(APE_VAE, self).__init__()
 
         # create the encoder and decoder networks

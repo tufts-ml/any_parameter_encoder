@@ -48,6 +48,7 @@ model_config = {
     # 'scale_type': 'mean',
     'scale_type': 'sample',
     'skip_connections': False,
+    'model_type': 'nvdm'
 }
 
 data_config = {
@@ -99,6 +100,7 @@ if __name__ == "__main__":
 
     # # train APE_VAE from scratch
     for i in [.005, .0005]:
+        model_config['architecture'] = 'naive'
         ape_vae = APE_VAE(**model_config)
         # pyro_scheduler = CosineAnnealingWarmRestarts({'optimizer': torch.optim.Adam, 'T_0': 5000, 'optim_args': {"lr": .005}})
         pyro_scheduler = CosineAnnealingWarmRestarts({'optimizer': torch.optim.Adam, 'T_0': 5000, 'optim_args': {"lr": i}})
