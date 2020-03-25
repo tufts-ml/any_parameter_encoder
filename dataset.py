@@ -110,12 +110,14 @@ class ToyBarsDataset(data.Dataset):
 
 
 class ToyBarsDocsDataset(data.Dataset):
-    def __init__(self, doc_file, n_topics, vocab_size, alpha, use_cuda, training=True, generate=True):
+    def __init__(self, doc_file, n_topics, vocab_size, alpha, use_cuda, training=True, generate=True, subset_docs=None):
         if not os.path.exists(doc_file):
             create_toy_bar_docs(doc_file, n_topics, vocab_size, num_docs=100000)
         device = torch.device("cuda:0" if use_cuda else "cpu")
         dtype = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
         self.documents = torch.from_numpy(np.load(doc_file)).type(dtype)
+        if subset_docs:
+            self.documents = self.documents[:subset_docs]
         self.num_docs = len(self.documents)
         self.vocab_size = vocab_size
         self.alpha = alpha
