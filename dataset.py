@@ -55,9 +55,9 @@ def generate_documents(topics, n_topics, vocab_size, avg_num_words, alpha=.05, s
         documents.append(doc.astype(np.float32))
     return documents, doc_topic_dists
 
-def create_toy_bar_docs(doc_file, n_topics, vocab_size, num_docs=50):
+def create_toy_bar_docs(doc_file, n_topics, vocab_size, num_docs=50, seed=0):
     true_topics = get_true_topics(n_topics, vocab_size)
-    docs, _ = generate_documents(true_topics, n_topics, vocab_size, 50, num_docs=num_docs)
+    docs, _ = generate_documents(true_topics, n_topics, vocab_size, 50, num_docs=num_docs, seed=seed)
     np.save(doc_file, docs)
 
 
