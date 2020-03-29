@@ -80,7 +80,7 @@ def train_from_scratch(vae_svi, training_generator, validation_generator, schedu
                 writer.add_scalar(f'{name} validation loss', val_loss / num_val_batches, step)
     return vae_svi
 
-def train_ape(vae_svi, data_generators, scheduler, epochs=1, use_cuda=True, results_dir=None, name=''):
+def train_ape(vae_svi, data_generators, scheduler, epochs=1, use_cuda=True, results_dir=None, name='', display_step=30):
     """ Specifically to train APE using topics/document combinations """
     writer = SummaryWriter(results_dir)
     # CUDA for PyTorch
@@ -104,7 +104,7 @@ def train_ape(vae_svi, data_generators, scheduler, epochs=1, use_cuda=True, resu
             writer.add_scalar(f'{name} training loss', epoch_loss / num_batches, step)
             lr = list(scheduler.optim_objs.values())[0].get_lr()
             writer.add_scalar(f'{name} lr', np.array(lr), step)
-            if step % 30 == 0:
+            if step % display_step == 0:
                 summary_dict = {'train': epoch_loss / num_batches}
                 # Validation
                 for key in data_generators.keys():

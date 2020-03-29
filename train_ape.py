@@ -73,7 +73,11 @@ train_config = {
     'epochs': 100,
     'use_cuda': use_cuda,
     'results_dir': args.results_dir,
+    'display_step': 30
 }
+
+if args.test:
+    train_config['display_step'] = 1
 
 eval_config = {
     'documents': 'data/toy_bar_docs.npy',
