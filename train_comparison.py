@@ -48,7 +48,7 @@ model_config = {
     # 'scale_type': 'mean',
     'scale_type': 'sample',
     'skip_connections': False,
-    'model_type': 'nvdm'
+    'model_type': 'avitm'
 }
 
 data_config = {
