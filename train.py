@@ -111,7 +111,7 @@ def train_ape(vae_svi, data_generators, scheduler, epochs=1, use_cuda=True, resu
                     if key != 'train':
                         val_loss = get_val_loss(vae_svi, data_generators[key], use_cuda, device)
                         summary_dict.update({key: val_loss})
-                writer.add_scalar('losses', summary_dict, step)
+                writer.add_scalars('losses', summary_dict, step)
     return vae_svi
 
 def get_val_loss(vae_svi, validation_generator, use_cuda, device):
