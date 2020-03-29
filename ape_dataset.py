@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import torch
+from torch.utils import data
 
 from dataset import create_toy_bar_docs, generate_topics, generate_documents
 
@@ -22,7 +23,7 @@ def create_docs(doc_file, n_topics, vocab_size, num_docs):
         raise ValueError('doc_file must include "same," "sim," or "diff"')
 
 def generate_topic_sets(topics_file, num_models, betas, seed=1):
-    topic_sets = np.array([generate_topics(betas, seed) for _ in num_models])
+    topic_sets = np.array([generate_topics(betas, seed) for _ in range(num_models)])
     np.save(topics_file, topic_sets)
 
 def create_topics(topics_file, n_topics, vocab_size, num_models):
@@ -50,12 +51,12 @@ class APEDataset(data.Dataset):
         topics = np.load(topics_file)
 
         if num_docs > len(documents):
-            raise ValueError(f'{doc_file} does contains less than {num_docs} documents')
+            raise ValueError(f'{doc_file} contains less than {num_docs} documents')
         elif num_docs < len(documents):
             documents = documents[:num_docs]
 
         if num_models > len(topics):
-            raise ValueError(f'{topics_file} does contains less than {num_models} topics')
+            raise ValueError(f'{topics_file} contains less than {num_models} topics')
         elif num_models < len(topics):
             documents = documents[:num_models]
 

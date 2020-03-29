@@ -31,6 +31,7 @@ except RuntimeError:
 parser = argparse.ArgumentParser(description='Results summary')
 parser.add_argument('--results_dir', type=str, help='directory of results')
 parser.add_argument('--architecture', type=str, help='encoder architecture', default='template')
+parser.add_argument('--test', dest='test', action='store_true')
 args = parser.parse_args()
 
 use_cuda = torch.cuda.is_available()
@@ -45,7 +46,6 @@ model_config = {
     'n_topics': 20,
     'use_cuda': use_cuda,
     'architecture': args.architecture,
-    # 'scale_type': 'mean',
     'scale_type': 'sample',
     'skip_connections': False,
     'model_type': 'avitm'
@@ -59,8 +59,13 @@ data_config = {
     'num_docs': 150
 }
 
+if args.test:
+    data_config['num_models'] = 3
+    data_config['num_docs'] = 2
+
 loader_config = {
-    'batch_size': 500,
+    # 'batch_size': 500,
+    'batch_size': 2,
     'shuffle': True,
     'num_workers': 0}
 
@@ -78,13 +83,19 @@ eval_config = {
 if __name__ == "__main__":
     wandb.init(sync_tensorboard=True, project="any_parameter_encoder", entity="lily", name=args.results_dir)
     
+    if not os.path.exists('ape_data'):
+        os.mkdir('ape_data')
+
     train_data_config = deepcopy(data_config)
-    train_data_config.update({'num_models': 10000, 'num_docs': 5000})
+    if args.test:
+        train_data_config.update({'num_models': 4, 'num_docs': 3})
+    else:
+        train_data_config.update({'num_models': 10000, 'num_docs': 5000})
     ape_training_set = APEDataset(doc_file='ape_data/same_docs.npy', topics_file='ape_data/same_topics.npy', **train_data_config)
-    data_generators = {'train': ape_training_set}
+    data_generators = {'train': data.DataLoader(ape_training_set, **loader_config)}
     for combo in itertools.product(['same', 'sim', 'diff'], ['same', 'sim', 'diff']):
         doc, topic = combo
-        dataset = APEDataset(training=True, doc_file=f'ape_data/{doc}_docs.npy', topics_file=f'ape_data/{topic}_topics.npy', **data_config)
+        dataset = APEDataset(doc_file=f'ape_data/{doc}_docs.npy', topics_file=f'ape_data/{topic}_topics.npy', **data_config)
         data_generators[combo] = data.DataLoader(dataset, **loader_config)
 
     # train APE
