@@ -94,10 +94,10 @@ if __name__ == "__main__":
     if args.test:
         train_data_config.update({'num_models': 4, 'num_docs': 3})
     else:
-        train_data_config.update({'num_models': 10000, 'num_docs': 5000})
-    ape_training_set = APEDataset(doc_file='ape_data/same_docs.npy', topics_file='ape_data/same_topics.npy', **train_data_config)
+        train_data_config.update({'num_models': 100000, 'num_docs': 5000})
+    ape_training_set = APEDataset(doc_file='ape_data/same_docs.npy', topics_file='ape_data/big_same_topics.npy', **train_data_config)
     data_generators = {'train': data.DataLoader(ape_training_set, **loader_config)}
-    for combo in itertools.product(['same', 'sim', 'diff'], ['same', 'sim', 'diff']):
+    for combo in itertools.product(['same', 'sim', 'diff'], ['big_same', 'sim', 'diff']):
         doc, topic = combo
         dataset = APEDataset(doc_file=f'ape_data/{doc}_docs.npy', topics_file=f'ape_data/{topic}_topics.npy', **data_config)
         data_generators[combo] = data.DataLoader(dataset, **loader_config)
