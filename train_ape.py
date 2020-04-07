@@ -64,8 +64,7 @@ if args.test:
     data_config['num_docs'] = 2
 
 loader_config = {
-    # 'batch_size': 500,
-    'batch_size': 2,
+    'batch_size': 500,
     'shuffle': True,
     'num_workers': 0}
 
