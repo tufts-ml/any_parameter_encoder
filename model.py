@@ -41,7 +41,7 @@ class Encoder(nn.Module):
         self.architecture = architecture
         if architecture == 'naive' or architecture == 'naive_separated':
             modules.append(MLP((1 + n_topics) * vocab_size, n_hidden_units))
-        elif architecture in ['template', 'template_unnorm', 'pseudo_inverse', 'pseudo_inverse_scaled']:
+        elif architecture in ['template', 'template_unnorm', 'pseudo_inverse', 'pseudo_inverse_scaled', 'pseudo_inverse_unnorm']:
             modules.append(MLP(n_topics, n_hidden_units))
         elif architecture == 'template_plus_topics':
             modules.append(MLP(n_topics * (1 + vocab_size), n_hidden_units))
