@@ -109,6 +109,7 @@ if __name__ == "__main__":
         ape_model_config['model_type'] = model_type
         ape_model_config['architecture'] = architecture
         ape_model_config['n_hidden_layers'] = 0
+        ape_model_config['n_hidden_units'] = ape_model_config['n_topics']
 
         if topic_type == 'true_topics':
             val_gen = true_ape_val_generator
