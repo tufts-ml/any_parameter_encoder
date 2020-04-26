@@ -26,7 +26,8 @@ class MLP_with_skip(MLP):
         return self.bn(x + self.relu(self.fc(x)))
 
 class Encoder(nn.Module):
-    def __init__(self, n_hidden_units, n_hidden_layers, architecture, n_topics=4, vocab_size=9, use_scale=False, skip_connections=False):
+    def __init__(self, n_hidden_units, n_hidden_layers, architecture, n_topics=4, vocab_size=9, use_scale=False, skip_connections=False,
+                 model_type='avitm'):
         super(Encoder, self).__init__()
         self.n_hidden_layers = n_hidden_layers
         self.vocab_size = vocab_size
@@ -34,6 +35,7 @@ class Encoder(nn.Module):
         # setup the non-linearities
         self.relu = F.relu
         self.skip_connections = skip_connections
+        self.model_type = model_type
         # encoder Linear layers
         modules = []
         self.architecture = architecture
@@ -96,6 +98,27 @@ class Encoder(nn.Module):
             # each of size batch_size x n_topics
             z_loc = self.bnmu(self.fcmu(self.enc_layers_mu(x_and_topics)))
             z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers_sigma(x_and_topics)))))
+        elif self.architecture == 'template_unnorm':
+            x_and_topics = torch.einsum("ab,abc->ac", (x, torch.transpose(topics, 1, 2)))
+            z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
+            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+        elif self.architecture == 'pseudo_inverse':
+            x_and_topics = torch.einsum("ab,abc->ac", (x, torch.transpose(topics, 1, 2)))  # [batch, n_topics] 
+            topics_topics_t = torch.einsum("abc,acb->abb", (topics, torch.transpose(topics, 1, 2)))  # [batch, n_topics, n_topics]
+            x_and_topics = torch.einsum("abb,ab->ab", (topics_topics_t, x_and_topics))  # [batch, n_topics]
+            z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
+            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+        elif self.architecture == 'pseudo_inverse_scaled':
+            x = torch.div(x, torch.sum(x, dim=1).reshape((-1, 1)))
+            if self.model_type == 'nvdm':
+                x = torch.log(x)
+            x_and_topics = torch.einsum("ab,abc->ac", (x, torch.transpose(topics, 1, 2)))  # [batch, n_topics] 
+            topics_topics_t = torch.einsum("abc,acb->abb", (topics, torch.transpose(topics, 1, 2)))  # [batch, n_topics, n_topics]
+            x_and_topics = torch.einsum("abb,ab->ab", (topics_topics_t, x_and_topics))  # [batch, n_topics]
+            if self.model_type == 'avitm':
+                x_and_topics = torch.log(x_and_topics)
+            z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
+            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
         else:
             raise ValueError('Invalid architecture')
         if self.use_scale:
@@ -141,7 +164,8 @@ class APE(nn.Module):
                 n_topics=n_topics,
                 vocab_size=vocab_size,
                 use_scale=False,
-                skip_connections=skip_connections)
+                skip_connections=skip_connections,
+                model_type=model_type)
             self.decoder = Decoder(use_scale=True)
         elif self.scale_type == 'mean':
             self.encoder = Encoder(
@@ -151,8 +175,9 @@ class APE(nn.Module):
                 n_topics=n_topics,
                 vocab_size=vocab_size,
                 use_scale=True,
-                skip_connections=skip_connections)
-            self.decoder = Decoder(use_scale=False)
+                skip_connections=skip_connections,
+                model_type=model_type)
+            self.decoder = Decoder(use_scale=False, model_type=model_type)
         if use_cuda:
             # calling cuda() here will put all the parameters of
             # the encoder and decoder networks into gpu memory
