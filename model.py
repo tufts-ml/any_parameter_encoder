@@ -118,7 +118,8 @@ class Encoder(nn.Module):
         elif self.architecture == 'pseudo_inverse_scaled':
             x = torch.div(x, torch.sum(x, dim=1).reshape((-1, 1)))
             if self.model_type == 'nvdm':
-                x = torch.log(x)
+                # log(1 + x) to avoid nans
+                x = torch.log1p(x)
             x_and_topics = torch.einsum("ab,abc->ac", (x, torch.transpose(topics, 1, 2)))  # [batch, n_topics] 
             topics_topics_t = torch.einsum("abc,acd->abd", (topics, torch.transpose(topics, 1, 2)))  # [batch, n_topics, n_topics]
             x_and_topics = torch.einsum("abd,ad->ab", (topics_topics_t, x_and_topics))  # [batch, n_topics]
