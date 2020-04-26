@@ -99,9 +99,12 @@ if __name__ == "__main__":
 
     losses_to_record = {}
 
+    models = ['avitm', 'nvdm']
+    architectures = ['template', 'template_unnorm', 'pseudo_inverse', 'pseudo_inverse_scaled']
+
     # test APE, no training
     ape_model_config = deepcopy(model_config)
-    for combo in itertools.product(['true_topics', 'random_topics'], ['avitm', 'nvdm'], ['template_unnorm', 'pseudo_inverse', 'pseudo_inverse_scaled']):
+    for combo in itertools.product(['true_topics', 'random_topics'], models, architectures):
         topic_type, model_type, architecture = combo
         ape_model_config['model_type'] = model_type
         ape_model_config['architecture'] = architecture
@@ -121,7 +124,7 @@ if __name__ == "__main__":
 
     # test APE_VAE with training
     ape_vae_model_config = deepcopy(model_config)
-    for combo in itertools.product(['avitm', 'nvdm'], ['template_unnorm', 'pseudo_inverse', 'pseudo_inverse_scaled']):
+    for combo in itertools.product(models, architectures):
         model_type, architecture = combo
         ape_vae_model_config['model_type'] = model_type
         ape_vae_model_config['architecture'] = architecture
