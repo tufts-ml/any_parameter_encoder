@@ -100,7 +100,7 @@ if __name__ == "__main__":
     losses_to_record = {}
 
     models = ['avitm', 'nvdm']
-    architectures = ['template', 'template_unnorm', 'pseudo_inverse', 'pseudo_inverse_scaled']
+    architectures = ['template', 'template_unnorm', 'pseudo_inverse', 'pseudo_inverse_unnorm', 'pseudo_inverse_scaled']
 
     # test APE, no training
     ape_model_config = deepcopy(model_config)
