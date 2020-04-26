@@ -62,6 +62,12 @@ class Encoder(nn.Module):
             self.enc_layers = nn.Sequential(*modules)
         self.fcmu = nn.Linear(n_hidden_units, n_topics)
         self.fcsigma = nn.Linear(n_hidden_units, n_topics)
+
+        self.fcmu.weight = torch.eye(n_topics)
+        self.fcsigma.weight = torch.zeros((n_topics, n_topics))
+        self.fcmu.bias = torch.zeros(n_topics)
+        self.fcsigma.weight = torch.ones(n_topics)
+
         self.bnmu = nn.BatchNorm1d(n_topics)
         self.bnsigma = nn.BatchNorm1d(n_topics)
         self.use_scale = use_scale
