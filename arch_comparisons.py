@@ -117,10 +117,10 @@ if __name__ == "__main__":
             val_gen = ape_validation_generator
 
         ape_vae = APE(**ape_model_config)
-    ape_avi = TimedAVI(ape_vae.model, ape_vae.encoder_guide, ape_pyro_scheduler, loss=Trace_ELBO(), num_samples=100, encoder=ape_vae.encoder)
-    val_loss = get_val_loss(ape_avi, val_gen, use_cuda, device)
-    print(combo, val_loss)
-    losses_to_record['.'.join(combo)] = val_loss
+        ape_avi = TimedAVI(ape_vae.model, ape_vae.encoder_guide, ape_pyro_scheduler, loss=Trace_ELBO(), num_samples=100, encoder=ape_vae.encoder)
+        val_loss = get_val_loss(ape_avi, val_gen, use_cuda, device)
+        print(combo, val_loss)
+        losses_to_record['.'.join(combo)] = val_loss
     wandb.log(losses_to_record)
 
     # test APE_VAE with training
