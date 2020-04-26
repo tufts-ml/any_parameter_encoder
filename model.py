@@ -111,13 +111,13 @@ class Encoder(nn.Module):
             z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
         elif self.architecture == 'pseudo_inverse_unnorm':
             x_and_topics = torch.einsum("ab,abc->ac", (x, torch.transpose(topics, 1, 2)))  # [batch, n_topics] 
-            topics_topics_t = torch.einsum("abc,acd->abd", (topics, torch.transpose(topics, 1, 2)))  # [batch, n_topics, n_topics]
+            topics_topics_t = torch.inverse(torch.einsum("abc,acd->abd", (topics, torch.transpose(topics, 1, 2))))  # [batch, n_topics, n_topics]
             x_and_topics = torch.einsum("abd,ad->ab", (topics_topics_t, x_and_topics))  # [batch, n_topics]
             z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
             z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
         elif self.architecture == 'pseudo_inverse':
             x_and_topics = torch.einsum("ab,abc->ac", (x, torch.transpose(topics, 1, 2)))  # [batch, n_topics] 
-            topics_topics_t = torch.einsum("abc,acd->abd", (topics, torch.transpose(topics, 1, 2)))  # [batch, n_topics, n_topics]
+            topics_topics_t = torch.inverse(torch.einsum("abc,acd->abd", (topics, torch.transpose(topics, 1, 2))))  # [batch, n_topics, n_topics]
             x_and_topics = torch.einsum("abd,ad->ab", (topics_topics_t, x_and_topics))  # [batch, n_topics]
             x_and_topics = torch.div(x_and_topics, torch.sum(x_and_topics, dim=1).reshape((-1, 1)))
             z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
@@ -128,7 +128,7 @@ class Encoder(nn.Module):
                 # log(1 + x) to avoid nans
                 x = torch.log1p(x)
             x_and_topics = torch.einsum("ab,abc->ac", (x, torch.transpose(topics, 1, 2)))  # [batch, n_topics] 
-            topics_topics_t = torch.einsum("abc,acd->abd", (topics, torch.transpose(topics, 1, 2)))  # [batch, n_topics, n_topics]
+            topics_topics_t = torch.inverse(torch.einsum("abc,acd->abd", (topics, torch.transpose(topics, 1, 2))))  # [batch, n_topics, n_topics]
             x_and_topics = torch.einsum("abd,ad->ab", (topics_topics_t, x_and_topics))  # [batch, n_topics]
             if self.model_type == 'avitm':
                 x_and_topics = torch.log(x_and_topics)
