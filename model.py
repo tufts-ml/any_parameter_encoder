@@ -63,10 +63,10 @@ class Encoder(nn.Module):
         self.fcmu = nn.Linear(n_hidden_units, n_topics)
         self.fcsigma = nn.Linear(n_hidden_units, n_topics)
 
-        self.fcmu.weight.copy_(torch.eye(n_topics))
-        self.fcsigma.weight.copy_(torch.zeros((n_topics, n_topics)))
-        self.fcmu.bias.copy_(torch.zeros(n_topics))
-        self.fcsigma.weight.copy_(torch.ones(n_topics))
+        self.fcmu.weight.data = torch.eye(n_topics).data
+        self.fcsigma.weight.data = torch.zeros((n_topics, n_topics)).data
+        self.fcmu.bias.data = torch.zeros(n_topics).data
+        self.fcsigma.weight.data = torch.ones(n_topics).data
 
         self.bnmu = nn.BatchNorm1d(n_topics)
         self.bnsigma = nn.BatchNorm1d(n_topics)
