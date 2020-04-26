@@ -235,6 +235,10 @@ class APE(nn.Module):
 
 
 class Encoder_APE_VAE(Encoder):
+    """
+    TODO: instead of subclassing just if if/else branching.
+    The only difference is one less dimension for the topics (e.g. no batch dim)
+    """
     def __init__(self, n_hidden_units, n_hidden_layers, architecture, **kwargs):
         super(Encoder_APE_VAE, self).__init__(n_hidden_units, n_hidden_layers, architecture, **kwargs)
     
@@ -268,6 +272,27 @@ class Encoder_APE_VAE(Encoder):
             # each of size batch_size x n_topics
             z_loc = self.bnmu(self.fcmu(self.enc_layers_mu(x_and_topics)))
             z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers_sigma(x_and_topics)))))
+        elif self.architecture == 'template_unnorm':
+            x_and_topics = torch.einsum("ab,abc->ac", (x, torch.transpose(topics, 0, 1)))
+            z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
+            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+        elif self.architecture == 'pseudo_inverse':
+            x_and_topics = torch.einsum("ab,abc->ac", (x, torch.transpose(topics, 0, 1)))  # [batch, n_topics]
+            topics_topics_t = torch.einsum("abc,acb->abb", (topics, torch.transpose(topics, 0, 1)))  # [batch, n_topics, n_topics]
+            x_and_topics = torch.einsum("abb,ab->ab", (topics_topics_t, x_and_topics))  # [batch, n_topics]
+            z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
+            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+        elif self.architecture == 'pseudo_inverse_scaled':
+            x = torch.div(x, torch.sum(x, dim=1).reshape((-1, 1)))
+            if self.model_type == 'nvdm':
+                x = torch.log(x)
+            x_and_topics = torch.einsum("ab,abc->ac", (x, torch.transpose(topics, 0, 1)))  # [batch, n_topics]
+            topics_topics_t = torch.einsum("abc,acb->abb", (topics, torch.transpose(topics, 0, 1)))  # [batch, n_topics, n_topics]
+            x_and_topics = torch.einsum("abb,ab->ab", (topics_topics_t, x_and_topics))  # [batch, n_topics]
+            if self.model_type == 'avitm':
+                x_and_topics = torch.log(x_and_topics)
+            z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
+            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
         else:
             raise ValueError('Invalid architecture')
         if self.use_scale:
