@@ -308,9 +308,9 @@ class Encoder_APE_VAE(Encoder):
             x = torch.div(x, torch.sum(x, dim=1).reshape((-1, 1)))
             if self.model_type == 'nvdm':
                 x = torch.log(x)
-            x_and_topics = torch.einsum("ab,abc->ac", (x, torch.transpose(topics, 0, 1)))  # [batch, n_topics]
-            topics_topics_t = torch.einsum("abc,acd->abd", (topics, torch.transpose(topics, 0, 1)))  # [batch, n_topics, n_topics]
-            x_and_topics = torch.einsum("abd,ad->ab", (topics_topics_t, x_and_topics))  # [batch, n_topics]
+            x_and_topics = torch.einsum("ab,bc->ac", (x, torch.transpose(topics, 0, 1)))  # [batch, n_topics]
+            topics_topics_t = torch.einsum("abc,cd->abd", (topics, torch.transpose(topics, 0, 1)))  # [batch, n_topics, n_topics]
+            x_and_topics = torch.einsum("bd,ad->ab", (topics_topics_t, x_and_topics))  # [batch, n_topics]
             if self.model_type == 'avitm':
                 x_and_topics = torch.log(x_and_topics)
             z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
