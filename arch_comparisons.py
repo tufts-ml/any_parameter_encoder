@@ -132,7 +132,8 @@ if __name__ == "__main__":
 
         ape_vae = APE_VAE(**ape_vae_model_config)
         ape_vae_avi = TimedAVI(ape_vae.model, ape_vae.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_samples=100, encoder=ape_vae.encoder)
-        ape_vae_avi = train_from_scratch(ape_vae_avi, training_generator, validation_generator, pyro_scheduler, name='ape_vae', **train_config)
+        name = 'ape_vae_' + '_'.join(combo)
+        ape_vae_avi = train_from_scratch(ape_vae_avi, training_generator, validation_generator, pyro_scheduler, name=name, **train_config)
         torch.save(ape_vae.state_dict(), os.path.join(args.results_dir, 'ape_vae.dict'))
         print('ape_vae finished')
         del ape_vae
