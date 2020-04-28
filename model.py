@@ -293,7 +293,14 @@ class Encoder_APE_VAE(Encoder):
             z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
         elif self.architecture == 'pseudo_inverse':
             x_and_topics = torch.einsum("ab,bc->ac", (x, torch.transpose(topics, 0, 1)))  # [batch, n_topics]
-            topics_topics_t = torch.einsum("bc,cb->bb", (topics, torch.transpose(topics, 0, 1)))  # [batch, n_topics, n_topics]
+            topics_topics_t = torch.einsum("bc,cd->bd", (topics, torch.transpose(topics, 0, 1)))  # [batch, n_topics, n_topics]
+            x_and_topics = torch.einsum("bd,ad->ab", (topics_topics_t, x_and_topics))  # [batch, n_topics]
+            x_and_topics = torch.div(x_and_topics, torch.sum(x_and_topics, dim=1).reshape((-1, 1)))
+            z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
+            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+        elif self.architecture == 'pseudo_inverse_unnorm':
+            x_and_topics = torch.einsum("ab,bc->ac", (x, torch.transpose(topics, 0, 1)))  # [batch, n_topics]
+            topics_topics_t = torch.einsum("bc,cd->bd", (topics, torch.transpose(topics, 0, 1)))  # [batch, n_topics, n_topics]
             x_and_topics = torch.einsum("bd,ad->ab", (topics_topics_t, x_and_topics))  # [batch, n_topics]
             z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
             z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))

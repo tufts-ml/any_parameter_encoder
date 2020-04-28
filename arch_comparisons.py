@@ -103,25 +103,25 @@ if __name__ == "__main__":
     architectures = ['template', 'template_unnorm', 'pseudo_inverse', 'pseudo_inverse_unnorm', 'pseudo_inverse_scaled']
 
     # test APE, no training
-    ape_model_config = deepcopy(model_config)
-    for combo in itertools.product(['true_topics', 'random_topics'], models, architectures):
-        topic_type, model_type, architecture = combo
-        ape_model_config['model_type'] = model_type
-        ape_model_config['architecture'] = architecture
-        ape_model_config['n_hidden_layers'] = 0
-        ape_model_config['n_hidden_units'] = ape_model_config['n_topics']
+    # ape_model_config = deepcopy(model_config)
+    # for combo in itertools.product(['true_topics', 'random_topics'], models, architectures):
+    #     topic_type, model_type, architecture = combo
+    #     ape_model_config['model_type'] = model_type
+    #     ape_model_config['architecture'] = architecture
+    #     ape_model_config['n_hidden_layers'] = 0
+    #     ape_model_config['n_hidden_units'] = ape_model_config['n_topics']
 
-        if topic_type == 'true_topics':
-            val_gen = true_ape_val_generator
-        elif topic_type == 'random_topics':
-            val_gen = ape_validation_generator
+    #     if topic_type == 'true_topics':
+    #         val_gen = true_ape_val_generator
+    #     elif topic_type == 'random_topics':
+    #         val_gen = ape_validation_generator
 
-        ape_vae = APE(**ape_model_config)
-        ape_avi = TimedAVI(ape_vae.model, ape_vae.encoder_guide, ape_pyro_scheduler, loss=Trace_ELBO(), num_samples=100, encoder=ape_vae.encoder)
-        val_loss = get_val_loss(ape_avi, val_gen, use_cuda, device)
-        print(combo, val_loss)
-        losses_to_record['.'.join(combo)] = val_loss
-    wandb.log(losses_to_record)
+    #     ape_vae = APE(**ape_model_config)
+    #     ape_avi = TimedAVI(ape_vae.model, ape_vae.encoder_guide, ape_pyro_scheduler, loss=Trace_ELBO(), num_samples=100, encoder=ape_vae.encoder)
+    #     val_loss = get_val_loss(ape_avi, val_gen, use_cuda, device)
+    #     print(combo, val_loss)
+    #     losses_to_record['.'.join(combo)] = val_loss
+    # wandb.log(losses_to_record)
 
     # test APE_VAE with training
     ape_vae_model_config = deepcopy(model_config)
