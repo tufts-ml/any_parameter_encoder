@@ -251,7 +251,6 @@ class APE(nn.Module):
 
 class Encoder_APE_VAE(Encoder):
     """
-    TODO: instead of subclassing just if if/else branching.
     The only difference is one less dimension for the topics (e.g. no batch dim)
     """
     def __init__(self, n_hidden_units, n_hidden_layers, architecture, **kwargs):
@@ -325,6 +324,7 @@ class Encoder_APE_VAE(Encoder):
 class APE_VAE(nn.Module):
     """
     The difference between APE and APE_VAE is that APE takes in topics during the training process, while APE_VAE learns topics via gradient descent.
+    And since the topics need to be learned, there's a softmax constraint in the encoder and decoder.
     """
     def __init__(self, n_hidden_units=100, n_hidden_layers=2, results_dir=None,
                  alpha=.1, vocab_size=9, n_topics=4, use_cuda=False, architecture='naive',
@@ -374,7 +374,7 @@ class APE_VAE(nn.Module):
         self.n_hidden_units = n_hidden_units
         self.results_dir = results_dir
         self.architecture = architecture
-        self.topics = torch.empty(n_topics, vocab_size, requires_grad=True)
+        self.topics = nn.Softmax(dim=1)(torch.empty(n_topics, vocab_size, requires_grad=True))
         torch.nn.init.xavier_normal_(self.topics, gain=1.0)
         self.topics = self.topics.to(device)
 
