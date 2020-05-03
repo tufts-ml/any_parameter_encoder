@@ -67,6 +67,7 @@ train_config = {
     'epochs': 100,
     'use_cuda': use_cuda,
     'results_dir': args.results_dir,
+    'scaled': True
 }
 
 eval_config = {

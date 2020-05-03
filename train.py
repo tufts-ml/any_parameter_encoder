@@ -4,7 +4,7 @@ from torch.utils import data
 from torch.utils.tensorboard import SummaryWriter
 
 
-def train(vae_svi, training_generator, validation_generator, scheduler, epochs=1, use_cuda=True, results_dir=None, name=''):
+def train(vae_svi, training_generator, validation_generator, scheduler, epochs=1, use_cuda=True, results_dir=None, name='', scaled=False):
     """ Specifically to train APE using topics/document combinations """
     writer = SummaryWriter(results_dir)
     # CUDA for PyTorch
@@ -17,6 +17,7 @@ def train(vae_svi, training_generator, validation_generator, scheduler, epochs=1
         epoch_loss = 0
         # Training
         num_batches = 0
+        num_words = 0
         for document, topics in training_generator:
             # Transfer to GPU
             if use_cuda:
@@ -25,7 +26,11 @@ def train(vae_svi, training_generator, validation_generator, scheduler, epochs=1
             epoch_loss += vae_svi.step(document, topics)
             num_batches += 1
             step += 1
-            writer.add_scalar(f'{name} training loss', epoch_loss / num_batches, step)
+            num_words += torch.sum(document).item()
+            if scaled:
+                writer.add_scalar(f'{name} training loss', epoch_loss / num_batches / num_words, step)
+            else:
+                writer.add_scalar(f'{name} training loss', epoch_loss / num_batches, step)
             lr = list(scheduler.optim_objs.values())[0].get_lr()
             writer.add_scalar(f'{name} lr', np.array(lr), step)
             if step % 30 == 0:
@@ -33,17 +38,22 @@ def train(vae_svi, training_generator, validation_generator, scheduler, epochs=1
                 with torch.set_grad_enabled(False):
                     val_loss = 0
                     num_val_batches = 0
+                    num_val_words = 0
                     for document, topics in validation_generator:
                         # Transfer to GPU
                         if use_cuda:
                             document, topics = document.to(device), topics.to(device)
                         val_loss += vae_svi.evaluate_loss(document, topics)
                         num_val_batches += 1
-                writer.add_scalar(f'{name} validation loss', val_loss / num_val_batches, step)
+                        num_val_words += torch.sum(document).item()
+                if scaled:
+                    writer.add_scalar(f'{name} validation loss', val_loss / num_val_batches / num_val_words, step)
+                else:
+                    writer.add_scalar(f'{name} validation loss', val_loss / num_val_batches, step)
     return vae_svi
 
 
-def train_from_scratch(vae_svi, training_generator, validation_generator, scheduler, epochs=1, use_cuda=True, results_dir=None, name=''):
+def train_from_scratch(vae_svi, training_generator, validation_generator, scheduler, epochs=1, use_cuda=True, results_dir=None, name='', scaled=False):
     writer = SummaryWriter(results_dir)
     # CUDA for PyTorch
     device = torch.device("cuda:0" if use_cuda else "cpu")
@@ -55,6 +65,7 @@ def train_from_scratch(vae_svi, training_generator, validation_generator, schedu
         epoch_loss = 0
         # Training
         num_batches = 0
+        num_words = 0
         for document in training_generator:
             # Transfer to GPU
             if use_cuda:
@@ -63,7 +74,11 @@ def train_from_scratch(vae_svi, training_generator, validation_generator, schedu
             epoch_loss += vae_svi.step(document)
             num_batches += 1
             step += 1
-            writer.add_scalar(f'{name} training loss', epoch_loss / num_batches, step)
+            num_words += torch.sum(document).item()
+            if scaled:
+                writer.add_scalar(f'{name} training loss', epoch_loss / num_batches / num_words, step)
+            else:
+                writer.add_scalar(f'{name} training loss', epoch_loss / num_batches, step)
             lr = list(scheduler.optim_objs.values())[0].get_lr()
             writer.add_scalar(f'{name} lr', np.array(lr), step)
             if step % 30 == 0:
@@ -71,16 +86,21 @@ def train_from_scratch(vae_svi, training_generator, validation_generator, schedu
                 with torch.set_grad_enabled(False):
                     val_loss = 0
                     num_val_batches = 0
+                    num_val_words = 0
                     for document in validation_generator:
                         # Transfer to GPU
                         if use_cuda:
                             document = document.to(device)
                         val_loss += vae_svi.evaluate_loss(document)
                         num_val_batches += 1
-                writer.add_scalar(f'{name} validation loss', val_loss / num_val_batches, step)
+                        num_val_words += torch.sum(document).item()
+                if scaled:
+                    writer.add_scalar(f'{name} validation loss', val_loss / num_val_batches / num_val_words, step)
+                else:
+                    writer.add_scalar(f'{name} validation loss', val_loss / num_val_batches, step)
     return vae_svi
 
-def train_ape(vae_svi, data_generators, scheduler, epochs=1, use_cuda=True, results_dir=None, name='', display_step=30):
+def train_ape(vae_svi, data_generators, scheduler, epochs=1, use_cuda=True, results_dir=None, name='', display_step=30, scaled=False):
     """ Specifically to train APE using topics/document combinations """
     writer = SummaryWriter(results_dir)
     # CUDA for PyTorch
@@ -93,6 +113,7 @@ def train_ape(vae_svi, data_generators, scheduler, epochs=1, use_cuda=True, resu
         epoch_loss = 0
         # Training
         num_batches = 0
+        num_words = 0
         for document, topics in data_generators['train']:
             # Transfer to GPU
             if use_cuda:
@@ -101,7 +122,11 @@ def train_ape(vae_svi, data_generators, scheduler, epochs=1, use_cuda=True, resu
             epoch_loss += vae_svi.step(document, topics)
             num_batches += 1
             step += 1
-            writer.add_scalar(f'{name} training loss', epoch_loss / num_batches, step)
+            num_words += torch.sum(document).item()
+            if scaled:
+                writer.add_scalar(f'{name} training loss', epoch_loss / num_batches / num_words, step)
+            else:
+                writer.add_scalar(f'{name} training loss', epoch_loss / num_batches, step)
             lr = list(scheduler.optim_objs.values())[0].get_lr()
             writer.add_scalar(f'{name} lr', np.array(lr), step)
             if step % display_step == 0:
@@ -114,14 +139,19 @@ def train_ape(vae_svi, data_generators, scheduler, epochs=1, use_cuda=True, resu
                 writer.add_scalars('losses', summary_dict, step)
     return vae_svi
 
-def get_val_loss(vae_svi, validation_generator, use_cuda, device):
+def get_val_loss(vae_svi, validation_generator, use_cuda, device, scaled=False):
     with torch.set_grad_enabled(False):
         val_loss = 0
         num_val_batches = 0
+        num_words = 0
         for document, topics in validation_generator:
             # Transfer to GPU
             if use_cuda:
                 document, topics = document.to(device), topics.to(device)
             val_loss += vae_svi.evaluate_loss(document, topics)
             num_val_batches += 1
-    return val_loss / num_val_batches
+            num_words += torch.sum(document).item()
+    if scaled:
+        return val_loss / num_val_batches / num_words
+    else:
+        return val_loss / num_val_batches
