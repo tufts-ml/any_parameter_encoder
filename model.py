@@ -392,8 +392,9 @@ class APE_VAE(nn.Module):
         self.n_hidden_units = n_hidden_units
         self.results_dir = results_dir
         self.architecture = architecture
-        self.topics = nn.Softmax(dim=1)(torch.empty(n_topics, vocab_size, requires_grad=True))
+        self.topics = torch.empty(n_topics, vocab_size, requires_grad=True)
         torch.nn.init.xavier_normal_(self.topics, gain=1.0)
+        self.topics = nn.Softmax(dim=1)(self.topics)
         self.topics = self.topics.to(device)
 
     def model(self, x):
