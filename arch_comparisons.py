@@ -103,6 +103,7 @@ if __name__ == "__main__":
     # test APE, no training
     ape_model_config = deepcopy(model_config)
     for combo in itertools.product(['true_topics', 'random_topics'], models, architectures):
+        ape_pyro_scheduler = CosineAnnealingWarmRestarts({'optimizer': torch.optim.Adam, 'T_0': 500, 'optim_args': {"lr": .005}})
         topic_type, model_type, architecture = combo
         ape_model_config['model_type'] = model_type
         ape_model_config['architecture'] = architecture
