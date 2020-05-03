@@ -90,8 +90,10 @@ if __name__ == "__main__":
     ape_training_generator = data.DataLoader(ape_training_set, **loader_config)
     ape_validation_generator = data.DataLoader(ape_validation_set, **loader_config)
 
+    true_ape_training_set = ToyBarsDataset(training=True, doc_file='data/toy_bar_docs_large.npy', topics_file='data/true_topics.npy', num_models=1, subset_docs=5000, **data_config)
+    true_ape_training_generator = data.DataLoader(true_ape_training_set, **loader_config)
     true_ape_validation_set = ToyBarsDataset(training=False, doc_file='data/toy_bar_docs_large.npy', topics_file='data/true_topics.npy', num_models=1, subset_docs=5000, **data_config)
-    true_ape_val_generator = data.DataLoader(true_ape_validation_set, **loader_config)
+    true_ape_validation_generator = data.DataLoader(true_ape_validation_set, **loader_config)
 
     # pyro_scheduler is for ape_vae
     pyro_scheduler = CosineAnnealingWarmRestarts({'optimizer': torch.optim.Adam, 'T_0': 5000, 'optim_args': {"lr": .005}})
@@ -104,25 +106,25 @@ if __name__ == "__main__":
     architectures = ['template', 'template_unnorm', 'pseudo_inverse', 'pseudo_inverse_unnorm', 'pseudo_inverse_scaled']
 
     # test APE, no training
-    # ape_model_config = deepcopy(model_config)
-    # for combo in itertools.product(['true_topics', 'random_topics'], models, architectures):
-    #     topic_type, model_type, architecture = combo
-    #     ape_model_config['model_type'] = model_type
-    #     ape_model_config['architecture'] = architecture
-    #     ape_model_config['n_hidden_layers'] = 0
-    #     ape_model_config['n_hidden_units'] = ape_model_config['n_topics']
+    ape_model_config = deepcopy(model_config)
+    for combo in itertools.product(['true_topics', 'random_topics'], models, architectures):
+        topic_type, model_type, architecture = combo
+        ape_model_config['model_type'] = model_type
+        ape_model_config['architecture'] = architecture
+        ape_model_config['n_hidden_layers'] = 0
+        ape_model_config['n_hidden_units'] = ape_model_config['n_topics']
 
-    #     if topic_type == 'true_topics':
-    #         val_gen = true_ape_val_generator
-    #     elif topic_type == 'random_topics':
-    #         val_gen = ape_validation_generator
+        if topic_type == 'true_topics':
+            val_gen = true_ape_validation_generator
+        elif topic_type == 'random_topics':
+            val_gen = ape_validation_generator
 
-    #     ape_vae = APE(**ape_model_config)
-    #     ape_avi = TimedAVI(ape_vae.model, ape_vae.encoder_guide, ape_pyro_scheduler, loss=Trace_ELBO(), num_samples=100, encoder=ape_vae.encoder)
-    #     val_loss = get_val_loss(ape_avi, val_gen, use_cuda, device)
-    #     print(combo, val_loss)
-    #     losses_to_record['.'.join(combo)] = val_loss
-    # wandb.log(losses_to_record)
+        ape_vae = APE(**ape_model_config)
+        ape_avi = TimedAVI(ape_vae.model, ape_vae.encoder_guide, ape_pyro_scheduler, loss=Trace_ELBO(), num_samples=100, encoder=ape_vae.encoder)
+        val_loss = get_val_loss(ape_avi, val_gen, use_cuda, device)
+        print(combo, val_loss)
+        losses_to_record['.'.join(combo)] = val_loss
+    wandb.log(losses_to_record)
 
     # test APE_VAE with training
     ape_vae_model_config = deepcopy(model_config)
@@ -153,7 +155,7 @@ if __name__ == "__main__":
     del vae
     del vae_avi
 
-    # test APE with training
+    # test APE with training, use only the true topics
     ape_vae_model_config = deepcopy(model_config)
     for combo in itertools.product(['avitm', 'nvdm'], ['template_unnorm', 'pseudo_inverse', 'pseudo_inverse_scaled']):
         model_type, architecture = combo
@@ -164,6 +166,6 @@ if __name__ == "__main__":
         ape_avi = TimedAVI(ape.model, ape.encoder_guide, ape_pyro_scheduler, loss=Trace_ELBO(), num_samples=100, encoder=ape.encoder)
         ape_train_config = deepcopy(train_config)
         ape_train_config['epochs'] = 1
-        ape_avi = train(ape_avi, ape_training_generator, ape_validation_generator, ape_pyro_scheduler, name='ape', **ape_train_config)
+        ape_avi = train(ape_avi, true_ape_training_generator, true_ape_validation_generator, ape_pyro_scheduler, name='ape', **ape_train_config)
         torch.save(ape.state_dict(), os.path.join(args.results_dir, 'ape.dict'))
         print('ape finished')
