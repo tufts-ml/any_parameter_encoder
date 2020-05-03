@@ -41,7 +41,7 @@ class Encoder(nn.Module):
         self.architecture = architecture
         if architecture == 'naive' or architecture == 'naive_separated':
             modules.append(MLP((1 + n_topics) * vocab_size, n_hidden_units))
-        elif architecture in ['template', 'template_unnorm', 'pseudo_inverse', 'pseudo_inverse_scaled', 'pseudo_inverse_unnorm']:
+        elif architecture in ['template', 'template_scaled', 'template_unnorm', 'pseudo_inverse', 'pseudo_inverse_scaled', 'pseudo_inverse_unnorm']:
             modules.append(MLP(n_topics, n_hidden_units))
         elif architecture == 'template_plus_topics':
             modules.append(MLP(n_topics * (1 + vocab_size), n_hidden_units))
@@ -107,6 +107,15 @@ class Encoder(nn.Module):
             z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers_sigma(x_and_topics)))))
         elif self.architecture == 'template_unnorm':
             x_and_topics = torch.einsum("ab,abc->ac", (x, torch.transpose(topics, 1, 2)))
+            z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
+            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+        elif self.architecture == 'template_scaled':
+            x = torch.div(x, torch.sum(x, dim=1).reshape((-1, 1)))
+            if self.model_type == 'nvdm':
+                x = torch.log1p(x)
+            x_and_topics = torch.einsum("ab,abc->ac", (x, torch.transpose(topics, 1, 2)))
+            if self.model_type == 'avitm':
+                x_and_topics = torch.log1p(x_and_topics)
             z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
             z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
         elif self.architecture == 'pseudo_inverse_unnorm':
@@ -288,6 +297,15 @@ class Encoder_APE_VAE(Encoder):
             z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers_sigma(x_and_topics)))))
         elif self.architecture == 'template_unnorm':
             x_and_topics = torch.einsum("ab,bc->ac", (x, torch.transpose(topics, 0, 1)))
+            z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
+            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+        elif self.architecture == 'template_scaled':
+            x = torch.div(x, torch.sum(x, dim=1).reshape((-1, 1)))
+            if self.model_type == 'nvdm':
+                x = torch.log1p(x)
+            x_and_topics = torch.einsum("ab,bc->ac", (x, torch.transpose(topics, 0, 1)))
+            if self.model_type == 'avitm':
+                x_and_topics = torch.log1p(x_and_topics)
             z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
             z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
         elif self.architecture == 'pseudo_inverse':
