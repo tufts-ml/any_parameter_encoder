@@ -76,7 +76,7 @@ eval_config = {
 }
 
 if __name__ == "__main__":
-    wandb.init(sync_tensorboard=True, project="any_parameter_encoder", entity="lily", name=args.results_dir)
+    wandb.init(sync_tensorboard=True, project="encoder_moment_matching", entity="lily", name=args.results_dir, reinit=True)
     names = []
     inferences = []
 
@@ -95,15 +95,10 @@ if __name__ == "__main__":
     true_ape_validation_set = ToyBarsDataset(training=False, doc_file='data/toy_bar_docs_large.npy', topics_file='data/true_topics.npy', num_models=1, subset_docs=5000, **data_config)
     true_ape_validation_generator = data.DataLoader(true_ape_validation_set, **loader_config)
 
-    # pyro_scheduler is for ape_vae
-    pyro_scheduler = CosineAnnealingWarmRestarts({'optimizer': torch.optim.Adam, 'T_0': 5000, 'optim_args': {"lr": .005}})
-    vae_pyro_scheduler = CosineAnnealingWarmRestarts({'optimizer': torch.optim.Adam, 'T_0': 500, 'optim_args': {"lr": .00001}})
-    ape_pyro_scheduler = CosineAnnealingWarmRestarts({'optimizer': torch.optim.Adam, 'T_0': 500, 'optim_args': {"lr": .005}})
-
     losses_to_record = {}
 
     models = ['avitm', 'nvdm']
-    architectures = ['template', 'template_unnorm', 'pseudo_inverse', 'pseudo_inverse_unnorm', 'pseudo_inverse_scaled']
+    architectures = ['template', 'template_unnorm', 'template_scaled', 'pseudo_inverse', 'pseudo_inverse_unnorm', 'pseudo_inverse_scaled']
 
     # test APE, no training
     ape_model_config = deepcopy(model_config)
@@ -125,24 +120,30 @@ if __name__ == "__main__":
         print(combo, val_loss)
         losses_to_record['.'.join(combo)] = val_loss
     wandb.log(losses_to_record)
+    wandb.join()
 
     # test APE_VAE with training
     ape_vae_model_config = deepcopy(model_config)
     for combo in itertools.product(models, architectures):
+        ape_vae_pyro_scheduler = CosineAnnealingWarmRestarts({'optimizer': torch.optim.Adam, 'T_0': 5000, 'optim_args': {"lr": .005}})
         model_type, architecture = combo
         ape_vae_model_config['model_type'] = model_type
         ape_vae_model_config['architecture'] = architecture
+        name = 'ape_vae_' + '_'.join(combo)
+        wandb.init(sync_tensorboard=True, project="encoder_moment_matching", entity="lily", name=name, reinit=True)
 
         ape_vae = APE_VAE(**ape_vae_model_config)
-        ape_vae_avi = TimedAVI(ape_vae.model, ape_vae.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_samples=100, encoder=ape_vae.encoder)
-        name = 'ape_vae_' + '_'.join(combo)
-        ape_vae_avi = train_from_scratch(ape_vae_avi, training_generator, validation_generator, pyro_scheduler, name=name, **train_config)
-        torch.save(ape_vae.state_dict(), os.path.join(args.results_dir, 'ape_vae.dict'))
+        ape_vae_avi = TimedAVI(ape_vae.model, ape_vae.encoder_guide, ape_vae_pyro_scheduler, loss=Trace_ELBO(), num_samples=100, encoder=ape_vae.encoder)
+        ape_vae_avi = train_from_scratch(ape_vae_avi, training_generator, validation_generator, ape_vae_pyro_scheduler, name=name, **train_config)
+        # torch.save(ape_vae.state_dict(), os.path.join(args.results_dir, 'ape_vae.dict'))
         print('ape_vae finished')
         del ape_vae
         del ape_vae_avi
+        wandb.join()
 
     # train VAE from scratch
+    vae_pyro_scheduler = CosineAnnealingWarmRestarts({'optimizer': torch.optim.Adam, 'T_0': 500, 'optim_args': {"lr": .00001}})
+    wandb.init(sync_tensorboard=True, project="encoder_moment_matching", entity="lily", name='vae', reinit=True)
     standard_model_config = deepcopy(model_config)
     standard_model_config['architecture'] = 'standard'
     vae = APE_VAE(**standard_model_config)
@@ -154,18 +155,25 @@ if __name__ == "__main__":
     print('vae finished')
     del vae
     del vae_avi
+    wandb.join()
 
     # test APE with training, use only the true topics
     ape_vae_model_config = deepcopy(model_config)
     for combo in itertools.product(['avitm', 'nvdm'], ['template_unnorm', 'pseudo_inverse', 'pseudo_inverse_scaled']):
+        ape_pyro_scheduler = CosineAnnealingWarmRestarts({'optimizer': torch.optim.Adam, 'T_0': 500, 'optim_args': {"lr": .005}})
         model_type, architecture = combo
         ape_vae_model_config['model_type'] = model_type
         ape_vae_model_config['architecture'] = architecture
+        name = 'ape_true_' + '_'.join(combo)
+        wandb.init(sync_tensorboard=True, project="encoder_moment_matching", entity="lily", name=name, reinit=True)
 
         ape = APE(**ape_vae_model_config)
         ape_avi = TimedAVI(ape.model, ape.encoder_guide, ape_pyro_scheduler, loss=Trace_ELBO(), num_samples=100, encoder=ape.encoder)
         ape_train_config = deepcopy(train_config)
         ape_train_config['epochs'] = 1
-        ape_avi = train(ape_avi, true_ape_training_generator, true_ape_validation_generator, ape_pyro_scheduler, name='ape', **ape_train_config)
-        torch.save(ape.state_dict(), os.path.join(args.results_dir, 'ape.dict'))
+        ape_avi = train(ape_avi, true_ape_training_generator, true_ape_validation_generator, ape_pyro_scheduler, name=name, **ape_train_config)
+        # torch.save(ape.state_dict(), os.path.join(args.results_dir, 'ape.dict'))
         print('ape finished')
+        del ape
+        del ape_avi
+        wandb.join()
