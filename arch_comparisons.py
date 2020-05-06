@@ -117,7 +117,7 @@ if __name__ == "__main__":
             val_gen = ape_validation_generator
 
         ape_vae = APE(**ape_model_config)
-        ape_avi = TimedAVI(ape_vae.model, ape_vae.encoder_guide, ape_pyro_scheduler, loss=Trace_ELBO(retain_graph=True), num_samples=100, encoder=ape_vae.encoder)
+        ape_avi = TimedAVI(ape_vae.model, ape_vae.encoder_guide, ape_pyro_scheduler, loss=Trace_ELBO(), num_samples=100, encoder=ape_vae.encoder)
         val_loss = get_val_loss(ape_avi, val_gen, use_cuda, device, scaled=True)
         print(combo, val_loss)
         losses_to_record['.'.join(combo)] = val_loss
@@ -136,7 +136,7 @@ if __name__ == "__main__":
         wandb.init(sync_tensorboard=True, project="encoder_moment_matching", entity="lily", name=name, reinit=True)
 
         ape_vae = APE_VAE(**ape_vae_model_config)
-        ape_vae_avi = TimedAVI(ape_vae.model, ape_vae.encoder_guide, ape_vae_pyro_scheduler, loss=Trace_ELBO(), num_samples=100, encoder=ape_vae.encoder)
+        ape_vae_avi = TimedAVI(ape_vae.model, ape_vae.encoder_guide, ape_vae_pyro_scheduler, loss=Trace_ELBO(retain_graph=True), num_samples=100, encoder=ape_vae.encoder)
         ape_vae_avi = train_from_scratch(ape_vae_avi, training_generator, validation_generator, ape_vae_pyro_scheduler, name=name, **train_config)
         # torch.save(ape_vae.state_dict(), os.path.join(args.results_dir, 'ape_vae.dict'))
         print('ape_vae finished')
