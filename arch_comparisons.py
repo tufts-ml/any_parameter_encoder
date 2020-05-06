@@ -76,7 +76,8 @@ eval_config = {
 }
 
 if __name__ == "__main__":
-    wandb.init(sync_tensorboard=True, project="encoder_moment_matching1", entity="lily", name=args.results_dir, reinit=True)
+    project_name = "encoder_moment_matching"
+    wandb.init(sync_tensorboard=True, project=project_name, entity="lily", name=args.results_dir, reinit=True)
     names = []
     inferences = []
 
@@ -133,7 +134,7 @@ if __name__ == "__main__":
         ape_vae_model_config['model_type'] = model_type
         ape_vae_model_config['architecture'] = architecture
         name = 'ape_vae_' + "_".join(combo)
-        wandb.init(sync_tensorboard=True, project="encoder_moment_matching", entity="lily", name=name, reinit=True)
+        wandb.init(sync_tensorboard=True, project=project_name, entity="lily", name=name, reinit=True)
 
         ape_vae = APE_VAE(**ape_vae_model_config)
         ape_vae_avi = TimedAVI(ape_vae.model, ape_vae.encoder_guide, ape_vae_pyro_scheduler, loss=Trace_ELBO(retain_graph=True), num_samples=100, encoder=ape_vae.encoder)
@@ -147,7 +148,7 @@ if __name__ == "__main__":
     # train VAE from scratch
     # vae_pyro_scheduler = CosineAnnealingWarmRestarts({'optimizer': torch.optim.Adam, 'T_0': 500, 'optim_args': {"lr": .00001}})
     vae_pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, "step_size": 250, "gamma": .5})
-    wandb.init(sync_tensorboard=True, project="encoder_moment_matching", entity="lily", name='vae', reinit=True)
+    wandb.init(sync_tensorboard=True, project=project_name, entity="lily", name='vae', reinit=True)
     standard_model_config = deepcopy(model_config)
     standard_model_config['architecture'] = 'standard'
     vae = APE_VAE(**standard_model_config)
@@ -170,7 +171,7 @@ if __name__ == "__main__":
         ape_vae_model_config['model_type'] = model_type
         ape_vae_model_config['architecture'] = architecture
         name = 'ape_true_' + "_".join(combo)
-        wandb.init(sync_tensorboard=True, project="encoder_moment_matching", entity="lily", name=name, reinit=True)
+        wandb.init(sync_tensorboard=True, project=project_name, entity="lily", name=name, reinit=True)
 
         ape = APE(**ape_vae_model_config)
         ape_avi = TimedAVI(ape.model, ape.encoder_guide, ape_pyro_scheduler, loss=Trace_ELBO(), num_samples=100, encoder=ape.encoder)
