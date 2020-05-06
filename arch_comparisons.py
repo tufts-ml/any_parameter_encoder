@@ -116,7 +116,7 @@ if __name__ == "__main__":
             val_gen = ape_validation_generator
 
         ape_vae = APE(**ape_model_config)
-        ape_avi = TimedAVI(ape_vae.model, ape_vae.encoder_guide, ape_pyro_scheduler, loss=Trace_ELBO(), num_samples=100, encoder=ape_vae.encoder)
+        ape_avi = TimedAVI(ape_vae.model, ape_vae.encoder_guide, ape_pyro_scheduler, loss=Trace_ELBO(retain_graph=True), num_samples=100, encoder=ape_vae.encoder)
         val_loss = get_val_loss(ape_avi, val_gen, use_cuda, device, scaled=True)
         print(combo, val_loss)
         losses_to_record['.'.join(combo)] = val_loss
@@ -130,7 +130,7 @@ if __name__ == "__main__":
         model_type, architecture = combo
         ape_vae_model_config['model_type'] = model_type
         ape_vae_model_config['architecture'] = architecture
-        name = 'ape_vae_' + '_'.join(combo)
+        name = 'ape_vae'
         wandb.init(sync_tensorboard=True, project="encoder_moment_matching", entity="lily", name=name, reinit=True)
 
         ape_vae = APE_VAE(**ape_vae_model_config)
@@ -165,7 +165,7 @@ if __name__ == "__main__":
         model_type, architecture = combo
         ape_vae_model_config['model_type'] = model_type
         ape_vae_model_config['architecture'] = architecture
-        name = 'ape_true_' + '_'.join(combo)
+        name = 'ape_true'
         wandb.init(sync_tensorboard=True, project="encoder_moment_matching", entity="lily", name=name, reinit=True)
 
         ape = APE(**ape_vae_model_config)
