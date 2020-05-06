@@ -132,12 +132,12 @@ if __name__ == "__main__":
         model_type, architecture = combo
         ape_vae_model_config['model_type'] = model_type
         ape_vae_model_config['architecture'] = architecture
-        name = 'ape_vae'
+        name = 'ape_vae_' + "_".join(combo)
         wandb.init(sync_tensorboard=True, project="encoder_moment_matching", entity="lily", name=name, reinit=True)
 
         ape_vae = APE_VAE(**ape_vae_model_config)
         ape_vae_avi = TimedAVI(ape_vae.model, ape_vae.encoder_guide, ape_vae_pyro_scheduler, loss=Trace_ELBO(retain_graph=True), num_samples=100, encoder=ape_vae.encoder)
-        ape_vae_avi = train_from_scratch(ape_vae_avi, training_generator, validation_generator, ape_vae_pyro_scheduler, name=name, **train_config)
+        ape_vae_avi = train_from_scratch(ape_vae_avi, training_generator, validation_generator, ape_vae_pyro_scheduler, name='', **train_config)
         # torch.save(ape_vae.state_dict(), os.path.join(args.results_dir, 'ape_vae.dict'))
         print('ape_vae finished')
         del ape_vae
@@ -154,7 +154,7 @@ if __name__ == "__main__":
     vae_train_config = deepcopy(train_config)
     vae_train_config['epochs'] = 1500
     vae_avi = TimedAVI(vae.model, vae.encoder_guide, vae_pyro_scheduler, loss=Trace_ELBO(), num_samples=100, encoder=vae.encoder)
-    vae_avi = train_from_scratch(vae_avi, training_generator, validation_generator, vae_pyro_scheduler, name='vae', **vae_train_config)
+    vae_avi = train_from_scratch(vae_avi, training_generator, validation_generator, vae_pyro_scheduler, name='', **vae_train_config)
     torch.save(vae.state_dict(), os.path.join(args.results_dir, 'vae.dict'))
     print('vae finished')
     del vae
@@ -169,14 +169,14 @@ if __name__ == "__main__":
         model_type, architecture = combo
         ape_vae_model_config['model_type'] = model_type
         ape_vae_model_config['architecture'] = architecture
-        name = 'ape_true'
+        name = 'ape_true_' + "_".join(combo)
         wandb.init(sync_tensorboard=True, project="encoder_moment_matching", entity="lily", name=name, reinit=True)
 
         ape = APE(**ape_vae_model_config)
         ape_avi = TimedAVI(ape.model, ape.encoder_guide, ape_pyro_scheduler, loss=Trace_ELBO(), num_samples=100, encoder=ape.encoder)
         ape_train_config = deepcopy(train_config)
         ape_train_config['epochs'] = 1
-        ape_avi = train(ape_avi, true_ape_training_generator, true_ape_validation_generator, ape_pyro_scheduler, name=name, **ape_train_config)
+        ape_avi = train(ape_avi, true_ape_training_generator, true_ape_validation_generator, ape_pyro_scheduler, name='', **ape_train_config)
         # torch.save(ape.state_dict(), os.path.join(args.results_dir, 'ape.dict'))
         print('ape finished')
         del ape
