@@ -76,7 +76,7 @@ eval_config = {
 }
 
 if __name__ == "__main__":
-    wandb.init(sync_tensorboard=True, project="encoder_moment_matching", entity="lily", name=args.results_dir, reinit=True)
+    wandb.init(sync_tensorboard=True, project="encoder_moment_matching1", entity="lily", name=args.results_dir, reinit=True)
     names = []
     inferences = []
 
@@ -103,7 +103,8 @@ if __name__ == "__main__":
     # test APE, no training
     ape_model_config = deepcopy(model_config)
     for combo in itertools.product(['true_topics', 'random_topics'], models, architectures):
-        ape_pyro_scheduler = CosineAnnealingWarmRestarts({'optimizer': torch.optim.Adam, 'T_0': 500, 'optim_args': {"lr": .005}})
+        # ape_pyro_scheduler = CosineAnnealingWarmRestarts({'optimizer': torch.optim.Adam, 'T_0': 500, 'optim_args': {"lr": .005}})
+        ape_pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, "step_size": 250, "gamma": .5})
         topic_type, model_type, architecture = combo
         ape_model_config['model_type'] = model_type
         ape_model_config['architecture'] = architecture
@@ -126,7 +127,8 @@ if __name__ == "__main__":
     # test APE_VAE with training
     ape_vae_model_config = deepcopy(model_config)
     for combo in itertools.product(models, architectures):
-        ape_vae_pyro_scheduler = CosineAnnealingWarmRestarts({'optimizer': torch.optim.Adam, 'T_0': 5000, 'optim_args': {"lr": .005}})
+        # ape_vae_pyro_scheduler = CosineAnnealingWarmRestarts({'optimizer': torch.optim.Adam, 'T_0': 5000, 'optim_args': {"lr": .005}})
+        ape_vae_pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, "step_size": 250, "gamma": .5})
         model_type, architecture = combo
         ape_vae_model_config['model_type'] = model_type
         ape_vae_model_config['architecture'] = architecture
@@ -143,7 +145,8 @@ if __name__ == "__main__":
         wandb.join()
 
     # train VAE from scratch
-    vae_pyro_scheduler = CosineAnnealingWarmRestarts({'optimizer': torch.optim.Adam, 'T_0': 500, 'optim_args': {"lr": .00001}})
+    # vae_pyro_scheduler = CosineAnnealingWarmRestarts({'optimizer': torch.optim.Adam, 'T_0': 500, 'optim_args': {"lr": .00001}})
+    vae_pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, "step_size": 250, "gamma": .5})
     wandb.init(sync_tensorboard=True, project="encoder_moment_matching", entity="lily", name='vae', reinit=True)
     standard_model_config = deepcopy(model_config)
     standard_model_config['architecture'] = 'standard'
@@ -161,7 +164,8 @@ if __name__ == "__main__":
     # test APE with training, use only the true topics
     ape_vae_model_config = deepcopy(model_config)
     for combo in itertools.product(['avitm', 'nvdm'], ['template_unnorm', 'pseudo_inverse', 'pseudo_inverse_scaled']):
-        ape_pyro_scheduler = CosineAnnealingWarmRestarts({'optimizer': torch.optim.Adam, 'T_0': 500, 'optim_args': {"lr": .005}})
+        # ape_pyro_scheduler = CosineAnnealingWarmRestarts({'optimizer': torch.optim.Adam, 'T_0': 500, 'optim_args': {"lr": .005}})
+        ape_pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, "step_size": 250, "gamma": .5})
         model_type, architecture = combo
         ape_vae_model_config['model_type'] = model_type
         ape_vae_model_config['architecture'] = architecture
