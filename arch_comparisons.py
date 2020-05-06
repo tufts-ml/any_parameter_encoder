@@ -91,9 +91,9 @@ if __name__ == "__main__":
     ape_training_generator = data.DataLoader(ape_training_set, **loader_config)
     ape_validation_generator = data.DataLoader(ape_validation_set, **loader_config)
 
-    true_ape_training_set = ToyBarsDataset(training=True, doc_file='data/toy_bar_docs_large.npy', topics_file='data/true_topics.npy', num_models=1, subset_docs=5000, **data_config)
+    true_ape_training_set = ToyBarsDataset(training=True, doc_file='data/toy_bar_docs_large.npy', topics_file='data/true_topics.npy', num_models=1, subset_docs=50000, **data_config)
     true_ape_training_generator = data.DataLoader(true_ape_training_set, **loader_config)
-    true_ape_validation_set = ToyBarsDataset(training=False, doc_file='data/toy_bar_docs_large.npy', topics_file='data/true_topics.npy', num_models=1, subset_docs=5000, **data_config)
+    true_ape_validation_set = ToyBarsDataset(training=False, doc_file='data/toy_bar_docs_large.npy', topics_file='data/true_topics.npy', num_models=1, subset_docs=50000, **data_config)
     true_ape_validation_generator = data.DataLoader(true_ape_validation_set, **loader_config)
 
     losses_to_record = {}
@@ -176,7 +176,7 @@ if __name__ == "__main__":
         ape = APE(**ape_vae_model_config)
         ape_avi = TimedAVI(ape.model, ape.encoder_guide, ape_pyro_scheduler, loss=Trace_ELBO(), num_samples=100, encoder=ape.encoder)
         ape_train_config = deepcopy(train_config)
-        ape_train_config['epochs'] = 1
+        ape_train_config['epochs'] = 100
         ape_avi = train(ape_avi, true_ape_training_generator, true_ape_validation_generator, ape_pyro_scheduler, name='', **ape_train_config)
         # torch.save(ape.state_dict(), os.path.join(args.results_dir, 'ape.dict'))
         print('ape finished')
