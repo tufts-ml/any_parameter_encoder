@@ -165,7 +165,7 @@ class Decoder(nn.Module):
         if self.model_type == 'avitm':
             word_probs = torch.matmul(self.softmax(z), topics)
         elif self.model_type == 'nvdm':
-            bias = torch.zeros(topics.size()[1], requires_grad=True)
+            bias = torch.zeros(topics.size()[2], requires_grad=True)
             word_probs = self.softmax(torch.matmul(z, topics).add(bias))
         else:
             raise ValueError('Passed unsupported model_type: ', self.model_type)
