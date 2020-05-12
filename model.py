@@ -190,7 +190,7 @@ class APE(nn.Module):
                 use_scale=False,
                 skip_connections=skip_connections,
                 model_type=model_type)
-            self.decoder = Decoder(use_scale=True)
+            self.decoder = Decoder(use_scale=True, model_type=model_type)
         elif self.scale_type == 'mean':
             self.encoder = Encoder(
                 n_hidden_units,
@@ -360,7 +360,7 @@ class APE_VAE(nn.Module):
                 vocab_size=vocab_size,
                 use_scale=False,
                 skip_connections=skip_connections)
-            self.decoder = Decoder(use_scale=True)
+            self.decoder = Decoder(use_scale=True, model_type=model_type)
         elif self.scale_type == 'mean':
             self.encoder = Encoder(
                 n_hidden_units,
@@ -370,7 +370,7 @@ class APE_VAE(nn.Module):
                 vocab_size=vocab_size,
                 use_scale=True,
                 skip_connections=skip_connections)
-            self.decoder = Decoder(use_scale=False)
+            self.decoder = Decoder(use_scale=False, model_type=model_type)
         if use_cuda:
             # calling cuda() here will put all the parameters of
             # the encoder and decoder networks into gpu memory
