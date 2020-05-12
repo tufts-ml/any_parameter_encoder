@@ -7,7 +7,6 @@ import itertools
 import pickle
 import torch
 from torch.utils import data
-import cPickle
 import pyro
 from pyro.optim import ExponentialLR, StepLR
 from pyro.infer import Trace_ELBO, TraceMeanField_ELBO
@@ -75,7 +74,8 @@ train_config = {
 
 eval_config = {
     'documents': 'data/toy_bar_docs.npy',
-    'topics': 'data/true_topics.npy'
+    # 'topics': 'data/true_topics.npy'
+    'topics': 'data/train_topics.npy'
 }
 
 if __name__ == "__main__":
@@ -113,10 +113,15 @@ if __name__ == "__main__":
     dtype = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
     all_docs = np.load(eval_config['documents'])[:5]
     all_topics = np.load(eval_config['topics'])
+    np.save(os.path.join('debug', 'docs.npy'), all_docs)
+    np.save(os.path.join('debug', 'topics.npy'), all_topics)
     # doc_idx = np.random.choice(range(len(all_docs)), size=300)
     # topic_idx = np.random.choice(range(len(all_topics)), size=300)
     # documents = all_docs[doc_idx]
     # topics = all_topics[topic_idx]
+    if not os.path.exists('debug'):
+        os.mkdir('debug')
+
     documents, topics = zip(*[combination for combination in itertools.product(all_docs, all_topics)])
     documents = np.array(documents)
     num_words = documents.sum()
@@ -130,7 +135,11 @@ if __name__ == "__main__":
             nuts_kernel.initial_trace = svi.exec_traces[-1]
             inference = TimedMCMC(nuts_kernel, num_samples=100, warmup_steps=100)
         posterior = inference.run(documents, topics)
-        cPickle.dump(posterior, open('.'.join([name, inference]) + '.pkl', 'wb'))
+        traces = []
+        for tr in posterior.exec_traces:
+            traces.append(tr.nodes['latent']['value'].detach().numpy())
+        trace_filename = os.path.join('debug', '.'.join([name, inference]) + '.npy')
+        np.save(trace_filename, np.array(traces))
         likelihoods = []
         for _ in range(10):
             likelihood = get_posterior_predictive_density(documents, topics, vae.model, posterior)
