@@ -98,7 +98,7 @@ if __name__ == "__main__":
         training_set = ToyBarsDataset(training=True, topics_file='data/true_topics.npy', num_models=1, **data_config)
         training_generator = data.DataLoader(training_set, batch_size=500)
         n_epochs = 10000
-        svi = train(svi, training_generator, training_generator, **{'epochs': n_epochs, 'use_cuda': use_cuda, 'results_dir': args.results_dir})
+        svi = train(svi, training_generator, training_generator, pyro_scheduler, **{'epochs': n_epochs, 'use_cuda': use_cuda, 'results_dir': args.results_dir})
         print(n_epochs)
         names.append('svi')
         inferences.append(svi)

@@ -99,7 +99,7 @@ if __name__ == "__main__":
             validation_set = ToyBarsDataset(training=False, topics_file='data/valid_topics.npy', num_models=500, **data_config)
             training_generator = data.DataLoader(training_set, **loader_config)
             validation_generator = data.DataLoader(validation_set, **loader_config)
-            avi = train(avi, training_generator, validation_generator, **train_config)
+            avi = train(avi, training_generator, validation_generator, pyro_scheduler, **train_config)
 
             # we only save the model to use in downstream inference
             torch.save(vae.state_dict(), model_path)
@@ -115,7 +115,7 @@ if __name__ == "__main__":
         training_set = ToyBarsDataset(training=True, topics_file='data/test_topics.npy', num_models=10, **data_config)
         training_generator = data.DataLoader(training_set, batch_size=500)
         n_epochs = 10000
-        svi = train(svi, training_generator, training_generator, **{'epochs': n_epochs, 'use_cuda': use_cuda, 'results_dir': args.results_dir})
+        svi = train(svi, training_generator, training_generator, pyro_scheduler, **{'epochs': n_epochs, 'use_cuda': use_cuda, 'results_dir': args.results_dir})
         print(n_epochs)
         names.append('svi')
         inferences.append(svi)
