@@ -7,6 +7,7 @@ import itertools
 import pickle
 import torch
 from torch.utils import data
+import cPickle
 import pyro
 from pyro.optim import ExponentialLR, StepLR
 from pyro.infer import Trace_ELBO, TraceMeanField_ELBO
@@ -129,8 +130,7 @@ if __name__ == "__main__":
             nuts_kernel.initial_trace = svi.exec_traces[-1]
             inference = TimedMCMC(nuts_kernel, num_samples=100, warmup_steps=100)
         posterior = inference.run(documents, topics)
-        import ipdb; ipdb.set_trace()
-        pickle.dump(posterior, open('.'.join([name, inference]) + '.pkl', 'wb'))
+        cPickle.dump(posterior, open('.'.join([name, inference]) + '.pkl', 'wb'))
         likelihoods = []
         for _ in range(10):
             likelihood = get_posterior_predictive_density(documents, topics, vae.model, posterior)
