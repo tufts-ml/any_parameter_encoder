@@ -139,6 +139,7 @@ if __name__ == "__main__":
                 values.append([topic_type, model_type, loss.__name__, data_size, val_loss])
     df = pd.DataFrame(values)
     df.columns = ['data_size', 'topic_type', 'model_type', 'metric', 'data_size', 'loss']
+    df.to_csv('no_training.csv')
 
     # test APE_VAE with training
     ape_vae_model_config = deepcopy(model_config)
