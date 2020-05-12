@@ -56,18 +56,19 @@ def generate_documents(topics, n_topics, vocab_size, avg_num_words, alpha=.05, s
         documents.append(doc.astype(np.float32))
     return documents, doc_topic_dists
 
-def create_toy_bar_docs(doc_file, n_topics, vocab_size, num_docs=50, seed=0):
+def create_toy_bar_docs(doc_file, n_topics, vocab_size, num_docs=50, seed=0, avg_num_words=50):
     true_topics = get_true_topics(n_topics, vocab_size)
-    docs, _ = generate_documents(true_topics, n_topics, vocab_size, 50, num_docs=num_docs, seed=seed)
+    docs, _ = generate_documents(true_topics, n_topics, vocab_size, avg_num_words=avg_num_words, num_docs=num_docs, seed=seed)
     np.save(doc_file, docs)
 
 
 class ToyBarsDataset(data.Dataset):
-    def __init__(self, doc_file, n_topics, vocab_size, alpha, use_cuda, topics_file=None, num_models=None, training=True, generate=True, subset_docs=None):
+    def __init__(self, doc_file, n_topics, vocab_size, alpha, use_cuda, topics_file=None, num_models=None, training=True, generate=True, subset_docs=None, avg_num_words=50):
         if not os.path.exists('true_topics.npy'):
             get_true_topics(n_topics, vocab_size)
         if not os.path.exists(doc_file):
-            create_toy_bar_docs(doc_file, n_topics, vocab_size)
+            print('Creating ', doc_file)
+            create_toy_bar_docs(doc_file, n_topics, vocab_size, avg_num_words=avg_num_words)
         device = torch.device("cuda:0" if use_cuda else "cpu")
         dtype = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
         self.documents = torch.from_numpy(np.load(doc_file)).type(dtype)
@@ -113,9 +114,10 @@ class ToyBarsDataset(data.Dataset):
 
 
 class ToyBarsDocsDataset(data.Dataset):
-    def __init__(self, doc_file, n_topics, vocab_size, alpha, use_cuda, training=True, generate=True, subset_docs=None):
+    def __init__(self, doc_file, n_topics, vocab_size, alpha, use_cuda, training=True, generate=True, subset_docs=None, avg_num_words=50):
         if not os.path.exists(doc_file):
-            create_toy_bar_docs(doc_file, n_topics, vocab_size, num_docs=100000)
+            print('Creating ', doc_file)
+            create_toy_bar_docs(doc_file, n_topics, vocab_size, num_docs=100000, avg_num_words=avg_num_words)
         device = torch.device("cuda:0" if use_cuda else "cpu")
         dtype = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
         self.documents = torch.from_numpy(np.load(doc_file)).type(dtype)

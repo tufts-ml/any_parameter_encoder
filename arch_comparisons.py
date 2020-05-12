@@ -1,13 +1,14 @@
 import os
 import argparse
 import numpy as np
+import pandas as pd
 import itertools
 from copy import deepcopy
 import torch
 from torch.utils import data
 import pyro
 from pyro.optim import ExponentialLR, StepLR, ReduceLROnPlateau, CosineAnnealingWarmRestarts
-from pyro.infer import Trace_ELBO
+from pyro.infer import Trace_ELBO, TraceMeanField_ELBO
 from pyro.infer.mcmc import NUTS
 
 from dataset import ToyBarsDataset, ToyBarsDocsDataset
@@ -81,20 +82,25 @@ if __name__ == "__main__":
     names = []
     inferences = []
 
-    training_set = ToyBarsDocsDataset(training=True, doc_file='data/toy_bar_docs_large.npy', subset_docs=50000, **data_config)
-    validation_set = ToyBarsDocsDataset(training=False, doc_file='data/toy_bar_docs_large.npy', subset_docs=50000, **data_config)
-    training_generator = data.DataLoader(training_set, **loader_config)
-    validation_generator = data.DataLoader(validation_set, **loader_config)
+    # training_set = ToyBarsDocsDataset(training=True, doc_file='data/toy_bar_docs_large.npy', subset_docs=50000, **data_config)
+    # validation_set = ToyBarsDocsDataset(training=False, doc_file='data/toy_bar_docs_large.npy', subset_docs=50000, **data_config)
+    # training_generator = data.DataLoader(training_set, **loader_config)
+    # validation_generator = data.DataLoader(validation_set, **loader_config)
     
-    ape_training_set = ToyBarsDataset(training=True, doc_file='data/toy_bar_docs_large.npy', topics_file='data/train_topics.npy', num_models=20000, subset_docs=5000, **data_config)
+    # ape_training_set = ToyBarsDataset(training=True, doc_file='data/toy_bar_docs_large.npy', topics_file='data/train_topics.npy', num_models=20000, subset_docs=5000, **data_config)
     ape_validation_set = ToyBarsDataset(training=False, doc_file='data/toy_bar_docs_large.npy', topics_file='data/valid_topics.npy', num_models=50, subset_docs=5000, **data_config)
-    ape_training_generator = data.DataLoader(ape_training_set, **loader_config)
+    # ape_training_generator = data.DataLoader(ape_training_set, **loader_config)
     ape_validation_generator = data.DataLoader(ape_validation_set, **loader_config)
+    # create the many_words docs dataset
+    ape_validation_set_many_words = ToyBarsDataset(training=False, doc_file='data/toy_bar_docs_large_many_words.npy', topics_file='data/valid_topics.npy', num_models=50, subset_docs=5000, avg_num_words=500, **data_config)
+    ape_validation_generator_many_words = data.DataLoader(ape_validation_set_many_words, **loader_config)
 
     true_ape_training_set = ToyBarsDataset(training=True, doc_file='data/toy_bar_docs_large.npy', topics_file='data/true_topics.npy', num_models=1, subset_docs=50000, **data_config)
     true_ape_training_generator = data.DataLoader(true_ape_training_set, **loader_config)
     true_ape_validation_set = ToyBarsDataset(training=False, doc_file='data/toy_bar_docs_large.npy', topics_file='data/true_topics.npy', num_models=1, subset_docs=50000, **data_config)
     true_ape_validation_generator = data.DataLoader(true_ape_validation_set, **loader_config)
+    true_ape_validation_set_many_words = ToyBarsDataset(training=False, doc_file='data/toy_bar_docs_large_many_words.npy', topics_file='data/true_topics.npy', num_models=1, subset_docs=50000, **data_config)
+    true_ape_validation_generator_many_words = data.DataLoader(true_ape_validation_set_many_words, **loader_config)
 
     losses_to_record = {}
 
@@ -103,27 +109,36 @@ if __name__ == "__main__":
 
     # test APE, no training
     ape_model_config = deepcopy(model_config)
+    values = []
     for combo in itertools.product(['true_topics', 'random_topics'], models, architectures):
-        # ape_pyro_scheduler = CosineAnnealingWarmRestarts({'optimizer': torch.optim.Adam, 'T_0': 500, 'optim_args': {"lr": .005}})
-        ape_pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, "step_size": 250, "gamma": .5})
-        topic_type, model_type, architecture = combo
-        ape_model_config['model_type'] = model_type
-        ape_model_config['architecture'] = architecture
-        ape_model_config['n_hidden_layers'] = 0
-        ape_model_config['n_hidden_units'] = ape_model_config['n_topics']
+        for loss in [Trace_ELBO, TraceMeanField_ELBO]:
+            for data_size in ['small', 'large']:
+                # ape_pyro_scheduler = CosineAnnealingWarmRestarts({'optimizer': torch.optim.Adam, 'T_0': 500, 'optim_args': {"lr": .005}})
+                ape_pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, "step_size": 250, "gamma": .5})
+                topic_type, model_type, architecture = combo
+                ape_model_config['model_type'] = model_type
+                ape_model_config['architecture'] = architecture
+                ape_model_config['n_hidden_layers'] = 0
+                ape_model_config['n_hidden_units'] = ape_model_config['n_topics']
 
-        if topic_type == 'true_topics':
-            val_gen = true_ape_validation_generator
-        elif topic_type == 'random_topics':
-            val_gen = ape_validation_generator
+                if topic_type == 'true_topics':
+                    if data_size == 'large':
+                        val_gen = true_ape_validation_generator_many_words
+                    else:
+                        val_gen = true_ape_validation_generator
+                elif topic_type == 'random_topics':
+                    if data_size == 'large':
+                        val_gen = ape_validation_generator_many_words
+                    else:
+                        val_gen = ape_validation_generator
 
-        ape_vae = APE(**ape_model_config)
-        ape_avi = TimedAVI(ape_vae.model, ape_vae.encoder_guide, ape_pyro_scheduler, loss=Trace_ELBO(), num_samples=100, encoder=ape_vae.encoder)
-        val_loss = get_val_loss(ape_avi, val_gen, use_cuda, device, scaled=True)
-        print(combo, val_loss)
-        losses_to_record['.'.join(combo)] = val_loss
-    wandb.log(losses_to_record)
-    wandb.join()
+                ape_vae = APE(**ape_model_config)
+                ape_avi = TimedAVI(ape_vae.model, ape_vae.encoder_guide, ape_pyro_scheduler, loss=loss(), num_samples=100, encoder=ape_vae.encoder)
+                val_loss = get_val_loss(ape_avi, val_gen, use_cuda, device, scaled=True)
+                print(combo, val_loss)
+                values.append([topic_type, model_type, loss.__name__, data_size, val_loss])
+    df = pd.DataFrame(values)
+    df.columns = ['data_size', 'topic_type', 'model_type', 'metric', 'data_size', 'loss']
 
     # test APE_VAE with training
     ape_vae_model_config = deepcopy(model_config)
