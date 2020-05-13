@@ -74,8 +74,8 @@ train_config = {
 
 eval_config = {
     'documents': 'data/toy_bar_docs.npy',
-    # 'topics': 'data/true_topics.npy'
-    'topics': 'data/train_topics.npy'
+    'topics': 'data/true_topics.npy'
+    # 'topics': 'data/train_topics.npy'
 }
 
 if __name__ == "__main__":
@@ -98,7 +98,7 @@ if __name__ == "__main__":
         svi = TimedSVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=TraceMeanField_ELBO(), num_samples=100) #, num_steps=100000)
         training_set = ToyBarsDataset(training=True, topics_file='data/true_topics.npy', num_models=1, **data_config)
         training_generator = data.DataLoader(training_set, batch_size=500)
-        n_epochs = 10000
+        n_epochs = 1000
         svi = train(svi, training_generator, training_generator, pyro_scheduler, **{'epochs': n_epochs, 'use_cuda': use_cuda, 'results_dir': args.results_dir})
         print(n_epochs)
         names.append('svi')
