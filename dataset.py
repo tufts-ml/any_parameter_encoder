@@ -112,6 +112,36 @@ class ToyBarsDataset(data.Dataset):
         return document, topics
 
 
+class NonToyBarsDataset(ToyBarsDataset):
+    def __init__(self, doc_file, n_topics, vocab_size, alpha, use_cuda, topics_file=None, num_models=None, training=True, generate=True, subset_docs=None, avg_num_words=50):
+        if not os.path.exists(topics_file):
+            topics = generate_topics([.1] * n_topics)
+            np.save(topics_file, topics)
+        if not os.path.exists(doc_file):
+            print('Creating ', doc_file)
+            docs, _ = generate_documents(topics, n_topics, vocab_size, avg_num_words=avg_num_words, num_docs=num_docs)
+            np.save(doc_file, docs)
+        device = torch.device("cuda:0" if use_cuda else "cpu")
+        dtype = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
+        self.documents = torch.from_numpy(np.load(doc_file)).type(dtype)
+        if subset_docs:
+            self.documents = self.documents[:subset_docs]
+        self.num_docs = len(self.documents)
+        self.n_topics = n_topics
+        self.vocab_size = vocab_size
+        self.alpha = alpha
+        self.use_cuda = use_cuda
+        self.training = training
+        self.generate = generate
+        if generate:
+            self.num_models = num_models
+        else:
+            self.topics = torch.from_numpy(np.load(os.path.join(topics_file)))
+            self.topics = self.topics.to(device).type(dtype)
+            self.num_models = len(self.topics)
+        self.documents = self.documents.to(device)
+        
+
 
 class ToyBarsDocsDataset(data.Dataset):
     def __init__(self, doc_file, n_topics, vocab_size, alpha, use_cuda, training=True, generate=True, subset_docs=None, avg_num_words=50):
