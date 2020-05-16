@@ -51,6 +51,7 @@ model_config = {
     'use_cuda': use_cuda,
     'scale_type': 'sample',
     'skip_connections': False,
+    'architecture': args.architecture
 }
 
 data_config = {
@@ -138,7 +139,7 @@ if __name__ == "__main__":
         traces = []
         for tr in posterior.exec_traces:
             traces.append(tr.nodes['latent']['value'].detach().numpy())
-        trace_filename = os.path.join('debug', '.'.join([name, inference]) + '.npy')
+        trace_filename = os.path.join('debug', name + '_' + args.architecture + '.npy')
         np.save(trace_filename, np.array(traces))
         likelihoods = []
         for _ in range(10):
