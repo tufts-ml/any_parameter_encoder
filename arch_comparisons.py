@@ -87,18 +87,18 @@ if __name__ == "__main__":
     # validation_generator = data.DataLoader(validation_set, **loader_config)
     
     # ape_training_set = ToyBarsDataset(training=True, doc_file='data/toy_bar_docs_large.npy', topics_file='data/train_topics.npy', num_models=20000, subset_docs=5000, **data_config)
-    ape_validation_set = ToyBarsDataset(training=False, doc_file='data/toy_bar_docs_large.npy', topics_file='data/valid_topics.npy', num_models=50, subset_docs=5000, **data_config)
+    # ape_validation_set = ToyBarsDataset(training=False, doc_file='data/toy_bar_docs_large.npy', topics_file='data/valid_topics.npy', num_models=50, subset_docs=5000, **data_config)
     # ape_training_generator = data.DataLoader(ape_training_set, **loader_config)
-    ape_validation_generator = data.DataLoader(ape_validation_set, **loader_config)
+    # ape_validation_generator = data.DataLoader(ape_validation_set, **loader_config)
     # create the many_words docs dataset
-    ape_validation_set_many_words = ToyBarsDataset(training=False, doc_file='data/toy_bar_docs_large_many_words.npy', topics_file='data/valid_topics.npy', num_models=50, subset_docs=5000, avg_num_words=500, **data_config)
-    ape_validation_generator_many_words = data.DataLoader(ape_validation_set_many_words, **loader_config)
+    # ape_validation_set_many_words = ToyBarsDataset(training=False, doc_file='data/toy_bar_docs_large_many_words.npy', topics_file='data/valid_topics.npy', num_models=50, subset_docs=5000, avg_num_words=500, **data_config)
+    # ape_validation_generator_many_words = data.DataLoader(ape_validation_set_many_words, **loader_config)
 
     # true_ape_training_set = ToyBarsDataset(training=True, doc_file='data/toy_bar_docs_large.npy', topics_file='data/true_topics.npy', num_models=1, subset_docs=50000, **data_config)
     # true_ape_training_generator = data.DataLoader(true_ape_training_set, **loader_config)
-    true_ape_validation_set = ToyBarsDataset(training=False, doc_file='data/toy_bar_docs_large.npy', topics_file='data/true_topics.npy', num_models=1, subset_docs=50000, **data_config)
+    true_ape_validation_set = ToyBarsDataset(training=False, doc_file='data/non_toy_bars_docs.npy', topics_file='data/non_toy_bars_topics.npy', num_models=1, subset_docs=50000, **data_config)
     true_ape_validation_generator = data.DataLoader(true_ape_validation_set, **loader_config)
-    true_ape_validation_set_many_words = ToyBarsDataset(training=False, doc_file='data/toy_bar_docs_large_many_words.npy', topics_file='data/true_topics.npy', num_models=1, subset_docs=50000, **data_config)
+    true_ape_validation_set_many_words = ToyBarsDataset(training=False, doc_file='data/non_toy_bars_docs_many_words.npy', topics_file='data/non_toy_bars_topics.npy', num_models=1, subset_docs=50000, **data_config)
     true_ape_validation_generator_many_words = data.DataLoader(true_ape_validation_set_many_words, **loader_config)
 
     losses_to_record = {}
@@ -111,7 +111,7 @@ if __name__ == "__main__":
     values = []
     for seed in range(10):
         pyro.set_rng_seed(seed)
-        for combo in itertools.product(['true_topics', 'random_topics'], models, architectures):
+        for combo in itertools.product(['true_topics'], models, architectures):
             for loss in [Trace_ELBO, TraceMeanField_ELBO]:
                 for data_size in ['small', 'large']:
                     # ape_pyro_scheduler = CosineAnnealingWarmRestarts({'optimizer': torch.optim.Adam, 'T_0': 500, 'optim_args': {"lr": .005}})
@@ -127,11 +127,11 @@ if __name__ == "__main__":
                             val_gen = true_ape_validation_generator_many_words
                         else:
                             val_gen = true_ape_validation_generator
-                    elif topic_type == 'random_topics':
-                        if data_size == 'large':
-                            val_gen = ape_validation_generator_many_words
-                        else:
-                            val_gen = ape_validation_generator
+                    # elif topic_type == 'random_topics':
+                    #     if data_size == 'large':
+                    #         val_gen = ape_validation_generator_many_words
+                    #     else:
+                    #         val_gen = ape_validation_generator
 
                     ape_vae = APE(**ape_model_config)
                     ape_avi = TimedAVI(ape_vae.model, ape_vae.encoder_guide, ape_pyro_scheduler, loss=loss(), num_samples=100, encoder=ape_vae.encoder)
@@ -140,7 +140,7 @@ if __name__ == "__main__":
                     values.append([topic_type, model_type, loss.__name__, data_size, val_loss, seed])
     df = pd.DataFrame(values)
     df.columns = ['data_size', 'topic_type', 'model_type', 'metric', 'data_size', 'loss', 'seed']
-    df.to_csv('no_training.csv')
+    df.to_csv('no_training_non_toy_bars.csv')
     import sys; sys.exit()
 
     # test APE_VAE with training
