@@ -11,7 +11,7 @@ from pyro.optim import ExponentialLR, StepLR, ReduceLROnPlateau, CosineAnnealing
 from pyro.infer import Trace_ELBO, TraceMeanField_ELBO
 from pyro.infer.mcmc import NUTS
 
-from dataset import ToyBarsDataset, ToyBarsDocsDataset
+from dataset import ToyBarsDataset, ToyBarsDocsDataset, NonToyBarsDataset
 from model import APE, APE_VAE
 from train import train, train_from_scratch, get_val_loss
 from evaluate import TimedSVI, TimedMCMC, TimedAVI
@@ -96,9 +96,9 @@ if __name__ == "__main__":
 
     # true_ape_training_set = ToyBarsDataset(training=True, doc_file='data/toy_bar_docs_large.npy', topics_file='data/true_topics.npy', num_models=1, subset_docs=50000, **data_config)
     # true_ape_training_generator = data.DataLoader(true_ape_training_set, **loader_config)
-    true_ape_validation_set = ToyBarsDataset(training=False, doc_file='data/non_toy_bars_docs.npy', topics_file='data/non_toy_bars_topics.npy', num_models=1, subset_docs=50000, **data_config)
+    true_ape_validation_set = NonToyBarsDataset(training=False, doc_file='data/non_toy_bars_docs.npy', topics_file='data/non_toy_bars_topics.npy', num_models=1, subset_docs=50000, **data_config)
     true_ape_validation_generator = data.DataLoader(true_ape_validation_set, **loader_config)
-    true_ape_validation_set_many_words = ToyBarsDataset(training=False, doc_file='data/non_toy_bars_docs_many_words.npy', topics_file='data/non_toy_bars_topics.npy', num_models=1, subset_docs=50000, **data_config)
+    true_ape_validation_set_many_words = NonToyBarsDataset(training=False, doc_file='data/non_toy_bars_docs_many_words.npy', topics_file='data/non_toy_bars_topics.npy', num_models=1, subset_docs=50000, **data_config)
     true_ape_validation_generator_many_words = data.DataLoader(true_ape_validation_set_many_words, **loader_config)
 
     losses_to_record = {}
