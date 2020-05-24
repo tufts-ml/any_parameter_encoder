@@ -83,19 +83,28 @@ class Encoder(nn.Module):
             x_and_topics = torch.cat((x, topics.reshape(-1, self.n_topics * self.vocab_size)), dim=1)
             # then return a mean vector and a (positive) square root covariance
             # each of size batch_size x n_topics
-            z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
-            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+            # z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
+            # z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+            z_loc = self.fcmu(self.enc_layers(x_and_topics))
+            z_scale = torch.sqrt(torch.exp(self.fcsigma(self.enc_layers(x_and_topics))))
+            
         elif self.architecture == 'template':
             x_and_topics = torch.einsum("ab,abc->ac", (x, torch.transpose(topics, 1, 2)))
             x_and_topics = torch.div(x_and_topics, torch.sum(x_and_topics, dim=1).reshape((-1, 1)))
-            z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
-            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+            # z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
+            # z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+            z_loc = self.fcmu(self.enc_layers(x_and_topics))
+            z_scale = torch.sqrt(torch.exp(self.fcsigma(self.enc_layers(x_and_topics))))
+            
         elif self.architecture == 'template_plus_topics':
             x_and_topics = torch.einsum("ab,abc->ac", (x, torch.transpose(topics, 1, 2)))
             x_and_topics = torch.div(x_and_topics, torch.sum(x_and_topics, dim=1).reshape((-1, 1)))
             x_and_topics = torch.cat((x_and_topics, topics.reshape(-1, self.n_topics * self.vocab_size)), dim=1)
-            z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
-            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+            # z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
+            # z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+            z_loc = self.fcmu(self.enc_layers(x_and_topics))
+            z_scale = torch.sqrt(torch.exp(self.fcsigma(self.enc_layers(x_and_topics))))
+            
         elif self.architecture == 'standard':
             z_loc = self.bnmu(self.fcmu(self.enc_layers(x)))
             z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x)))))
@@ -107,8 +116,11 @@ class Encoder(nn.Module):
             z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers_sigma(x_and_topics)))))
         elif self.architecture == 'template_unnorm':
             x_and_topics = torch.einsum("ab,abc->ac", (x, torch.transpose(topics, 1, 2)))
-            z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
-            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+            # z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
+            # z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+            z_loc = self.fcmu(self.enc_layers(x_and_topics))
+            z_scale = torch.sqrt(torch.exp(self.fcsigma(self.enc_layers(x_and_topics))))
+            
         elif self.architecture == 'template_scaled':
             x = torch.div(x, torch.sum(x, dim=1).reshape((-1, 1)))
             if self.model_type == 'nvdm':
@@ -116,21 +128,30 @@ class Encoder(nn.Module):
             x_and_topics = torch.einsum("ab,abc->ac", (x, torch.transpose(topics, 1, 2)))
             if self.model_type == 'avitm':
                 x_and_topics = torch.log1p(x_and_topics)
-            z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
-            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+            # z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
+            # z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+            z_loc = self.fcmu(self.enc_layers(x_and_topics))
+            z_scale = torch.sqrt(torch.exp(self.fcsigma(self.enc_layers(x_and_topics))))
+            
         elif self.architecture == 'pseudo_inverse_unnorm':
             x_and_topics = torch.einsum("ab,abc->ac", (x, torch.transpose(topics, 1, 2)))  # [batch, n_topics] 
             topics_topics_t = torch.inverse(torch.einsum("abc,acd->abd", (topics, torch.transpose(topics, 1, 2))))  # [batch, n_topics, n_topics]
             x_and_topics = torch.einsum("abd,ad->ab", (topics_topics_t, x_and_topics))  # [batch, n_topics]
-            z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
-            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+            # z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
+            # z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+            z_loc = self.fcmu(self.enc_layers(x_and_topics))
+            z_scale = torch.sqrt(torch.exp(self.fcsigma(self.enc_layers(x_and_topics))))
+            
         elif self.architecture == 'pseudo_inverse':
             x_and_topics = torch.einsum("ab,abc->ac", (x, torch.transpose(topics, 1, 2)))  # [batch, n_topics] 
             topics_topics_t = torch.inverse(torch.einsum("abc,acd->abd", (topics, torch.transpose(topics, 1, 2))))  # [batch, n_topics, n_topics]
             x_and_topics = torch.einsum("abd,ad->ab", (topics_topics_t, x_and_topics))  # [batch, n_topics]
             x_and_topics = torch.div(x_and_topics, torch.sum(x_and_topics, dim=1).reshape((-1, 1)))
-            z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
-            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+            # z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
+            # z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+            z_loc = self.fcmu(self.enc_layers(x_and_topics))
+            z_scale = torch.sqrt(torch.exp(self.fcsigma(self.enc_layers(x_and_topics))))
+            
         elif self.architecture == 'pseudo_inverse_scaled':
             x = torch.div(x, torch.sum(x, dim=1).reshape((-1, 1)))
             if self.model_type == 'nvdm':
@@ -141,12 +162,18 @@ class Encoder(nn.Module):
             x_and_topics = torch.einsum("abd,ad->ab", (topics_topics_t, x_and_topics))  # [batch, n_topics]
             if self.model_type == 'avitm':
                 x_and_topics = torch.log1p(x_and_topics)
-            z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
-            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+            # z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
+            # z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+            z_loc = self.fcmu(self.enc_layers(x_and_topics))
+            z_scale = torch.sqrt(torch.exp(self.fcsigma(self.enc_layers(x_and_topics))))
+            
         elif self.architecture == 'prior':
             x_and_topics = torch.zeros((x.shape[0], topics.shape[1]))
-            z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
-            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+            # z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
+            # z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+            z_loc = self.fcmu(self.enc_layers(x_and_topics))
+            z_scale = torch.sqrt(torch.exp(self.fcsigma(self.enc_layers(x_and_topics))))
+            
         else:
             raise ValueError('Invalid architecture')
         if self.use_scale:
@@ -277,19 +304,27 @@ class Encoder_APE_VAE(Encoder):
             x_and_topics = torch.cat((x, topics.reshape(-1, self.n_topics * self.vocab_size)), dim=1)
             # then return a mean vector and a (positive) square root covariance
             # each of size batch_size x n_topics
-            z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
-            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+            # z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
+            # z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+            z_loc = self.fcmu(self.enc_layers(x_and_topics))
+            z_scale = torch.sqrt(torch.exp(self.fcsigma(self.enc_layers(x_and_topics))))
         elif self.architecture == 'template':
             x_and_topics = torch.matmul(x, torch.transpose(topics, 0, 1))
             x_and_topics = torch.div(x_and_topics, torch.sum(x_and_topics, dim=1).reshape((-1, 1)))
-            z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
-            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+            # z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
+            # z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+            z_loc = self.fcmu(self.enc_layers(x_and_topics))
+            z_scale = torch.sqrt(torch.exp(self.fcsigma(self.enc_layers(x_and_topics))))
+            
         elif self.architecture == 'template_plus_topics':
             x_and_topics = torch.matmul(x, torch.transpose(topics, 0, 1))
             x_and_topics = torch.div(x_and_topics, torch.sum(x_and_topics, dim=1).reshape((-1, 1)))
             x_and_topics = torch.cat((x_and_topics, topics.reshape(-1, self.n_topics * self.vocab_size)), dim=1)
-            z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
-            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+            # z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
+            # z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+            z_loc = self.fcmu(self.enc_layers(x_and_topics))
+            z_scale = torch.sqrt(torch.exp(self.fcsigma(self.enc_layers(x_and_topics))))
+            
         elif self.architecture == 'standard':
             z_loc = self.bnmu(self.fcmu(self.enc_layers(x)))
             z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x)))))
@@ -301,8 +336,11 @@ class Encoder_APE_VAE(Encoder):
             z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers_sigma(x_and_topics)))))
         elif self.architecture == 'template_unnorm':
             x_and_topics = torch.einsum("ab,bc->ac", (x, torch.transpose(topics, 0, 1)))
-            z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
-            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+            # z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
+            # z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+            z_loc = self.fcmu(self.enc_layers(x_and_topics))
+            z_scale = torch.sqrt(torch.exp(self.fcsigma(self.enc_layers(x_and_topics))))
+            
         elif self.architecture == 'template_scaled':
             x = torch.div(x, torch.sum(x, dim=1).reshape((-1, 1)))
             if self.model_type == 'nvdm':
@@ -310,21 +348,30 @@ class Encoder_APE_VAE(Encoder):
             x_and_topics = torch.einsum("ab,bc->ac", (x, torch.transpose(topics, 0, 1)))
             if self.model_type == 'avitm':
                 x_and_topics = torch.log1p(x_and_topics)
-            z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
-            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+            # z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
+            # z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+            z_loc = self.fcmu(self.enc_layers(x_and_topics))
+            z_scale = torch.sqrt(torch.exp(self.fcsigma(self.enc_layers(x_and_topics))))
+            
         elif self.architecture == 'pseudo_inverse':
             x_and_topics = torch.einsum("ab,bc->ac", (x, torch.transpose(topics, 0, 1)))  # [batch, n_topics]
             topics_topics_t = torch.einsum("bc,cd->bd", (topics, torch.transpose(topics, 0, 1)))  # [batch, n_topics, n_topics]
             x_and_topics = torch.einsum("bd,ad->ab", (topics_topics_t, x_and_topics))  # [batch, n_topics]
             x_and_topics = torch.div(x_and_topics, torch.sum(x_and_topics, dim=1).reshape((-1, 1)))
-            z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
-            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+            # z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
+            # z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+            z_loc = self.fcmu(self.enc_layers(x_and_topics))
+            z_scale = torch.sqrt(torch.exp(self.fcsigma(self.enc_layers(x_and_topics))))
+            
         elif self.architecture == 'pseudo_inverse_unnorm':
             x_and_topics = torch.einsum("ab,bc->ac", (x, torch.transpose(topics, 0, 1)))  # [batch, n_topics]
             topics_topics_t = torch.einsum("bc,cd->bd", (topics, torch.transpose(topics, 0, 1)))  # [batch, n_topics, n_topics]
             x_and_topics = torch.einsum("bd,ad->ab", (topics_topics_t, x_and_topics))  # [batch, n_topics]
-            z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
-            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+            # z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
+            # z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+            z_loc = self.fcmu(self.enc_layers(x_and_topics))
+            z_scale = torch.sqrt(torch.exp(self.fcsigma(self.enc_layers(x_and_topics))))
+            
         elif self.architecture == 'pseudo_inverse_scaled':
             x = torch.div(x, torch.sum(x, dim=1).reshape((-1, 1)))
             if self.model_type == 'nvdm':
@@ -334,8 +381,11 @@ class Encoder_APE_VAE(Encoder):
             x_and_topics = torch.einsum("bd,ad->ab", (topics_topics_t, x_and_topics))  # [batch, n_topics]
             if self.model_type == 'avitm':
                 x_and_topics = torch.log1p(x_and_topics)
-            z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
-            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+            # z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
+            # z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+            z_loc = self.fcmu(self.enc_layers(x_and_topics))
+            z_scale = torch.sqrt(torch.exp(self.fcsigma(self.enc_layers(x_and_topics))))
+            
         else:
             raise ValueError('Invalid architecture')
         if self.use_scale:
