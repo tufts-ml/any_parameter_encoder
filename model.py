@@ -41,7 +41,7 @@ class Encoder(nn.Module):
         self.architecture = architecture
         if architecture == 'naive' or architecture == 'naive_separated':
             modules.append(MLP((1 + n_topics) * vocab_size, n_hidden_units))
-        elif architecture in ['template', 'template_scaled', 'template_unnorm', 'pseudo_inverse', 'pseudo_inverse_scaled', 'pseudo_inverse_unnorm']:
+        elif architecture in ['template', 'template_scaled', 'template_unnorm', 'pseudo_inverse', 'pseudo_inverse_scaled', 'pseudo_inverse_unnorm', 'prior']:
             modules.append(MLP(n_topics, n_hidden_units))
         elif architecture == 'template_plus_topics':
             modules.append(MLP(n_topics * (1 + vocab_size), n_hidden_units))
@@ -141,6 +141,10 @@ class Encoder(nn.Module):
             x_and_topics = torch.einsum("abd,ad->ab", (topics_topics_t, x_and_topics))  # [batch, n_topics]
             if self.model_type == 'avitm':
                 x_and_topics = torch.log1p(x_and_topics)
+            z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
+            z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
+        elif self.architecture == 'prior':
+            x_and_topics = torch.zeros((x.shape[0], topics.shape[1]))
             z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
             z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
         else:
