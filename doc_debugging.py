@@ -74,8 +74,8 @@ train_config = {
 }
 
 eval_config = {
-    'documents': 'data/toy_bar_docs.npy',
-    'topics': 'data/true_topics.npy'
+    'documents': 'data/non_toy_bar_docs.npy',
+    'topics': 'data/non_toy_bar_topics.npy'
     # 'topics': 'data/train_topics.npy'
 }
 
@@ -139,7 +139,7 @@ if __name__ == "__main__":
         traces = []
         for tr in posterior.exec_traces:
             traces.append(tr.nodes['latent']['value'].detach().numpy())
-        trace_filename = os.path.join('debug', name + '_' + args.architecture + '.npy')
+        trace_filename = os.path.join('non_toy_bars_debug', name + '_' + args.architecture + '.npy')
         np.save(trace_filename, np.array(traces))
         likelihoods = []
         for _ in range(10):

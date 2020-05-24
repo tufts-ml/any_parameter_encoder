@@ -96,9 +96,10 @@ if __name__ == "__main__":
 
     # true_ape_training_set = ToyBarsDataset(training=True, doc_file='data/toy_bar_docs_large.npy', topics_file='data/true_topics.npy', num_models=1, subset_docs=50000, **data_config)
     # true_ape_training_generator = data.DataLoader(true_ape_training_set, **loader_config)
-    true_ape_validation_set = NonToyBarsDataset(training=False, doc_file='data/non_toy_bars_docs.npy', topics_file='data/non_toy_bars_topics.npy', num_models=1, subset_docs=50000, **data_config)
+    # training = True just gives us more data
+    true_ape_validation_set = NonToyBarsDataset(training=True, doc_file='data/non_toy_bars_docs.npy', topics_file='data/non_toy_bars_topics.npy', num_models=1, num_docs=5000, **data_config)
     true_ape_validation_generator = data.DataLoader(true_ape_validation_set, **loader_config)
-    true_ape_validation_set_many_words = NonToyBarsDataset(training=False, doc_file='data/non_toy_bars_docs_many_words.npy', topics_file='data/non_toy_bars_topics.npy', num_models=1, subset_docs=50000, **data_config)
+    true_ape_validation_set_many_words = NonToyBarsDataset(training=True, doc_file='data/non_toy_bars_docs_many_words.npy', topics_file='data/non_toy_bars_topics.npy', num_models=1, num_docs=5000, avg_num_words=500, **data_config)
     true_ape_validation_generator_many_words = data.DataLoader(true_ape_validation_set_many_words, **loader_config)
 
     losses_to_record = {}
@@ -137,9 +138,9 @@ if __name__ == "__main__":
                     ape_avi = TimedAVI(ape_vae.model, ape_vae.encoder_guide, ape_pyro_scheduler, loss=loss(), num_samples=100, encoder=ape_vae.encoder)
                     val_loss = get_val_loss(ape_avi, val_gen, use_cuda, device, scaled=True)
                     print(combo, val_loss)
-                    values.append([topic_type, model_type, loss.__name__, data_size, val_loss, seed])
+                    values.append([topic_type, model_type, architecture, loss.__name__, data_size, val_loss, seed])
     df = pd.DataFrame(values)
-    df.columns = ['data_size', 'topic_type', 'model_type', 'metric', 'data_size', 'loss', 'seed']
+    df.columns = ['topic_type', 'model_type', 'architecture', 'metric', 'data_size', 'loss', 'seed']
     df.to_csv('no_training_non_toy_bars.csv')
     import sys; sys.exit()
 
