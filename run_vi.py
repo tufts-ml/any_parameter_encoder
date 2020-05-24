@@ -44,7 +44,7 @@ model_config = {
     'vocab_size': 100,
     'n_topics': 20,
     'use_cuda': use_cuda,
-    'architecture': None,
+    'architecture': 'template',
     'scale_type': 'sample',
     'skip_connections': False,
     'model_type': 'nvdm'
@@ -96,9 +96,8 @@ if __name__ == "__main__":
             for loss in [Trace_ELBO, TraceMeanField_ELBO]:
                 for data_size in ['small', 'large']:
                     ape_pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, "step_size": 250, "gamma": .5})
-                    topic_type, model_type, architecture = combo
+                    topic_type, model_type = combo
                     ape_model_config['model_type'] = model_type
-                    ape_model_config['architecture'] = architecture
                     ape_model_config['n_hidden_layers'] = 0
                     ape_model_config['n_hidden_units'] = ape_model_config['n_topics']
 
