@@ -87,3 +87,62 @@ def get_posterior_predictive_density(data, topics, model, posterior, num_samples
     posterior_predictive_density = evaluate_log_predictive_density(posterior_predictive_traces)
     posterior_predictive_density = float(posterior_predictive_density.detach().numpy())
     return posterior_predictive_density
+
+
+
+import weakref
+
+import pyro
+import pyro.ops.jit
+from pyro.distributions.util import is_identically_zero
+from pyro.infer.elbo import ELBO
+from pyro.infer.enum import get_importance_trace
+from pyro.infer.util import MultiFrameTensor, get_plate_stacks, is_validation_enabled, torch_item
+from pyro.util import check_if_enumerated, warn_if_nan
+
+
+def _compute_log_r(model_trace, guide_trace):
+    log_r = MultiFrameTensor()
+    stacks = get_plate_stacks(model_trace)
+    for name, model_site in model_trace.nodes.items():
+        if model_site["type"] == "sample":
+            log_r_term = model_site["log_prob"]
+            if not model_site["is_observed"]:
+                log_r_term = log_r_term - guide_trace.nodes[name]["log_prob"]
+            log_r.add((stacks[name], log_r_term.detach()))
+    return log_r
+
+
+class Trace_ELBO_no_KL(Trace_ELBO):
+
+    def _differentiable_loss_particle(self, model_trace, guide_trace):
+        """
+        Difference from Trace_ELBO is that we do not have the entropy term
+        """
+        elbo_particle = 0
+        surrogate_elbo_particle = 0
+        log_r = None
+
+        # compute elbo and surrogate elbo
+        for name, site in model_trace.nodes.items():
+            if site["type"] == "sample":
+                elbo_particle = elbo_particle + torch_item(site["log_prob_sum"])
+                surrogate_elbo_particle = surrogate_elbo_particle + site["log_prob_sum"]
+
+        for name, site in guide_trace.nodes.items():
+            if site["type"] == "sample":
+                log_prob, score_function_term, entropy_term = site["score_parts"]
+
+                elbo_particle = elbo_particle - torch_item(site["log_prob_sum"])
+
+                # only change
+                # if not is_identically_zero(entropy_term):
+                #     surrogate_elbo_particle = surrogate_elbo_particle - entropy_term.sum()
+
+                if not is_identically_zero(score_function_term):
+                    if log_r is None:
+                        log_r = _compute_log_r(model_trace, guide_trace)
+                    site = log_r.sum_to(site["cond_indep_stack"])
+                    surrogate_elbo_particle = surrogate_elbo_particle + (site * score_function_term).sum()
+
+        return -elbo_particle, -surrogate_elbo_particle
