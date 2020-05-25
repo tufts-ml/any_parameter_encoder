@@ -113,36 +113,63 @@ def _compute_log_r(model_trace, guide_trace):
     return log_r
 
 
-class Trace_ELBO_no_KL(Trace_ELBO):
+from __future__ import absolute_import, division, print_function
+
+import warnings
+import weakref
+
+import torch
+from torch.distributions import kl_divergence
+
+import pyro.ops.jit
+from pyro.distributions.util import is_identically_zero, scale_and_mask
+from pyro.infer.trace_elbo import Trace_ELBO
+from pyro.infer.util import is_validation_enabled, torch_item
+from pyro.util import warn_if_nan
+
+def _check_fully_reparametrized(guide_site):
+    log_prob, score_function_term, entropy_term = guide_site["score_parts"]
+    fully_rep = (guide_site["fn"].has_rsample and not is_identically_zero(entropy_term) and
+                 is_identically_zero(score_function_term))
+    if not fully_rep:
+        raise NotImplementedError("All distributions in the guide must be fully reparameterized.")
+
+class TraceMeanField_ELBO_no_KL(TraceMeanField_ELBO):
 
     def _differentiable_loss_particle(self, model_trace, guide_trace):
-        """
-        Difference from Trace_ELBO is that we do not have the entropy term
-        """
         elbo_particle = 0
-        surrogate_elbo_particle = 0
-        log_r = None
 
-        # compute elbo and surrogate elbo
-        for name, site in model_trace.nodes.items():
-            if site["type"] == "sample":
-                elbo_particle = elbo_particle + torch_item(site["log_prob_sum"])
-                surrogate_elbo_particle = surrogate_elbo_particle + site["log_prob_sum"]
+        for name, model_site in model_trace.nodes.items():
+            if model_site["type"] == "sample":
+                if model_site["is_observed"]:
+                    elbo_particle = elbo_particle + model_site["log_prob_sum"]
+                else:
+                    guide_site = guide_trace.nodes[name]
+                    if is_validation_enabled():
+                        _check_fully_reparametrized(guide_site)
 
-        for name, site in guide_trace.nodes.items():
-            if site["type"] == "sample":
-                log_prob, score_function_term, entropy_term = site["score_parts"]
+                    # use kl divergence if available, else fall back on sampling
+                    # try:
+                    #     kl_qp = kl_divergence(guide_site["fn"], model_site["fn"])
+                    #     kl_qp = scale_and_mask(kl_qp, scale=guide_site["scale"], mask=guide_site["mask"])
+                    #     assert kl_qp.shape == guide_site["fn"].batch_shape
+                    #     elbo_particle = elbo_particle - kl_qp.sum()
+                    # except NotImplementedError:
+                    #     entropy_term = guide_site["score_parts"].entropy_term
+                    #     elbo_particle = elbo_particle + model_site["log_prob_sum"] - entropy_term.sum()
+                    kl_qp = kl_divergence(guide_site["fn"], model_site["fn"])
+                    kl_qp = scale_and_mask(kl_qp, scale=guide_site["scale"], mask=guide_site["mask"])
+                    print(kl_qp)
 
-                elbo_particle = elbo_particle - torch_item(site["log_prob_sum"])
+        # handle auxiliary sites in the guide
+        for name, guide_site in guide_trace.nodes.items():
+            if guide_site["type"] == "sample" and name not in model_trace.nodes():
+                assert guide_site["infer"].get("is_auxiliary")
+                if is_validation_enabled():
+                    _check_fully_reparametrized(guide_site)
+                entropy_term = guide_site["score_parts"].entropy_term
+                elbo_particle = elbo_particle - entropy_term.sum()
 
-                # only change
-                # if not is_identically_zero(entropy_term):
-                #     surrogate_elbo_particle = surrogate_elbo_particle - entropy_term.sum()
-
-                if not is_identically_zero(score_function_term):
-                    if log_r is None:
-                        log_r = _compute_log_r(model_trace, guide_trace)
-                    site = log_r.sum_to(site["cond_indep_stack"])
-                    surrogate_elbo_particle = surrogate_elbo_particle + (site * score_function_term).sum()
-
-        return -elbo_particle, -surrogate_elbo_particle
+        loss = -(elbo_particle.detach() if torch._C._get_tracing_state() else torch_item(elbo_particle))
+        surrogate_loss = -elbo_particle
+        return loss, surrogate_loss
