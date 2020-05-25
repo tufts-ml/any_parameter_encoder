@@ -163,7 +163,8 @@ class TraceMeanField_ELBO_no_KL(TraceMeanField_ELBO):
 
         # handle auxiliary sites in the guide
         for name, guide_site in guide_trace.nodes.items():
-            if guide_site["type"] == "sample" and name not in model_trace.nodes():
+            if guide_site["type"] == "sample" and name not in model_trace.nodes:
+                raise ValueError('Hit guide_site not in model_trace')
                 assert guide_site["infer"].get("is_auxiliary")
                 if is_validation_enabled():
                     _check_fully_reparametrized(guide_site)
