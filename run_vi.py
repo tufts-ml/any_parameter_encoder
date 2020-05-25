@@ -116,6 +116,6 @@ if __name__ == "__main__":
                     val_loss = get_val_loss(svi, val_gen, use_cuda, device, scaled=True)
                     print(combo, val_loss)
                     values.append([topic_type, model_type, 'svi_mean_field', loss.__name__, data_size, val_loss, seed])
-    df = pd.DataFrame(values)
-    df.columns = ['topic_type', 'model_type', 'architecture', 'metric', 'data_size', 'loss', 'seed']
-    df.to_csv('no_training_non_toy_bars_svi.csv')
+                    df = pd.DataFrame(values)
+                    df.columns = ['topic_type', 'model_type', 'architecture', 'metric', 'data_size', 'loss', 'seed']
+                    df.to_csv('no_training_non_toy_bars_svi.csv')
