@@ -97,7 +97,7 @@ if __name__ == "__main__":
         pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .05}, 'step_size': 200, 'gamma': 0.95})
         print(pyro_scheduler)
         svi = TimedSVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=TraceMeanField_ELBO(), num_samples=100) #, num_steps=100000)
-        training_set = NonToyBarsDataset(training=True, topics_file=eval_config['topics'], num_models=1, **data_config)
+        training_set = NonToyBarsDataset(training=True, topics_file=eval_config['topics'], num_models=1, subset_docs=5, **data_config)
         training_generator = data.DataLoader(training_set, batch_size=500)
         n_epochs = 10
         svi = train(svi, training_generator, training_generator, pyro_scheduler, **{'epochs': n_epochs, 'use_cuda': use_cuda, 'results_dir': args.results_dir})
@@ -138,7 +138,7 @@ if __name__ == "__main__":
         posterior = inference.run(documents, topics)
         traces = []
         for tr in posterior.exec_traces:
-            traces.append(tr.nodes['latent']['value'].detach().numpy())
+            traces.append(tr.nodes['latent']['value'].cpu().detach().numpy())
         trace_filename = os.path.join(args.results_dir, name + '_' + args.architecture + '.npy')
         np.save(trace_filename, np.array(traces))
         likelihoods = []
