@@ -91,7 +91,8 @@ if __name__ == "__main__":
         names.append('avi')
         inferences.append(avi)
 
-    if args.run_svi:
+    # Note: can only run one at a time due to global param store
+    elif args.run_svi:
         # hyperparameters have been optimized
         pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .05}, 'step_size': 200, 'gamma': 0.95})
         print(pyro_scheduler)
@@ -104,7 +105,7 @@ if __name__ == "__main__":
         names.append('svi')
         inferences.append(svi)
 
-    if args.run_mcmc:
+    elif args.run_mcmc:
         nuts_kernel = NUTS(vae.model, adapt_step_size=True)
         mcmc = TimedMCMC(nuts_kernel, num_samples=100, warmup_steps=100)
         names.append('mcmc')
@@ -148,3 +149,9 @@ if __name__ == "__main__":
         print(name)
         print(np.mean(posterior.run_times), np.std(posterior.run_times))
         print(np.mean(likelihoods), np.std(likelihoods))
+
+        print(pyro.get_param_store().get_all_param_names())
+        z_loc = pyro.get_param_store().get_param('z_loc')[0]
+        z_scale = pyro.get_param_store().get_param('z_scale')[0]
+        print(z_loc)
+        print(z_scale)
