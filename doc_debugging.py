@@ -139,7 +139,7 @@ if __name__ == "__main__":
         traces = []
         for tr in posterior.exec_traces:
             traces.append(tr.nodes['latent']['value'].detach().numpy())
-        trace_filename = os.path.join(args.results_dir', name + '_' + args.architecture + '.npy')
+        trace_filename = os.path.join(args.results_dir, name + '_' + args.architecture + '.npy')
         np.save(trace_filename, np.array(traces))
         likelihoods = []
         for _ in range(10):
