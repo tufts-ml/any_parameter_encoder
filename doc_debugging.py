@@ -12,7 +12,7 @@ from pyro.optim import ExponentialLR, StepLR
 from pyro.infer import Trace_ELBO, TraceMeanField_ELBO
 from pyro.infer.mcmc import NUTS
 
-from dataset import ToyBarsDataset
+from dataset import ToyBarsDataset, NonToyBarsDataset
 from model import APE
 from train import train
 from evaluate import TimedSVI, TimedMCMC, TimedAVI
@@ -55,7 +55,7 @@ model_config = {
 }
 
 data_config = {
-    'doc_file': 'data/toy_bar_docs_large.npy',
+    'doc_file': 'data/non_toy_bar_docs.npy',
     'n_topics': 20,
     'vocab_size': 100,
     'alpha': .1,
@@ -80,7 +80,6 @@ eval_config = {
 }
 
 if __name__ == "__main__":
-    wandb.init(sync_tensorboard=True, project="any_parameter_encoder", entity="lily", name=args.results_dir)
     names = []
     inferences = []
 
@@ -97,9 +96,9 @@ if __name__ == "__main__":
         pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .05}, 'step_size': 200, 'gamma': 0.95})
         print(pyro_scheduler)
         svi = TimedSVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=TraceMeanField_ELBO(), num_samples=100) #, num_steps=100000)
-        training_set = ToyBarsDataset(training=True, topics_file='data/true_topics.npy', num_models=1, **data_config)
+        training_set = NonToyBarsDataset(training=True, topics_file=eval_config['topics'], num_models=1, **data_config)
         training_generator = data.DataLoader(training_set, batch_size=500)
-        n_epochs = 1000
+        n_epochs = 10
         svi = train(svi, training_generator, training_generator, pyro_scheduler, **{'epochs': n_epochs, 'use_cuda': use_cuda, 'results_dir': args.results_dir})
         print(n_epochs)
         names.append('svi')
