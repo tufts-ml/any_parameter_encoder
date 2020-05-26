@@ -1,3 +1,4 @@
+from __future__ import absolute_import, division, print_function
 import os
 import csv
 import math
@@ -113,8 +114,6 @@ def _compute_log_r(model_trace, guide_trace):
     return log_r
 
 
-from __future__ import absolute_import, division, print_function
-
 import warnings
 import weakref
 
@@ -159,7 +158,7 @@ class TraceMeanField_ELBO_no_KL(TraceMeanField_ELBO):
                     #     elbo_particle = elbo_particle + model_site["log_prob_sum"] - entropy_term.sum()
                     kl_qp = kl_divergence(guide_site["fn"], model_site["fn"])
                     kl_qp = scale_and_mask(kl_qp, scale=guide_site["scale"], mask=guide_site["mask"])
-                    print(kl_qp)
+                    print(kl_qp.sum())
 
         # handle auxiliary sites in the guide
         for name, guide_site in guide_trace.nodes.items():
