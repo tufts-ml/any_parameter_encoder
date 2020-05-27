@@ -67,7 +67,7 @@ class Encoder(nn.Module):
             self.fcmu.weight.data = torch.eye(n_topics).data
             self.fcsigma.weight.data = torch.zeros((n_hidden_units, n_topics)).data
             self.fcmu.bias.data = torch.zeros(n_topics).data
-            self.fcsigma.bias.data = torch.ones(n_topics).data
+            self.fcsigma.bias.data = torch.ones(n_topics).data * .001  # gives a z_scale close to 1
 
         self.bnmu = nn.BatchNorm1d(n_topics)
         self.bnsigma = nn.BatchNorm1d(n_topics)

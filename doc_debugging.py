@@ -151,7 +151,9 @@ if __name__ == "__main__":
         print(np.mean(likelihoods), np.std(likelihoods))
 
         print(pyro.get_param_store().get_all_param_names())
-        z_loc = pyro.get_param_store().get_param('z_loc')[0]
-        z_scale = pyro.get_param_store().get_param('z_scale')[0]
-        print(z_loc)
-        print(z_scale)
+        z_locs = pyro.get_param_store().get_param('z_loc')
+        z_scales = pyro.get_param_store().get_param('z_scale')
+        print(z_locs)
+        print(z_scales)
+        np.save(trace_filename.replace('.npy', '_loc.npy'), np.array(z_locs))
+        np.save(trace_filename.replace('.npy', '_scale.npy'), np.array(z_scales))
