@@ -135,9 +135,9 @@ if __name__ == "__main__":
                 val_loss = get_val_loss(ape_avi, val_gen, use_cuda, device, scaled=True)
                 print(combo, val_loss)
                 values.append([topic_type, model_type, architecture, loss.__name__, val_loss, seed])
-    df = pd.DataFrame(values)
-    df.columns = ['topic_type', 'model_type', 'architecture', 'metric', 'loss', 'seed']
-    df.to_csv('no_training1.csv')
+                df = pd.DataFrame(values)
+                df.columns = ['topic_type', 'model_type', 'architecture', 'metric', 'loss', 'seed']
+                df.to_csv('no_training1.csv')
     import sys; sys.exit()
 
     # test APE_VAE with training
