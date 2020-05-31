@@ -11,4 +11,8 @@ print(df.columns)
 if 'architecture' not in list(df.columns):
     architectures = ['template', 'template_unnorm', 'template_scaled', 'pseudo_inverse', 'pseudo_inverse_unnorm', 'pseudo_inverse_scaled']
     df['architecture'] = np.tile(np.repeat(architectures, 4), int(len(df) / (len(architectures) * 4)))
-print(df[df.model_type == 'avitm'].groupby(['metric', 'data_size', 'architecture']).loss.agg(mean=np.mean, std=np.std))
+if 'data_size' in list(df.columns):
+    cols = ['metric', 'architecture', 'topic_type', 'data_size']
+else:
+    cols = ['metric', 'architecture', 'topic_type']
+print(df[df.model_type == 'avitm'].groupby(cols).loss.agg(mean=np.mean, std=np.std))
