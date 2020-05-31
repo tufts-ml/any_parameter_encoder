@@ -72,7 +72,7 @@ class ToyBarsDataset(data.Dataset):
             topics = np.load(topics_file)
         if not os.path.exists(doc_file):
             print('Creating ', doc_file)
-            docs, true_dist = generate_documents(topics, n_topics, vocab_size, avg_num_words=avg_num_words, num_docs=num_docs, seed=seed)
+            docs, true_dist = generate_documents(topics, n_topics, vocab_size, avg_num_words=avg_num_words, num_docs=num_docs, seed=0)
             np.save(doc_file, docs)
             np.save(doc_file.replace('.npy', '_dist.npy'), true_dist)
         else:
