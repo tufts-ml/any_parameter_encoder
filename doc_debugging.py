@@ -156,5 +156,5 @@ if __name__ == "__main__":
         z_scales = pyro.get_param_store().get_param('z_scale')
         print(z_locs)
         print(z_scales)
-        np.save(trace_filename.replace('.npy', '_loc.npy'), np.array(z_locs))
-        np.save(trace_filename.replace('.npy', '_scale.npy'), np.array(z_scales))
+        np.save(trace_filename.replace('.npy', '_loc.npy'), np.array(z_locs.cpu().detach().numpy()))
+        np.save(trace_filename.replace('.npy', '_scale.npy'), np.array(z_scales.cpu().detach().numpy()))
