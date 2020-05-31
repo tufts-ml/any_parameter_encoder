@@ -168,7 +168,7 @@ class Encoder(nn.Module):
             z_scale = torch.sqrt(torch.exp(self.fcsigma(self.enc_layers(x_and_topics))))
             
         elif self.architecture == 'prior':
-            x_and_topics = torch.zeros((x.shape[0], topics.shape[1]))
+            x_and_topics = torch.zeros((x.shape[0], topics.shape[1])).to('cuda:0')
             # z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
             # z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
             z_loc = self.fcmu(self.enc_layers(x_and_topics))
