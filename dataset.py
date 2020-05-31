@@ -38,7 +38,7 @@ def get_toy_bar_betas(n_topics, vocab_size):
 
 def get_true_topics(n_topics, vocab_size, topics_file):
     betas = get_toy_bar_betas(n_topics, vocab_size)
-    topics = generate_topics(betas=betas, seed=0, shuffle=True)
+    topics = generate_topics(betas=betas, seed=0, shuffle=False)
     np.save(topics_file, np.expand_dims(topics, 0))
     return topics
 
@@ -75,8 +75,6 @@ class ToyBarsDataset(data.Dataset):
             docs, true_dist = generate_documents(topics, n_topics, vocab_size, avg_num_words=avg_num_words, num_docs=num_docs, seed=0)
             np.save(doc_file, docs)
             np.save(doc_file.replace('.npy', '_dist.npy'), true_dist)
-        else:
-            topics = np.load(doc_file)
         device = torch.device("cuda:0" if use_cuda else "cpu")
         dtype = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
         self.documents = torch.from_numpy(np.load(doc_file)).type(dtype)

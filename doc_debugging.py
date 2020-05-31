@@ -98,7 +98,7 @@ if __name__ == "__main__":
             training=True,
             doc_file=os.path.join(args.results_dir, 'docs_many_words.npy'),
             topics_file=os.path.join(args.results_dir, 'topics_many_words.npy'),
-            num_models=1, num_docs=5000, avg_num_words=500, **data_config)
+            num_models=1, num_docs=50, avg_num_words=5000, **data_config)
         training_generator = data.DataLoader(non_toy_bars, **loader_config)
         n_epochs = 1000
         svi = train(svi, training_generator, training_generator, pyro_scheduler, **{'epochs': n_epochs, 'use_cuda': use_cuda, 'results_dir': args.results_dir})
