@@ -55,7 +55,6 @@ model_config = {
 }
 
 data_config = {
-    'doc_file': 'data/non_toy_bar_docs.npy',
     'n_topics': 20,
     'vocab_size': 100,
     'alpha': .1,
