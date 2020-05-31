@@ -69,7 +69,7 @@ class ToyBarsDataset(data.Dataset):
             print('Creating', topics_file)
             topics = get_true_topics(n_topics, vocab_size, topics_file)
         else:
-            topics = np.load(topics_file)
+            topics = np.load(topics_file)[0]
         if not os.path.exists(doc_file):
             print('Creating ', doc_file)
             docs, true_dist = generate_documents(topics, n_topics, vocab_size, avg_num_words=avg_num_words, num_docs=num_docs, seed=0)
