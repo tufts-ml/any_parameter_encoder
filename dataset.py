@@ -64,12 +64,12 @@ def create_toy_bar_docs(doc_file, n_topics, vocab_size, num_docs=50, seed=0, avg
 
 
 class ToyBarsDataset(data.Dataset):
-    def __init__(self, doc_file, n_topics, vocab_size, alpha, use_cuda, topics_file=None, num_models=None, training=True, generate=True, subset_docs=None, avg_num_words=50):
+    def __init__(self, doc_file, n_topics, vocab_size, alpha, use_cuda, topics_file=None, num_models=None, training=True, generate=True, subset_docs=None, avg_num_words=50, num_docs=50):
         if not os.path.exists(topics_file):
             get_true_topics(n_topics, vocab_size, topics_file)
         if not os.path.exists(doc_file):
             print('Creating ', doc_file)
-            create_toy_bar_docs(doc_file, n_topics, vocab_size, avg_num_words=avg_num_words)
+            create_toy_bar_docs(doc_file, n_topics, vocab_size, avg_num_words=avg_num_words, num_docs=num_docs)
         device = torch.device("cuda:0" if use_cuda else "cpu")
         dtype = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
         self.documents = torch.from_numpy(np.load(doc_file)).type(dtype)
