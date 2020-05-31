@@ -59,7 +59,8 @@ data_config = {
     'vocab_size': 100,
     'alpha': .1,
     'use_cuda': use_cuda,
-    'generate': False
+    'generate': False,
+    'subset_docs': 5
 }
 
 loader_config = {
