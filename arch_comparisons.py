@@ -76,7 +76,7 @@ eval_config = {
 }
 
 if __name__ == "__main__":
-    project_name = "encoder_moment_matching"
+    project_name = "ape_debug"
     wandb.init(sync_tensorboard=True, project=project_name, entity="lily", name=args.results_dir, reinit=True)
     names = []
     inferences = []
@@ -97,51 +97,47 @@ if __name__ == "__main__":
     # true_ape_training_set = ToyBarsDataset(training=True, doc_file='data/toy_bar_docs_large.npy', topics_file='data/true_topics.npy', num_models=1, subset_docs=50000, **data_config)
     # true_ape_training_generator = data.DataLoader(true_ape_training_set, **loader_config)
     # training = True just gives us more data
-    true_ape_validation_set = NonToyBarsDataset(training=True, doc_file='data/non_toy_bars_docs.npy', topics_file='data/non_toy_bars_topics.npy', num_models=1, num_docs=5000, **data_config)
-    true_ape_validation_generator = data.DataLoader(true_ape_validation_set, **loader_config)
-    true_ape_validation_set_many_words = NonToyBarsDataset(training=True, doc_file='data/non_toy_bars_docs_many_words.npy', topics_file='data/non_toy_bars_topics.npy', num_models=1, num_docs=5000, avg_num_words=500, **data_config)
-    true_ape_validation_generator_many_words = data.DataLoader(true_ape_validation_set_many_words, **loader_config)
+    # true_ape_validation_set = NonToyBarsDataset(training=True, doc_file='data/non_toy_bars_docs.npy', topics_file='data/non_toy_bars_topics.npy', num_models=1, num_docs=5000, **data_config)
+    # true_ape_validation_generator = data.DataLoader(true_ape_validation_set, **loader_config)
+    toy_bars = ToyBarsDataset(training=True, doc_file='data/toy_bars/docs_many_words.npy', topics_file='data/toy_bars/topics_many_words.npy', num_models=1, num_docs=5000, avg_num_words=500, **data_config)
+    toy_bars_gen = data.DataLoader(toy_bars, **loader_config)
+    non_toy_bars = NonToyBarsDataset(training=True, doc_file='data/non_toy_bars/docs_many_words.npy', topics_file='data/non_toy_bars/topics_many_words.npy', num_models=1, num_docs=5000, avg_num_words=500, **data_config)
+    non_toy_bars_gen = data.DataLoader(non_toy_bars, **loader_config)
 
     losses_to_record = {}
 
     models = ['avitm', 'nvdm']
-    architectures = ['template', 'template_unnorm', 'template_scaled', 'pseudo_inverse', 'pseudo_inverse_unnorm', 'pseudo_inverse_scaled']
+    # architectures = ['template', 'template_unnorm', 'template_scaled', 'pseudo_inverse', 'pseudo_inverse_unnorm', 'pseudo_inverse_scaled']
+    architectures = ['prior']
 
     # test APE, no training
     ape_model_config = deepcopy(model_config)
     values = []
     for seed in range(10):
         pyro.set_rng_seed(seed)
-        for combo in itertools.product(['true_topics'], models, architectures):
+        for combo in itertools.product(['toy_bars', 'non_toy_bars'], models, architectures):
             for loss in [Trace_ELBO, TraceMeanField_ELBO]:
-                for data_size in ['small', 'large']:
-                    # ape_pyro_scheduler = CosineAnnealingWarmRestarts({'optimizer': torch.optim.Adam, 'T_0': 500, 'optim_args': {"lr": .005}})
-                    ape_pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, "step_size": 250, "gamma": .5})
-                    topic_type, model_type, architecture = combo
-                    ape_model_config['model_type'] = model_type
-                    ape_model_config['architecture'] = architecture
-                    ape_model_config['n_hidden_layers'] = 0
-                    ape_model_config['n_hidden_units'] = ape_model_config['n_topics']
+                # ape_pyro_scheduler = CosineAnnealingWarmRestarts({'optimizer': torch.optim.Adam, 'T_0': 500, 'optim_args': {"lr": .005}})
+                ape_pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, "step_size": 250, "gamma": .5})
+                topic_type, model_type, architecture = combo
+                ape_model_config['model_type'] = model_type
+                ape_model_config['architecture'] = architecture
+                ape_model_config['n_hidden_layers'] = 0
+                ape_model_config['n_hidden_units'] = ape_model_config['n_topics']
 
-                    if topic_type == 'true_topics':
-                        if data_size == 'large':
-                            val_gen = true_ape_validation_generator_many_words
-                        else:
-                            val_gen = true_ape_validation_generator
-                    # elif topic_type == 'random_topics':
-                    #     if data_size == 'large':
-                    #         val_gen = ape_validation_generator_many_words
-                    #     else:
-                    #         val_gen = ape_validation_generator
+                if topic_type == 'true_topics':
+                    val_gen = toy_bars_gen
+                else:
+                    val_gen = non_toy_bars_gen
 
-                    ape_vae = APE(**ape_model_config)
-                    ape_avi = TimedAVI(ape_vae.model, ape_vae.encoder_guide, ape_pyro_scheduler, loss=loss(), num_samples=100, encoder=ape_vae.encoder)
-                    val_loss = get_val_loss(ape_avi, val_gen, use_cuda, device, scaled=True)
-                    print(combo, val_loss)
-                    values.append([topic_type, model_type, architecture, loss.__name__, data_size, val_loss, seed])
+                ape_vae = APE(**ape_model_config)
+                ape_avi = TimedAVI(ape_vae.model, ape_vae.encoder_guide, ape_pyro_scheduler, loss=loss(), num_samples=100, encoder=ape_vae.encoder)
+                val_loss = get_val_loss(ape_avi, val_gen, use_cuda, device, scaled=True)
+                print(combo, val_loss)
+                values.append([topic_type, model_type, architecture, loss.__name__, val_loss, seed])
     df = pd.DataFrame(values)
-    df.columns = ['topic_type', 'model_type', 'architecture', 'metric', 'data_size', 'loss', 'seed']
-    df.to_csv('no_training_non_toy_bars.csv')
+    df.columns = ['topic_type', 'model_type', 'architecture', 'metric', 'loss', 'seed']
+    df.to_csv('no_training1.csv')
     import sys; sys.exit()
 
     # test APE_VAE with training

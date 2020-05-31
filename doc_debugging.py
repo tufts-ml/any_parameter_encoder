@@ -73,13 +73,9 @@ train_config = {
     'use_cuda': use_cuda,
 }
 
-eval_config = {
-    'documents': 'data/non_toy_bar_docs.npy',
-    'topics': 'data/non_toy_bar_topics.npy'
-    # 'topics': 'data/train_topics.npy'
-}
-
 if __name__ == "__main__":
+    print(args.results_dir)
+    # should be data/non_toy_bars/ or data/toy_bars/
     names = []
     inferences = []
 
@@ -93,12 +89,17 @@ if __name__ == "__main__":
 
     # Note: can only run one at a time due to global param store
     elif args.run_svi:
+        wandb.init(sync_tensorboard=True, project="ape_debug", entity="lily", name="vi_debug")
         # hyperparameters have been optimized
         pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .05}, 'step_size': 200, 'gamma': 0.95})
         print(pyro_scheduler)
         svi = TimedSVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=TraceMeanField_ELBO(), num_samples=100) #, num_steps=100000)
-        training_set = NonToyBarsDataset(training=True, topics_file=eval_config['topics'], num_models=1, subset_docs=5, **data_config)
-        training_generator = data.DataLoader(training_set, batch_size=500)
+        non_toy_bars = NonToyBarsDataset(
+            training=True,
+            doc_file=os.path.join(args.results_dir, 'docs_many_words.npy'),
+            topics_file=os.path.join(args.results_dir, 'topics_many_words.npy'),
+            num_models=1, num_docs=5000, avg_num_words=500, **data_config)
+        training_generator = data.DataLoader(non_toy_bars, **loader_config)
         n_epochs = 10
         svi = train(svi, training_generator, training_generator, pyro_scheduler, **{'epochs': n_epochs, 'use_cuda': use_cuda, 'results_dir': args.results_dir})
         print(n_epochs)
@@ -112,8 +113,8 @@ if __name__ == "__main__":
         inferences.append(mcmc)
 
     dtype = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
-    all_docs = np.load(eval_config['documents'])[:5]
-    all_topics = np.load(eval_config['topics'])
+    all_docs = np.load(os.path.join(args.results_dir, 'docs_many_words.npy'))[:5]
+    all_topics = np.load(os.path.join(args.results_dir, 'topics_many_words.npy'))
     np.save(os.path.join('debug', 'docs.npy'), all_docs)
     np.save(os.path.join('debug', 'topics.npy'), all_topics)
     # doc_idx = np.random.choice(range(len(all_docs)), size=300)

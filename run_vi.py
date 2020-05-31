@@ -55,7 +55,7 @@ data_config = {
     'vocab_size': 100,
     'alpha': .1,
     'use_cuda': use_cuda,
-    'generate': False
+    'generate': False,
 }
 
 loader_config = {
@@ -76,13 +76,14 @@ eval_config = {
 }
 
 if __name__ == "__main__":
+    wandb.init(sync_tensorboard=True, project="ape_debug", entity="lily", name="vi_run")
     names = []
     inferences = []
 
-    true_ape_validation_set = NonToyBarsDataset(training=True, doc_file='data/non_toy_bars_docs.npy', topics_file='data/non_toy_bars_topics.npy', num_models=1, num_docs=5000, **data_config)
-    true_ape_validation_generator = data.DataLoader(true_ape_validation_set, **loader_config)
-    true_ape_validation_set_many_words = NonToyBarsDataset(training=True, doc_file='data/non_toy_bars_docs_many_words.npy', topics_file='data/non_toy_bars_topics.npy', num_models=1, num_docs=5000, avg_num_words=500, **data_config)
-    true_ape_validation_generator_many_words = data.DataLoader(true_ape_validation_set_many_words, **loader_config)
+    toy_bars = ToyBarsDataset(training=True, doc_file='data/toy_bars/docs_many_words.npy', topics_file='data/toy_bars/topics_many_words.npy', num_models=1, num_docs=5000, avg_num_words=500, **data_config)
+    toy_bars_gen = data.DataLoader(toy_bars, **loader_config)
+    non_toy_bars = NonToyBarsDataset(training=True, doc_file='data/non_toy_bars/docs_many_words.npy', topics_file='data/non_toy_bars/topics_many_words.npy', num_models=1, num_docs=5000, avg_num_words=500, **data_config)
+    non_toy_bars_gen = data.DataLoader(non_toy_bars, **loader_config)
 
     losses_to_record = {}
 
@@ -92,30 +93,28 @@ if __name__ == "__main__":
     values = []
     for seed in range(10):
         pyro.set_rng_seed(seed)
-        for combo in itertools.product(['true_topics'], models):
+        for combo in itertools.product(['toy_bars', 'non_toy_bars'], models):
             for loss in [Trace_ELBO, TraceMeanField_ELBO]:
-                for data_size in ['small', 'large']:
-                    ape_pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, "step_size": 250, "gamma": .5})
-                    topic_type, model_type = combo
-                    ape_model_config['model_type'] = model_type
-                    ape_model_config['n_hidden_layers'] = 0
-                    ape_model_config['n_hidden_units'] = ape_model_config['n_topics']
+                ape_pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, "step_size": 250, "gamma": .5})
+                topic_type, model_type = combo
+                ape_model_config['model_type'] = model_type
+                ape_model_config['n_hidden_layers'] = 0
+                ape_model_config['n_hidden_units'] = ape_model_config['n_topics']
 
-                    if topic_type == 'true_topics':
-                        if data_size == 'large':
-                            val_gen = true_ape_validation_generator_many_words
-                        else:
-                            val_gen = true_ape_validation_generator
+                if topic_type == 'toy_bars':
+                    val_gen = toy_bars_gen
+                elif topic_type == 'non_toy_bars':
+                    val_gen = non_toy_bars_gen
 
-                    ape_vae = APE(**ape_model_config)
+                ape_vae = APE(**ape_model_config)
 
-                    pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .05}, 'step_size': 200, 'gamma': 0.95})
-                    svi = TimedSVI(ape_vae.model, ape_vae.mean_field_guide, pyro_scheduler, loss=loss(), num_samples=100) #, num_steps=100000)
-                    n_epochs = 10000
-                    svi = train(svi, val_gen, val_gen, pyro_scheduler, **{'epochs': n_epochs, 'use_cuda': use_cuda, 'results_dir': args.results_dir})
-                    val_loss = get_val_loss(svi, val_gen, use_cuda, device, scaled=True)
-                    print(combo, val_loss)
-                    values.append([topic_type, model_type, 'svi_mean_field', loss.__name__, data_size, val_loss, seed])
-                    df = pd.DataFrame(values)
-                    df.columns = ['topic_type', 'model_type', 'architecture', 'metric', 'data_size', 'loss', 'seed']
-                    df.to_csv('no_training_non_toy_bars_svi.csv')
+                pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .05}, 'step_size': 200, 'gamma': 0.95})
+                svi = TimedSVI(ape_vae.model, ape_vae.mean_field_guide, pyro_scheduler, loss=loss(), num_samples=100) #, num_steps=100000)
+                n_epochs = 10000
+                svi = train(svi, val_gen, val_gen, pyro_scheduler, **{'epochs': n_epochs, 'use_cuda': use_cuda, 'results_dir': args.results_dir})
+                val_loss = get_val_loss(svi, val_gen, use_cuda, device, scaled=True)
+                print(combo, val_loss)
+                values.append([topic_type, model_type, 'svi_mean_field', loss.__name__, val_loss, seed])
+                df = pd.DataFrame(values)
+                df.columns = ['topic_type', 'model_type', 'architecture', 'metric', 'loss', 'seed']
+                df.to_csv('no_training1_svi.csv')
