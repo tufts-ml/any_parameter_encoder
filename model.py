@@ -55,11 +55,14 @@ class Encoder(nn.Module):
             else:
                 modules.append(MLP(n_hidden_units, n_hidden_units))
 
-        if architecture == 'naive_separated':
+        if n_hidden_layers == 0:
+            self.enc_layers = nn.Sequential()
+        elif architecture == 'naive_separated':
             self.enc_layers_mu = nn.Sequential(*modules)
             self.enc_layers_sigma = nn.Sequential(*modules)
         else:
             self.enc_layers = nn.Sequential(*modules)
+
         self.fcmu = nn.Linear(n_hidden_units, n_topics)
         self.fcsigma = nn.Linear(n_hidden_units, n_topics)
 
