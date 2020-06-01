@@ -11,11 +11,12 @@ prior =  softmax(np.load(os.path.join(directory, 'avi_prior_loc.npy')))
 docs = np.load(os.path.join(directory, 'docs_many_words.npy'))[:5]
 topics = np.load(os.path.join(directory, 'topics_many_words.npy'))
 k = np.matmul(docs, np.transpose(topics, (0, 2, 1)))
-i = 0
 def get_top_n(idx):
-    print('true', np.argpartition(true[idx], 4)[-4:])
-    print('svi', np.argpartition(svi[idx], 4)[-4:])
-    print('avi', np.argpartition(avi[idx], 4)[-4:])
-    print('k', np.argpartition(k[idx], 4)[-4:])
-print(get_top_n(i))
+    print('true', np.argpartition(true[idx], -4)[-4:])
+    print('svi', np.argpartition(svi[idx], -4)[-4:])
+    print('avi', np.argpartition(avi[idx], -4)[-4:])
+    print('k', np.argpartition(k[0][idx], -4)[-4:])
+for i in range(5):
+    get_top_n(i)
+    print(docs[i].reshape((10, 10)).astype(int))
 import ipdb; ipdb.set_trace()
