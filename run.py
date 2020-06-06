@@ -85,7 +85,7 @@ if __name__ == "__main__":
     if args.local_testing:
         num_models = {'train': 5, 'val': 2, 'test': 2}
     else:
-        num_models = {'train': 50000, 'val': 500, 'test': 300}
+        num_models = {'train': 50000, 'val': 500, 'test': 500}
     names = []
     inferences = []
 
