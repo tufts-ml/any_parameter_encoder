@@ -117,7 +117,6 @@ if __name__ == "__main__":
     if args.run_svi:
         # hyperparameters have been optimized
         pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .05}, 'step_size': 200, 'gamma': 0.95})
-        print(pyro_scheduler)
         svi = TimedSVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=Trace_ELBO(), num_samples=100) #, num_steps=100000)
         training_set = ToyBarsDataset(topics_file='data/test_topics.npy', num_models=num_models['test'], **data_config)
         training_generator = data.DataLoader(training_set, batch_size=500)
@@ -126,7 +125,6 @@ if __name__ == "__main__":
         else:
             n_epochs = 10000
         svi = train(svi, training_generator, training_generator, pyro_scheduler, **{'epochs': n_epochs, 'use_cuda': use_cuda, 'results_dir': args.results_dir})
-        print(n_epochs)
         names.append('svi')
         inferences.append(svi)
 
