@@ -134,7 +134,7 @@ class ToyBarsDocsDataset(data.Dataset):
 
         if num_docs < len(self.documents):
             self.documents = self.documents[:num_docs]
-        elif num_docs > self.documents:
+        elif num_docs > len(self.documents):
             raise ValueError(f'Already created {doc_file} with fewer topics than `num_docs`.')
         self.num_docs = num_docs
 

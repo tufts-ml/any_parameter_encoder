@@ -27,7 +27,7 @@ class MLP_with_skip(MLP):
 
 class Encoder(nn.Module):
     def __init__(self, n_hidden_units, n_hidden_layers, architecture, n_topics=4, vocab_size=9, use_scale=False, skip_connections=False,
-                 model_type='avitm'):
+                 model_type='avitm', use_cuda=False):
         super(Encoder, self).__init__()
         self.n_hidden_layers = n_hidden_layers
         self.vocab_size = vocab_size
@@ -36,6 +36,7 @@ class Encoder(nn.Module):
         self.relu = F.relu
         self.skip_connections = skip_connections
         self.model_type = model_type
+        self.use_cuda = use_cuda
         # encoder Linear layers
         modules = []
         self.architecture = architecture
@@ -173,7 +174,10 @@ class Encoder(nn.Module):
             z_scale = torch.sqrt(torch.exp(self.fcsigma(self.enc_layers(x_and_topics))))
             
         elif self.architecture == 'prior':
-            x_and_topics = torch.zeros((x.shape[0], topics.shape[1])).to('cuda:0')
+            if self.use_cuda:
+                x_and_topics = torch.zeros((x.shape[0], topics.shape[1])).to('cuda:0')
+            else:
+                x_and_topics = torch.zeros((x.shape[0], topics.shape[1]))
             # z_loc = self.bnmu(self.fcmu(self.enc_layers(x_and_topics)))
             # z_scale = torch.sqrt(torch.exp(self.bnsigma(self.fcsigma(self.enc_layers(x_and_topics)))))
             z_loc = self.fcmu(self.enc_layers(x_and_topics))
@@ -187,13 +191,14 @@ class Encoder(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, use_scale=False, model_type='avitm'):
+    def __init__(self, use_scale=False, model_type='avitm', use_cuda=False):
         super(Decoder, self).__init__()
         self.use_scale = use_scale
         if self.use_scale:
             self.scale = nn.Parameter(torch.ones([]), requires_grad=False)
         self.softmax = nn.Softmax(dim=1)
         self.model_type = model_type
+        self.use_cuda = use_cuda
 
     def forward(self, z, topics):
         if self.use_scale:
@@ -201,7 +206,10 @@ class Decoder(nn.Module):
         if self.model_type == 'avitm':
             word_probs = torch.matmul(self.softmax(z), topics)
         elif self.model_type == 'nvdm':
-            bias = torch.zeros(topics.size()[-1], requires_grad=True).to('cuda:0')
+            if self.use_cuda:
+                bias = torch.zeros(topics.size()[-1], requires_grad=True).to('cuda:0')
+            else:
+                bias = torch.zeros(topics.size()[-1], requires_grad=True)
             word_probs = self.softmax(torch.matmul(z, topics).add(bias))
         else:
             raise ValueError('Passed unsupported model_type: ', self.model_type)
@@ -225,8 +233,9 @@ class APE(nn.Module):
                 vocab_size=vocab_size,
                 use_scale=False,
                 skip_connections=skip_connections,
-                model_type=model_type)
-            self.decoder = Decoder(use_scale=True, model_type=model_type)
+                model_type=model_type,
+                use_cuda=use_cuda)
+            self.decoder = Decoder(use_scale=True, model_type=model_type, use_cuda=use_cuda)
         elif self.scale_type == 'mean':
             self.encoder = Encoder(
                 n_hidden_units,
@@ -236,8 +245,9 @@ class APE(nn.Module):
                 vocab_size=vocab_size,
                 use_scale=True,
                 skip_connections=skip_connections,
-                model_type=model_type)
-            self.decoder = Decoder(use_scale=False, model_type=model_type)
+                model_type=model_type,
+                use_cuda=use_cuda)
+            self.decoder = Decoder(use_scale=False, model_type=model_type, use_cuda=use_cuda)
         if use_cuda:
             # calling cuda() here will put all the parameters of
             # the encoder and decoder networks into gpu memory
@@ -419,8 +429,9 @@ class APE_VAE(nn.Module):
                 n_topics=n_topics,
                 vocab_size=vocab_size,
                 use_scale=False,
-                skip_connections=skip_connections)
-            self.decoder = Decoder(use_scale=True, model_type=model_type)
+                skip_connections=skip_connections,
+                use_cuda=use_cuda)
+            self.decoder = Decoder(use_scale=True, model_type=model_type, use_cuda=use_cuda)
         elif self.scale_type == 'mean':
             self.encoder = Encoder(
                 n_hidden_units,
@@ -429,8 +440,9 @@ class APE_VAE(nn.Module):
                 n_topics=n_topics,
                 vocab_size=vocab_size,
                 use_scale=True,
-                skip_connections=skip_connections)
-            self.decoder = Decoder(use_scale=False, model_type=model_type)
+                skip_connections=skip_connections,
+                use_cuda=use_cuda)
+            self.decoder = Decoder(use_scale=False, model_type=model_type, use_cuda=use_cuda)
         if use_cuda:
             # calling cuda() here will put all the parameters of
             # the encoder and decoder networks into gpu memory
