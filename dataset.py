@@ -36,10 +36,9 @@ def get_toy_bar_betas(n_topics, vocab_size):
         betas.append(beta)
     return betas
 
-def get_true_topics(n_topics, vocab_size, topics_file):
+def get_true_topics(n_topics, vocab_size):
     betas = get_toy_bar_betas(n_topics, vocab_size)
     topics = generate_topics(betas=betas, seed=0, shuffle=False)
-    np.save(topics_file, np.expand_dims(topics, 0))
     return topics
 
 def generate_documents(topics, n_topics, vocab_size, avg_num_words, alpha=.05, seed=0, num_docs=50):
@@ -57,136 +56,92 @@ def generate_documents(topics, n_topics, vocab_size, avg_num_words, alpha=.05, s
     return documents, doc_topic_dists
 
 def create_toy_bar_docs(doc_file, n_topics, vocab_size, num_docs=50, seed=0, avg_num_words=50):
-    true_topics = get_true_topics(n_topics, vocab_size, topics_file='true_topics.npy')
+    true_topics = get_true_topics(n_topics, vocab_size)
     docs, true_dist = generate_documents(true_topics, n_topics, vocab_size, avg_num_words=avg_num_words, num_docs=num_docs, seed=seed)
     np.save(doc_file, docs)
     np.save(doc_file.replace('.npy', '_dist.npy'), true_dist)
 
 
 class ToyBarsDataset(data.Dataset):
-    def __init__(self, doc_file, n_topics, vocab_size, alpha, use_cuda, topics_file=None, num_models=None, training=True, generate=True, subset_docs=None, avg_num_words=50, num_docs=50):
+    """
+    Topics are generated based on alpha; documents are generated from toy bar-like topics.
+
+    """
+    def __init__(self, doc_file, topics_file, n_topics, vocab_size, alpha, use_cuda,
+                 num_models, num_docs, avg_num_words=50, seed=0):
         if not os.path.exists(topics_file):
             print('Creating', topics_file)
-            topics = get_true_topics(n_topics, vocab_size, topics_file)
+            topics = []
+            for i in range(num_models):
+                topics.append(generate_topics(np.ones((n_topics, vocab_size)) * alpha, seed + i, shuffle=False))
+            topics = np.array(topics)
+            np.save(topics_file, topics)
         else:
-            topics = np.load(topics_file)[0]
+            topics = np.load(topics_file)
+
         if not os.path.exists(doc_file):
             print('Creating ', doc_file)
-            docs, true_dist = generate_documents(topics, n_topics, vocab_size, avg_num_words=avg_num_words, num_docs=num_docs, seed=0)
-            np.save(doc_file, docs)
+            true_topics = get_true_topics(n_topics, vocab_size)
+            documents, true_dist = generate_documents(
+                true_topics, n_topics, vocab_size, avg_num_words=avg_num_words,
+                num_docs=num_docs, seed=seed)
+            np.save(doc_file, documents)
             np.save(doc_file.replace('.npy', '_dist.npy'), true_dist)
+        else:
+            documents = np.load(doc_file)
+
+        if num_models < len(topics):
+            topics = topics[:num_models]
+        elif num_models > len(topics):
+            raise ValueError(f'Already created {topics_file} with fewer topics than `num_models`.')
+
+        if num_docs < len(documents):
+            documents = documents[:num_docs]
+        elif num_docs > len(documents):
+            raise ValueError(f'Already created {doc_file} with fewer topics than `num_docs`.')
+
+        self.num_models = num_models
+        self.num_docs = num_docs
         device = torch.device("cuda:0" if use_cuda else "cpu")
         dtype = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
-        self.documents = torch.from_numpy(np.load(doc_file)).type(dtype)
-        if subset_docs:
-            self.documents = self.documents[:subset_docs]
-        self.num_docs = len(self.documents)
-        self.n_topics = n_topics
-        self.vocab_size = vocab_size
-        self.alpha = alpha
-        self.use_cuda = use_cuda
-        self.training = training
-        self.generate = generate
-        if generate:
-            self.num_models = num_models
-        else:
-            self.topics = torch.from_numpy(np.load(os.path.join(topics_file)))
-            self.topics = self.topics.to(device).type(dtype)
-            self.num_models = len(self.topics)
-        self.documents = self.documents.to(device)
+        self.documents = torch.from_numpy(documents).type(dtype).to(device)
+        self.topics = torch.from_numpy(topics).type(dtype).to(device)
         
-
     def __len__(self):
         """ Denotes the total number of samples """
         return self.num_models * self.num_docs
 
     def __getitem__(self, index):
         """ Generates one sample of data """
-        if self.generate:
-            if self.training:
-                seed = index
-            else:
-                seed = index + self.num_models * self.num_docs
-            np.random.seed(seed)
-            topics = np.random.dirichlet(np.ones(self.vocab_size), size=self.n_topics)
-        else:
-            topics = self.topics[index % self.num_models]
+        topics = self.topics[index % self.num_models]
         document = self.documents[index % self.num_docs]
-        # dtype = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
-        # document = torch.from_numpy(document.astype(np.float32)).type(dtype)
-        # topics = torch.from_numpy(topics.astype(np.float32)).type(dtype)
         return document, topics
 
 
-class NonToyBarsDataset(ToyBarsDataset):
-    def __init__(self, doc_file, n_topics, vocab_size, alpha, use_cuda, topics_file=None, num_models=None, training=True, generate=True, subset_docs=None, avg_num_words=50, num_docs=500):
-        if not os.path.exists(topics_file):
-            topics = generate_topics(np.ones((n_topics, vocab_size)) * .1, seed=0)
-            np.save(topics_file, np.expand_dims(topics, 0))
-        if not os.path.exists(doc_file):
-            print('Creating ', doc_file)
-            topics = np.load(topics_file)[0]
-            docs, true_dist = generate_documents(topics, n_topics, vocab_size, avg_num_words=avg_num_words, num_docs=num_docs, seed=0)
-            np.save(doc_file, docs)
-            np.save(doc_file.replace('.npy', '_dist.npy'), true_dist)
-        device = torch.device("cuda:0" if use_cuda else "cpu")
-        dtype = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
-        self.documents = torch.from_numpy(np.load(doc_file)).type(dtype)
-        if subset_docs:
-            self.documents = self.documents[:subset_docs]
-        self.num_docs = len(self.documents)
-        self.n_topics = n_topics
-        self.vocab_size = vocab_size
-        self.alpha = alpha
-        self.use_cuda = use_cuda
-        self.training = training
-        self.generate = generate
-        if generate:
-            self.num_models = num_models
-        else:
-            self.topics = torch.from_numpy(np.load(os.path.join(topics_file)))
-            self.topics = self.topics.to(device).type(dtype)
-            self.num_models = len(self.topics)
-        self.documents = self.documents.to(device)
-        
-
-
 class ToyBarsDocsDataset(data.Dataset):
-    def __init__(self, doc_file, n_topics, vocab_size, alpha, use_cuda, training=True, generate=True, subset_docs=None, avg_num_words=50):
+    """
+    documents are generated from toy bar-like topics.
+
+    """
+    def __init__(self, doc_file, n_topics, vocab_size, alpha, use_cuda,
+                 num_docs, avg_num_words=50):
         if not os.path.exists(doc_file):
             print('Creating ', doc_file)
-            create_toy_bar_docs(doc_file, n_topics, vocab_size, num_docs=100000, avg_num_words=avg_num_words)
+            create_toy_bar_docs(doc_file, n_topics, vocab_size, num_docs=num_docs, avg_num_words=avg_num_words)
         device = torch.device("cuda:0" if use_cuda else "cpu")
         dtype = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
-        self.documents = torch.from_numpy(np.load(doc_file)).type(dtype)
-        if subset_docs:
-            self.documents = self.documents[:subset_docs]
-        self.num_docs = len(self.documents)
-        self.vocab_size = vocab_size
-        self.alpha = alpha
-        self.use_cuda = use_cuda
-        self.training = training
-        self.generate = generate
-        self.documents = self.documents.to(device)
-        
+        self.documents = torch.from_numpy(np.load(doc_file)).type(dtype).to(device)
+
+        if num_docs < len(self.documents):
+            self.documents = self.documents[:num_docs]
+        elif num_docs > self.documents:
+            raise ValueError(f'Already created {doc_file} with fewer topics than `num_docs`.')
+        self.num_docs = num_docs
 
     def __len__(self):
         """ Denotes the total number of samples """
-        if self.training:
-            return int(self.num_docs * .8)
-        else:
-            return int(self.num_docs * .2)
+        return self.num_docs
 
     def __getitem__(self, index):
         """ Generates one sample of data """
-        num_train = self.num_docs * .8
-        if self.training:
-            idx = int(index % num_train)
-        else:
-            idx = int(index + num_train)
-
-        document = self.documents[idx]
-        # dtype = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
-        # document = torch.from_numpy(document.astype(np.float32)).type(dtype)
-        # topics = torch.from_numpy(topics.astype(np.float32)).type(dtype)
-        return document
+        return self.documents[index % self.num_docs]
