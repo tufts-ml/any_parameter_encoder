@@ -86,7 +86,7 @@ def get_posterior_predictive_density(data, topics, model, posterior, num_samples
     posterior_predictive_traces = posterior_predictive.run(data, topics)
     # get the posterior predictive log likelihood
     posterior_predictive_density = evaluate_log_predictive_density(posterior_predictive_traces)
-    posterior_predictive_density = float(posterior_predictive_density.detach().numpy())
+    posterior_predictive_density = float(posterior_predictive_density.cpu().detach().numpy())
     return posterior_predictive_density
 
 
