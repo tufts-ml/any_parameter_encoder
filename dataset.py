@@ -53,7 +53,7 @@ def generate_documents(topics, n_topics, vocab_size, avg_num_words, alpha=.05, s
             z = np.random.choice(range(n_topics), p=pi)
             doc += np.random.multinomial(1, topics[z])
         documents.append(doc.astype(np.float32))
-    return documents, doc_topic_dists
+    return np.array(documents), doc_topic_dists
 
 def create_toy_bar_docs(doc_file, n_topics, vocab_size, num_docs=50, seed=0, avg_num_words=50):
     true_topics = get_true_topics(n_topics, vocab_size)
