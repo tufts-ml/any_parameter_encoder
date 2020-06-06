@@ -245,6 +245,7 @@ class APE(nn.Module):
             device = 'cuda:0'
         else:
             device = 'cpu'
+
         self.use_cuda = use_cuda
         self.n_topics = n_topics
         alpha_vec = alpha * np.ones((1, n_topics)).astype(np.float32)
@@ -277,8 +278,6 @@ class APE(nn.Module):
         with pyro.plate("data", x.shape[0]):
             # use the encoder to get the parameters used to define q(z|x)
             z_loc, z_scale = self.encoder.forward(x, topics)
-            z_loc = pyro.param("z_loc", z_loc)
-            z_scale = pyro.param("z_scale", z_scale)
             # sample the latent code z
             pyro.sample("latent",
                         dist.Normal(z_loc, z_scale).to_event(1))
