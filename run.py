@@ -34,6 +34,7 @@ parser.add_argument('--run_avi', help='run amortized variational inference', act
 parser.add_argument('--run_svi', help='run SVI', action='store_true')
 parser.add_argument('--run_mcmc', help='run MCMC', action='store_true')
 parser.add_argument('--warmstart_mcmc', help='warmstart MCMC', action='store_true')
+parser.add_argument('--local_testing', action='store_true')
 args = parser.parse_args()
 
 use_cuda = torch.cuda.is_available()
@@ -48,7 +49,6 @@ model_config = {
     'n_topics': 20,
     'use_cuda': use_cuda,
     'architecture': args.architecture,
-    # 'scale_type': 'mean',
     'scale_type': 'sample',
     'skip_connections': False,
 }
@@ -59,7 +59,7 @@ data_config = {
     'vocab_size': 100,
     'alpha': .1,
     'use_cuda': use_cuda,
-    'generate': False
+    'num_docs': 2
 }
 
 loader_config = {
@@ -68,7 +68,7 @@ loader_config = {
     'num_workers': 0}
 
 train_config = {
-    'epochs': 2,
+    'epochs': 1,
     'use_cuda': use_cuda,
     'results_dir': args.results_dir,
 }
@@ -79,7 +79,11 @@ eval_config = {
 }
 
 if __name__ == "__main__":
-    wandb.init(sync_tensorboard=True, project="any_parameter_encoder", entity="lily", name=args.results_dir)
+    # wandb.init(sync_tensorboard=True, project="any_parameter_encoder", entity="lily", name=args.results_dir)
+    if args.local_testing:
+        num_models = {'train': 5, 'val': 2, 'test': 2}
+    else:
+        num_models = {'train': 50000, 'val': 500, 'test': 300}
     names = []
     inferences = []
 
@@ -95,8 +99,9 @@ if __name__ == "__main__":
         avi = TimedAVI(vae.model, vae.encoder_guide, pyro_scheduler, loss=Trace_ELBO(), num_samples=100, encoder=vae.encoder)
 
         if not os.path.exists(model_path):
-            training_set = ToyBarsDataset(training=True, topics_file='data/train_topics.npy', num_models=50000, **data_config)
-            validation_set = ToyBarsDataset(training=False, topics_file='data/valid_topics.npy', num_models=500, **data_config)
+            training_set = ToyBarsDataset(topics_file='data/train_topics.npy', num_models=num_models['train'], **data_config)
+            validation_set = ToyBarsDataset(topics_file='data/valid_topics.npy', num_models=num_models['val'], **data_config)
+            test_set = ToyBarsDataset(topics_file='data/test_topics.npy', num_models=num_models['test'], **data_config)
             training_generator = data.DataLoader(training_set, **loader_config)
             validation_generator = data.DataLoader(validation_set, **loader_config)
             avi = train(avi, training_generator, validation_generator, pyro_scheduler, **train_config)
@@ -112,9 +117,12 @@ if __name__ == "__main__":
         pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .05}, 'step_size': 200, 'gamma': 0.95})
         print(pyro_scheduler)
         svi = TimedSVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=Trace_ELBO(), num_samples=100) #, num_steps=100000)
-        training_set = ToyBarsDataset(training=True, topics_file='data/test_topics.npy', num_models=10, **data_config)
+        training_set = ToyBarsDataset(topics_file='data/test_topics.npy', num_models=num_models['test'], **data_config)
         training_generator = data.DataLoader(training_set, batch_size=500)
-        n_epochs = 10000
+        if args.local_testing:
+            n_epochs = 1
+        else:
+            n_epochs = 10000
         svi = train(svi, training_generator, training_generator, pyro_scheduler, **{'epochs': n_epochs, 'use_cuda': use_cuda, 'results_dir': args.results_dir})
         print(n_epochs)
         names.append('svi')
