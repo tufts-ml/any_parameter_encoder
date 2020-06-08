@@ -5,6 +5,20 @@ from scipy.special import logsumexp, softmax
 
 np.set_printoptions(precision=3, suppress=1)
 
+## Settings
+## --------
+
+K = 6 # num topics
+V = 9 # num vocabs
+n_docs = 50
+n_words_per_doc = 500
+seed = 42
+
+alpha = 0.1
+alpha_K = alpha * np.ones(K)
+
+q_stddev = 0.1
+n_mc_samples = 5
 
 ## Draw dataset from LDA model given bar topics
 ## --------------------------------------------
@@ -88,20 +102,6 @@ def calc_elbo_per_token(x_DV, alpha_K, theta_KV, pi_DK, sigma, n_mc_samples=500,
     return elbo_per_token_list
 
 if __name__ == "__main__":
-    ## Settings
-    ## --------
-
-    K = 6 # num topics
-    V = 9 # num vocabs
-    n_docs = 50
-    n_words_per_doc = 500
-    seed = 42
-
-    alpha = 0.1
-    alpha_K = alpha * np.ones(K)
-
-    q_stddev = 0.1
-    n_mc_samples = 5
 
     ## Bar topics
     ## ----------
