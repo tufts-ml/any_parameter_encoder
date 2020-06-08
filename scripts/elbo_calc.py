@@ -93,7 +93,7 @@ def calc_elbo_per_token(x_DV, alpha_K, theta_KV, pi_DK, sigma, n_mc_samples=500,
 
         for d in range(D):
             log_prior_pdf[d] = np.sum(scipy.stats.norm(prior_loc_K, prior_stddev_K).logpdf(h_samp_DK[d]))
-            log_lik_pdf[d] = scipy.stats.multinomial(n=sum(x_DV[0]), p=np.dot(pi_samp_DK[d], theta_KV)).logpmf(x_DV[d])
+            log_lik_pdf[d] = scipy.stats.multinomial(n=sum(x_DV[d]), p=np.dot(pi_samp_DK[d], theta_KV)).logpmf(x_DV[d])
             log_q_pdf[d] = np.sum(scipy.stats.norm(loc_DK[d], scale_DK[d]).logpdf(h_samp_DK[d]))
 
         elbo_per_token = np.sum(log_prior_pdf + log_lik_pdf - log_q_pdf) / np.sum(x_DV)
