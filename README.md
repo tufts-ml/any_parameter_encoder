@@ -6,4 +6,7 @@ To train and evaluate and APE on the toy bars dataset as mentioned in the paper,
 
 To additionally run the SVI and MCMC benchmarks, simply add the corresponding flags.
 
-NOTE: This is still a work in progress. Not all benchmarks have been run on this code yet, but this version is meant to be a cleaned-up version to enable more effective future work.
+## Training from scratch
+
+To train APE_VAE (e.g. encoder architecture is aware of the decoder params) or the standard VAE from scratch, run
+```python run_ape.py --results_dir [results_dir] --architecture template```
