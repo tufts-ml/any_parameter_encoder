@@ -4,11 +4,33 @@ Sanity check the ELBO computation of the current APE code.
 
 Compare the following:
 
-* baseline of a general unigram model
-* manual calculation of the ELBO
-* calculation of the ELBO with SVI
+* -1.33: baseline of a general unigram model
+* -0.514: manual calculation of the ELBO
+* -1.62: calculation of the ELBO with SVI
 
-# Results so far
+# Results from baselines
+
+```
+(ape) [mhughe02@omega001 202006_compare_manual_to_pyro_elbo]$ python calc_manual_elbo.py 
+--alpha 0.1
+--q_stddev 0.1
+--n_mc_samples 5
+--seed 42
+5 MC samples of ELBO-per-token:
+[-0.514 -0.514 -0.514 -0.514 -0.514]
+
+Unigram-logpmf-per-token:
+[-1.326]
+```
+```
+(ape) [mhughe02@omega001 202006_compare_manual_to_pyro_elbo]$ bash try_svi.sh 
+/cluster/tufts/hugheslab/code/any_parameter_encoder /cluster/tufts/hugheslab/code/any_parameter_encoder/workflows/202006_compare_manual_to_pyro_elbo
+CUDA: False
+num_words 500585.0
+svi after 10 trials
+log pmf per token:  -1.61 (min  -1.62, max  -1.61)
+runtime: 0.0000 sec (min 0.0000, max 0.0000)
+```
 
 
 
