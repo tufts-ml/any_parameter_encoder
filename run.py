@@ -29,7 +29,7 @@ except RuntimeError:
 
 parser = argparse.ArgumentParser(description='Results summary')
 parser.add_argument('--results_dir', type=str, help='directory of results')
-parser.add_argument('--architecture', type=str, help='encoder architecture')
+parser.add_argument('--architecture', type=str, default='template', help='encoder architecture')
 parser.add_argument('--run_avi', help='run amortized variational inference', action='store_true')
 parser.add_argument('--run_svi', help='run SVI', action='store_true')
 parser.add_argument('--run_mcmc', help='run MCMC', action='store_true')
@@ -38,17 +38,17 @@ parser.add_argument('--local_testing', action='store_true')
 args = parser.parse_args()
 
 use_cuda = torch.cuda.is_available()
-print(use_cuda)
+print("CUDA:", use_cuda)
 if use_cuda:
     torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
 model_config = {
     'n_hidden_units': 100,
-    'n_hidden_layers': 2,
+    'n_hidden_layers': 1,
     'results_dir': args.results_dir,
-    'alpha': .1,
-    'vocab_size': 100,
-    'n_topics': 20,
+    'alpha': 0.1,
+    'vocab_size': 25,
+    'n_topics': 10,
     'use_cuda': use_cuda,
     'architecture': args.architecture,
     'scale_type': 'sample',
@@ -57,9 +57,9 @@ model_config = {
 
 data_config = {
     'doc_file': 'data/toy_bar_docs.npy',
-    'n_topics': 20,
-    'vocab_size': 100,
-    'alpha': .1,
+    'n_topics': 10,
+    'vocab_size': 25,
+    'alpha': 0.1,
     'use_cuda': use_cuda,
     'num_docs': 2
 }
@@ -67,7 +67,8 @@ data_config = {
 loader_config = {
     'batch_size': 500,
     'shuffle': True,
-    'num_workers': 0}
+    'num_workers': 0
+}
 
 train_config = {
     'epochs': 1,
@@ -77,7 +78,9 @@ train_config = {
 
 eval_config = {
     'documents': 'data/toy_bar_docs.npy',
-    'topics': 'data/test_topics.npy'
+    'topics': 'data/toy_bar_docs_topics.npy',
+    'n_trials': 10,
+    'n_mc_samples': 50,
 }
 
 if __name__ == "__main__":
@@ -124,7 +127,7 @@ if __name__ == "__main__":
             n_epochs = 1
         else:
             n_epochs = 10000
-        svi = train(svi, training_generator, training_generator, pyro_scheduler, **{'epochs': n_epochs, 'use_cuda': use_cuda, 'results_dir': args.results_dir})
+        #svi = train(svi, training_generator, training_generator, pyro_scheduler, **{'epochs': n_epochs, 'use_cuda': use_cuda, 'results_dir': args.results_dir})
         names.append('svi')
         inferences.append(svi)
 
@@ -135,17 +138,18 @@ if __name__ == "__main__":
         inferences.append(mcmc)
 
     dtype = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
-    all_docs = np.load(eval_config['documents'])
-    all_topics = np.load(eval_config['topics'])
+
+    documents = np.load(eval_config['documents'])
+    topics = np.load(eval_config['topics'])
     # doc_idx = np.random.choice(range(len(all_docs)), size=300)
     # topic_idx = np.random.choice(range(len(all_topics)), size=300)
     # documents = all_docs[doc_idx]
     # topics = all_topics[topic_idx]
-    documents, topics = zip(*[combination for combination in itertools.product(all_docs, all_topics)])
-    documents = np.array(documents)
+    #documents, topics = zip(*[combination for combination in itertools.product(all_docs, all_topics)])
+    #documents = np.array(documents)
     num_words = documents.sum()
     print('num_words', num_words)
-    documents = torch.from_numpy(documents).type(dtype)
+    documents = torch.from_numpy(np.array(documents)).type(dtype)
     topics = torch.from_numpy(np.array(topics)).type(dtype)
 
     for name, inference in zip(names, inferences):
@@ -154,11 +158,17 @@ if __name__ == "__main__":
             nuts_kernel.initial_trace = svi.exec_traces[-1]
             inference = TimedMCMC(nuts_kernel, num_samples=100, warmup_steps=100)
         posterior = inference.run(documents, topics)
-        likelihoods = []
-        for _ in range(10):
-            likelihood = get_posterior_predictive_density(documents, topics, vae.model, posterior)
-            print('likelihood', likelihood)
-            likelihoods.append(likelihood / num_words)
-        print(name)
-        print(np.mean(posterior.run_times), np.std(posterior.run_times))
-        print(np.mean(likelihoods), np.std(likelihoods))
+        logpmf_per_token_list = []
+        for _ in range(eval_config['n_trials']):
+            logpmf_per_tok = get_posterior_predictive_density(
+                documents, topics, vae.model, posterior, num_samples=eval_config['n_mc_samples']) / num_words
+            logpmf_per_token_list.append(logpmf_per_tok)
+        print("%s after %d trials" % (name, eval_config['n_trials']))
+        print("log pmf per token: % 6.2f (min % 6.2f, max % 6.2f)" % (
+            np.mean(logpmf_per_token_list),
+            np.min(logpmf_per_token_list),
+            np.max(logpmf_per_token_list)))
+        print("runtime: %6.4f sec (min %6.4f, max %6.4f)" % (
+            np.mean(posterior.run_times), np.min(posterior.run_times), np.max(posterior.run_times)))
+
+

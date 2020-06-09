@@ -20,7 +20,7 @@ def generate_topics(betas, seed, shuffle=True):
         topics.append(np.random.dirichlet(beta))
     return np.array(topics)
 
-def get_toy_bar_betas(n_topics, vocab_size):
+def get_toy_bar_betas(n_topics, vocab_size, active_word_weight=1000.0, multiplier=5):
     """ Very strong beta prior which biases towards topics that look like bars """
     betas = []
     for i in range(n_topics):
@@ -30,16 +30,16 @@ def get_toy_bar_betas(n_topics, vocab_size):
             popular_words = [idx for idx in range(vocab_size) if idx % dim == i]
         else:
             popular_words = [idx for idx in range(vocab_size) if int(idx / dim) == i - dim]
-        beta[popular_words] = 1000
+        beta[popular_words] = active_word_weight
         beta = normalize1d(beta)
-        beta[popular_words] *= 5
+        beta[popular_words] *= multiplier
         betas.append(beta)
     return betas
 
 def get_true_topics(n_topics, vocab_size):
     betas = get_toy_bar_betas(n_topics, vocab_size)
     topics = generate_topics(betas=betas, seed=0, shuffle=False)
-    return topics
+    return topics, betas
 
 def generate_documents(topics, n_topics, vocab_size, avg_num_words, alpha=.05, seed=0, num_docs=50):
     np.random.seed(seed)
@@ -56,11 +56,13 @@ def generate_documents(topics, n_topics, vocab_size, avg_num_words, alpha=.05, s
     return np.array(documents), doc_topic_dists
 
 def create_toy_bar_docs(doc_file, n_topics, vocab_size, num_docs=50, seed=0, avg_num_words=50):
-    true_topics = get_true_topics(n_topics, vocab_size)
+    true_topics, true_betas = get_true_topics(n_topics, vocab_size)
     docs, true_dist = generate_documents(true_topics, n_topics, vocab_size, avg_num_words=avg_num_words, num_docs=num_docs, seed=seed)
     np.save(doc_file, docs)
     np.save(doc_file.replace('.npy', '_dist.npy'), true_dist)
-
+    np.save(doc_file.replace('.npy', '_topics.npy'), true_topics)
+    np.save(doc_file.replace('.npy', '_betas.npy'), true_betas)
+    return docs, true_dist, true_topics, true_betas
 
 class ToyBarsDataset(data.Dataset):
     """
@@ -81,7 +83,7 @@ class ToyBarsDataset(data.Dataset):
 
         if not os.path.exists(doc_file):
             print('Creating ', doc_file)
-            true_topics = get_true_topics(n_topics, vocab_size)
+            true_topics, true_betas = get_true_topics(n_topics, vocab_size)
             documents, true_dist = generate_documents(
                 true_topics, n_topics, vocab_size, avg_num_words=avg_num_words,
                 num_docs=num_docs, seed=seed)
