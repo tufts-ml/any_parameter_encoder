@@ -454,10 +454,10 @@ class APE_VAE(nn.Module):
         self.n_topics = n_topics
         alpha_vec = alpha * np.ones((1, n_topics)).astype(np.float32)
         self.z_loc = torch.from_numpy((np.log(alpha_vec).T - np.mean(np.log(alpha_vec), 1)).T).float().to(device)
-        self.z_scale = torch.from_numpy((
+        self.z_scale = torch.from_numpy(np.sqrt((
             ((1.0 / alpha_vec) * (1 - (2.0 / n_topics))).T +
             (1.0 / (n_topics * n_topics)) * np.sum(1.0 / alpha_vec, 1)
-        ).T).float().to(device)
+        )).T).float().to(device)
 
         self.n_topics = n_topics
         self.n_hidden_layers = n_hidden_layers
