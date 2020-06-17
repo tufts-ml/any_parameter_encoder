@@ -46,39 +46,40 @@ def calc_elbo_per_token(x_DV, alpha_K, theta_KV, pi_DK, sigma, n_mc_samples=500,
 
     # Quick verify that our prior setting is reasonable
     # '''
-    np.set_printoptions(precision=3, suppress=1)
-    print("Sanity check of translation of Dir prior to SoftmaxNormal")
-    print("5 samples from the known Dir PRIOR")
-    pi_SK = prng.dirichlet(alpha_K, size=5)
-    print(pi_SK)
-    print("5 samples from the estimated SoftmaxNormal PRIOR")
-    h_SK = prng.randn(5, K) * prior_stddev_K[np.newaxis,:] + prior_loc_K[np.newaxis,:]
-    print(softmax(h_SK, axis=1))
-    print()
+    # np.set_printoptions(precision=3, suppress=1)
+    # print("Sanity check of translation of Dir prior to SoftmaxNormal")
+    # print("5 samples from the known Dir PRIOR")
+    # pi_SK = prng.dirichlet(alpha_K, size=5)
+    # print(pi_SK)
+    # print("5 samples from the estimated SoftmaxNormal PRIOR")
+    # h_SK = prng.randn(5, K) * prior_stddev_K[np.newaxis,:] + prior_loc_K[np.newaxis,:]
+    # print(softmax(h_SK, axis=1))
+    # print()
     # '''
 
 
     ## Estimate loc and scale parameters of q(pi)
     # when we invert softmax, location is ambiguous up to an additive constant,
     # so pick the one such that the sum of each row is zero
-    loc_DK = np.log(pi_DK)
-    loc_DK = loc_DK - np.mean(loc_DK, axis=1)[:,np.newaxis]
+    # loc_DK = np.log(pi_DK)
+    # loc_DK = loc_DK - np.mean(loc_DK, axis=1)[:,np.newaxis]
+    loc_DK = pi_DK
     scale_DK = sigma * np.ones((D, K))
 
 
     # Quick verify that our softmax-normal posteriors are reasonable
     # '''
-    for d in [0, 1, 2]:
-        print("5 samples from the estimated Dir POSTERIOR for doc %d" % d)
-        post_alpha_K = pi_DK[d] * n_words_per_doc + alpha_K
-        print(post_alpha_K)
-        pi_SK = prng.dirichlet(post_alpha_K, size=5)
-        print(pi_SK)
+    # for d in [0, 1, 2]:
+    #     print("5 samples from the estimated Dir POSTERIOR for doc %d" % d)
+    #     post_alpha_K = pi_DK[d] * n_words_per_doc + alpha_K
+    #     print(post_alpha_K)
+    #     pi_SK = prng.dirichlet(post_alpha_K, size=5)
+    #     print(pi_SK)
 
-        print("5 samples from the estimated SoftmaxNormal POSTERIOR for doc %d" % d)
-        h_SK = prng.randn(5, K) * scale_DK[d][np.newaxis,:] + loc_DK[d][np.newaxis,:]
-        print(softmax(h_SK, axis=1))
-        print()
+    #     print("5 samples from the estimated SoftmaxNormal POSTERIOR for doc %d" % d)
+    #     h_SK = prng.randn(5, K) * scale_DK[d][np.newaxis,:] + loc_DK[d][np.newaxis,:]
+    #     print(softmax(h_SK, axis=1))
+    #     print()
     # '''
 
     ## Draw samples
