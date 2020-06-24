@@ -49,7 +49,7 @@ class Encoder(nn.Module):
         elif architecture == 'standard':
             modules.append(MLP(vocab_size, n_hidden_units))
         else:
-            raise ValueError('Invalid architecture')
+            raise ValueError('Invalid architecture: {}'.format(architecture))
         for i in range(self.n_hidden_layers - 1):
             if self.skip_connections and i % 2 == 0:
                 modules.append(MLP_with_skip(n_hidden_units, n_hidden_units))
@@ -184,7 +184,7 @@ class Encoder(nn.Module):
             z_scale = torch.sqrt(torch.exp(self.fcsigma(self.enc_layers(x_and_topics))))
             
         else:
-            raise ValueError('Invalid architecture')
+            raise ValueError('Invalid architecture: {}'.format(self.architecture))
         if self.use_scale:
             z_loc = torch.mul(self.scale, z_loc)
         return z_loc, z_scale
@@ -403,7 +403,7 @@ class Encoder_APE_VAE(Encoder):
             z_scale = torch.sqrt(torch.exp(self.fcsigma(self.enc_layers(x_and_topics))))
             
         else:
-            raise ValueError('Invalid architecture')
+            raise ValueError('Invalid architecture: {}'.format(self.architecture))
         if self.use_scale:
             z_loc = torch.mul(self.scale, z_loc)
         return z_loc, z_scale
