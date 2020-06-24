@@ -77,7 +77,7 @@ eval_config = {
 }
 
 if __name__ == "__main__":
-    wandb.init(sync_tensorboard=True, project="ape_debug", entity="lily", name=f"vi_run_{args.results_dir}")
+    wandb.init(sync_tensorboard=True, project="ape_debug", entity="lily", name="vi_run_{}".format(args.results_dir))
     names = []
     inferences = []
 

@@ -87,8 +87,8 @@ if __name__ == "__main__":
     losses_to_record = {}
 
     models = ['avitm', 'nvdm']
-    # architectures = ['template', 'template_unnorm', 'template_scaled', 'pseudo_inverse', 'pseudo_inverse_unnorm', 'pseudo_inverse_scaled']
-    architectures = ['prior']
+    architectures = ['prior', 'template', 'template_unnorm', 'template_scaled', 'pseudo_inverse', 'pseudo_inverse_unnorm', 'pseudo_inverse_scaled']
+    # architectures = ['prior']
 
     # test APE, no training
     ape_model_config = deepcopy(model_config)
@@ -120,6 +120,7 @@ if __name__ == "__main__":
                 df.to_csv('no_training.csv')
 
 
+    print('Starting APE_VAE')
     training_set = ToyBarsDocsDataset(doc_file='data/toy_bar_docs_train.npy', num_docs=50000, **data_config)
     validation_set = ToyBarsDocsDataset(doc_file='data/toy_bar_docs_val.npy', num_docs=5000, **data_config)
     training_generator = data.DataLoader(training_set, **loader_config)
@@ -145,6 +146,7 @@ if __name__ == "__main__":
         del ape_vae_avi
         wandb.join()
 
+    print('Starting VAE')
     # train VAE from scratch
     # vae_pyro_scheduler = CosineAnnealingWarmRestarts({'optimizer': torch.optim.Adam, 'T_0': 500, 'optim_args': {"lr": .00001}})
     vae_pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, "step_size": 250, "gamma": .5})
