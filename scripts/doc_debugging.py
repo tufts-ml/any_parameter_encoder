@@ -12,7 +12,7 @@ from pyro.optim import ExponentialLR, StepLR
 from pyro.infer import Trace_ELBO, TraceMeanField_ELBO
 from pyro.infer.mcmc import NUTS
 
-from dataset import ToyBarsDataset, NonToyBarsDataset
+from dataset import ToyBarsDataset
 from model import APE
 from train import train
 from evaluate import TimedSVI, TimedMCMC, TimedAVI
@@ -94,7 +94,7 @@ if __name__ == "__main__":
         pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .05}, 'step_size': 200, 'gamma': 0.95})
         print(pyro_scheduler)
         svi = TimedSVI(vae.model, vae.mean_field_guide, pyro_scheduler, loss=TraceMeanField_ELBO(), num_samples=100) #, num_steps=100000)
-        non_toy_bars = NonToyBarsDataset(
+        non_toy_bars = ToyBarsDataset(
             training=True,
             doc_file=os.path.join(args.results_dir, 'docs_many_words.npy'),
             topics_file=os.path.join(args.results_dir, 'topics_many_words.npy'),

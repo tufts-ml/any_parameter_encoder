@@ -81,19 +81,6 @@ if __name__ == "__main__":
     names = []
     inferences = []
 
-    # training_set = ToyBarsDocsDataset(training=True, doc_file='data/toy_bar_docs_large.npy', subset_docs=50000, **data_config)
-    # validation_set = ToyBarsDocsDataset(training=False, doc_file='data/toy_bar_docs_large.npy', subset_docs=50000, **data_config)
-    # training_generator = data.DataLoader(training_set, **loader_config)
-    # validation_generator = data.DataLoader(validation_set, **loader_config)
-    
-    # ape_training_set = ToyBarsDataset(training=True, doc_file='data/toy_bar_docs_large.npy', topics_file='data/train_topics.npy', num_models=20000, subset_docs=5000, **data_config)
-    # ape_validation_set = ToyBarsDataset(training=False, doc_file='data/toy_bar_docs_large.npy', topics_file='data/valid_topics.npy', num_models=50, subset_docs=5000, **data_config)
-    # ape_training_generator = data.DataLoader(ape_training_set, **loader_config)
-    # ape_validation_generator = data.DataLoader(ape_validation_set, **loader_config)
-    # create the many_words docs dataset
-    # ape_validation_set_many_words = ToyBarsDataset(training=False, doc_file='data/toy_bar_docs_large_many_words.npy', topics_file='data/valid_topics.npy', num_models=50, subset_docs=5000, avg_num_words=500, **data_config)
-    # ape_validation_generator_many_words = data.DataLoader(ape_validation_set_many_words, **loader_config)
-
     # true_ape_training_set = ToyBarsDataset(training=True, doc_file='data/toy_bar_docs_large.npy', topics_file='data/true_topics.npy', num_models=1, subset_docs=50000, **data_config)
     # true_ape_training_generator = data.DataLoader(true_ape_training_set, **loader_config)
     # training = True just gives us more data
@@ -137,8 +124,13 @@ if __name__ == "__main__":
                 values.append([topic_type, model_type, architecture, loss.__name__, val_loss, seed])
                 df = pd.DataFrame(values)
                 df.columns = ['topic_type', 'model_type', 'architecture', 'metric', 'loss', 'seed']
-                df.to_csv('no_training1.csv')
-    import sys; sys.exit()
+                df.to_csv('no_training.csv')
+
+
+    training_set = ToyBarsDocsDataset(training=True, doc_file='data/toy_bar_docs_large.npy', subset_docs=50000, **data_config)
+    validation_set = ToyBarsDocsDataset(training=False, doc_file='data/toy_bar_docs_large.npy', subset_docs=50000, **data_config)
+    training_generator = data.DataLoader(training_set, **loader_config)
+    validation_generator = data.DataLoader(validation_set, **loader_config)
 
     # test APE_VAE with training
     ape_vae_model_config = deepcopy(model_config)
@@ -176,6 +168,15 @@ if __name__ == "__main__":
     del vae
     del vae_avi
     wandb.join()
+
+    import sys; sys.exit()
+    # ape_training_set = ToyBarsDataset(training=True, doc_file='data/toy_bar_docs_large.npy', topics_file='data/train_topics.npy', num_models=20000, subset_docs=5000, **data_config)
+    # ape_validation_set = ToyBarsDataset(training=False, doc_file='data/toy_bar_docs_large.npy', topics_file='data/valid_topics.npy', num_models=50, subset_docs=5000, **data_config)
+    # ape_training_generator = data.DataLoader(ape_training_set, **loader_config)
+    # ape_validation_generator = data.DataLoader(ape_validation_set, **loader_config)
+    # # create the many_words docs dataset
+    # ape_validation_set_many_words = ToyBarsDataset(training=False, doc_file='data/toy_bar_docs_large_many_words.npy', topics_file='data/valid_topics.npy', num_models=50, subset_docs=5000, avg_num_words=500, **data_config)
+    # ape_validation_generator_many_words = data.DataLoader(ape_validation_set_many_words, **loader_config)
 
     # test APE with training, use only the true topics
     ape_vae_model_config = deepcopy(model_config)
