@@ -11,7 +11,7 @@ from pyro.optim import ExponentialLR, StepLR, ReduceLROnPlateau, CosineAnnealing
 from pyro.infer import Trace_ELBO, TraceMeanField_ELBO
 from pyro.infer.mcmc import NUTS
 
-from dataset import ToyBarsDataset, ToyBarsDocsDataset, NonToyBarsDataset
+from dataset import ToyBarsDataset, ToyBarsDocsDataset
 from model import APE, APE_VAE
 from train import train, train_from_scratch, get_val_loss
 from evaluate import TimedSVI, TimedMCMC, TimedAVI
@@ -88,8 +88,6 @@ if __name__ == "__main__":
     # true_ape_validation_generator = data.DataLoader(true_ape_validation_set, **loader_config)
     toy_bars = ToyBarsDataset(training=True, doc_file='data/toy_bars/docs_many_words.npy', topics_file='data/toy_bars/topics_many_words.npy', num_models=1, num_docs=5000, avg_num_words=500, **data_config)
     toy_bars_gen = data.DataLoader(toy_bars, **loader_config)
-    non_toy_bars = NonToyBarsDataset(training=True, doc_file='data/non_toy_bars/docs_many_words.npy', topics_file='data/non_toy_bars/topics_many_words.npy', num_models=1, num_docs=5000, avg_num_words=500, **data_config)
-    non_toy_bars_gen = data.DataLoader(non_toy_bars, **loader_config)
 
     losses_to_record = {}
 
@@ -102,7 +100,7 @@ if __name__ == "__main__":
     values = []
     for seed in range(10):
         pyro.set_rng_seed(seed)
-        for combo in itertools.product(['toy_bars', 'non_toy_bars'], models, architectures):
+        for combo in itertools.product(['toy_bars'], models, architectures):
             for loss in [Trace_ELBO, TraceMeanField_ELBO]:
                 # ape_pyro_scheduler = CosineAnnealingWarmRestarts({'optimizer': torch.optim.Adam, 'T_0': 500, 'optim_args': {"lr": .005}})
                 ape_pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, "step_size": 250, "gamma": .5})
@@ -112,10 +110,10 @@ if __name__ == "__main__":
                 ape_model_config['n_hidden_layers'] = 0
                 ape_model_config['n_hidden_units'] = ape_model_config['n_topics']
 
-                if topic_type == 'true_topics':
+                if topic_type == 'toy_bars':
                     val_gen = toy_bars_gen
                 else:
-                    val_gen = non_toy_bars_gen
+                    raise NotImplementedError("unsupported topic_type")
 
                 ape_vae = APE(**ape_model_config)
                 ape_avi = TimedAVI(ape_vae.model, ape_vae.encoder_guide, ape_pyro_scheduler, loss=loss(), num_samples=100, encoder=ape_vae.encoder)
