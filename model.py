@@ -276,7 +276,7 @@ class APE(nn.Module):
         pyro.module("decoder", self.decoder)
         with pyro.plate("data", x.shape[0]):
             z = pyro.sample("latent",
-                            dist.Normal(self.z_loc, self.z_scale).to_event(1))
+                            dist.Normal(self.z_loc, torch.sqrt(self.z_scale)).to_event(1))
             word_probs = self.decoder.forward(z, topics)
             return pyro.sample("doc_words",
                         dist.Multinomial(probs=word_probs),
@@ -290,14 +290,14 @@ class APE(nn.Module):
             z_loc, z_scale = self.encoder.forward(x, topics)
             # sample the latent code z
             pyro.sample("latent",
-                        dist.Normal(z_loc, z_scale).to_event(1))
+                        dist.Normal(z_loc, torch.sqrt(z_scale)).to_event(1))
 
     def mean_field_guide(self, x, topics):
         with pyro.plate("data", x.shape[0]):
             z_loc = pyro.param("z_loc", x.new_zeros(torch.Size((x.shape[0], self.n_topics))))
             z_scale = pyro.param("z_scale", x.new_ones(torch.Size((x.shape[0], self.n_topics))))
 
-            pyro.sample("latent", dist.Normal(z_loc, z_scale).to_event(1))
+            pyro.sample("latent", dist.Normal(z_loc, torch.sqrt(z_scale)).to_event(1))
 
     def map_guide(self, x, topics):
         with pyro.plate("data", x.shape[0]):
@@ -474,7 +474,7 @@ class APE_VAE(nn.Module):
         pyro.module("decoder", self.decoder)
         with pyro.plate("data", x.shape[0]):
             z = pyro.sample("latent",
-                            dist.Normal(self.z_loc, self.z_scale).to_event(1))
+                            dist.Normal(self.z_loc, torch.sqrt(self.z_scale)).to_event(1))
             word_probs = self.decoder.forward(z, self.topics)
             return pyro.sample("doc_words",
                         dist.Multinomial(probs=word_probs),
@@ -488,4 +488,4 @@ class APE_VAE(nn.Module):
             z_loc, z_scale = self.encoder.forward(x, self.topics)
             # sample the latent code z
             pyro.sample("latent",
-                        dist.Normal(z_loc, z_scale).to_event(1))
+                        dist.Normal(z_loc, torch.sqrt(z_scale)).to_event(1))
