@@ -55,7 +55,7 @@ data_config = {
     'vocab_size': 100,
     'alpha': .1,
     'use_cuda': use_cuda,
-    'generate': False
+    'avg_num_words':500
 }
 
 loader_config = {
@@ -81,12 +81,7 @@ if __name__ == "__main__":
     names = []
     inferences = []
 
-    # true_ape_training_set = ToyBarsDataset(training=True, doc_file='data/toy_bar_docs_large.npy', topics_file='data/true_topics.npy', num_models=1, subset_docs=50000, **data_config)
-    # true_ape_training_generator = data.DataLoader(true_ape_training_set, **loader_config)
-    # training = True just gives us more data
-    # true_ape_validation_set = NonToyBarsDataset(training=True, doc_file='data/non_toy_bars_docs.npy', topics_file='data/non_toy_bars_topics.npy', num_models=1, num_docs=5000, **data_config)
-    # true_ape_validation_generator = data.DataLoader(true_ape_validation_set, **loader_config)
-    toy_bars = ToyBarsDataset(training=True, doc_file='data/toy_bars/docs_many_words.npy', topics_file='data/toy_bars/topics_many_words.npy', num_models=1, num_docs=5000, avg_num_words=500, **data_config)
+    toy_bars = ToyBarsDataset(doc_file='data/toy_bars/docs_many_words.npy', topics_file='data/toy_bars/topics_many_words.npy', num_models=1, num_docs=5000, **data_config)
     toy_bars_gen = data.DataLoader(toy_bars, **loader_config)
 
     losses_to_record = {}
@@ -125,8 +120,8 @@ if __name__ == "__main__":
                 df.to_csv('no_training.csv')
 
 
-    training_set = ToyBarsDocsDataset(training=True, doc_file='data/toy_bar_docs_large.npy', subset_docs=50000, **data_config)
-    validation_set = ToyBarsDocsDataset(training=False, doc_file='data/toy_bar_docs_large.npy', subset_docs=50000, **data_config)
+    training_set = ToyBarsDocsDataset(doc_file='data/toy_bar_docs_train.npy', num_docs=50000, **data_config)
+    validation_set = ToyBarsDocsDataset(doc_file='data/toy_bar_docs_val.npy', num_docs=5000, **data_config)
     training_generator = data.DataLoader(training_set, **loader_config)
     validation_generator = data.DataLoader(validation_set, **loader_config)
 

@@ -11,7 +11,7 @@ from pyro.optim import ExponentialLR, StepLR, ReduceLROnPlateau, CosineAnnealing
 from pyro.infer import Trace_ELBO, TraceMeanField_ELBO
 from pyro.infer.mcmc import NUTS
 
-from dataset import ToyBarsDataset, ToyBarsDocsDataset, NonToyBarsDataset
+from dataset import ToyBarsDataset, ToyBarsDocsDataset
 from model import APE, APE_VAE
 from train import train, train_from_scratch, get_val_loss
 from evaluate import TimedSVI, TimedMCMC, TimedAVI
@@ -55,8 +55,9 @@ data_config = {
     'vocab_size': 100,
     'alpha': .1,
     'use_cuda': use_cuda,
-    'generate': False,
+    'avg_num_words':500
 }
+
 
 loader_config = {
     'batch_size': 500,
@@ -76,14 +77,12 @@ eval_config = {
 }
 
 if __name__ == "__main__":
-    wandb.init(sync_tensorboard=True, project="ape_debug", entity="lily", name="vi_run")
+    wandb.init(sync_tensorboard=True, project="ape_debug", entity="lily", name=f"vi_run_{args.results_dir}")
     names = []
     inferences = []
 
-    toy_bars = ToyBarsDataset(training=True, doc_file='data/toy_bars/docs_many_words.npy', topics_file='data/toy_bars/topics_many_words.npy', num_models=1, num_docs=5000, avg_num_words=500, **data_config)
+    toy_bars = ToyBarsDataset(doc_file='data/toy_bars/docs_many_words.npy', topics_file='data/toy_bars/topics_many_words.npy', num_models=1, num_docs=5000, **data_config)
     toy_bars_gen = data.DataLoader(toy_bars, **loader_config)
-    non_toy_bars = NonToyBarsDataset(training=True, doc_file='data/non_toy_bars/docs_many_words.npy', topics_file='data/non_toy_bars/topics_many_words.npy', num_models=1, num_docs=5000, avg_num_words=500, **data_config)
-    non_toy_bars_gen = data.DataLoader(non_toy_bars, **loader_config)
 
     losses_to_record = {}
 
@@ -93,7 +92,7 @@ if __name__ == "__main__":
     values = []
     for seed in range(10):
         pyro.set_rng_seed(seed)
-        for combo in itertools.product(['toy_bars', 'non_toy_bars'], models):
+        for combo in itertools.product(['toy_bars'], models):
             for loss in [Trace_ELBO, TraceMeanField_ELBO]:
                 ape_pyro_scheduler = StepLR({'optimizer': torch.optim.Adam, 'optim_args': {"lr": .01}, "step_size": 250, "gamma": .5})
                 topic_type, model_type = combo
@@ -103,8 +102,8 @@ if __name__ == "__main__":
 
                 if topic_type == 'toy_bars':
                     val_gen = toy_bars_gen
-                elif topic_type == 'non_toy_bars':
-                    val_gen = non_toy_bars_gen
+                else:
+                    raise NotImplementedError("unsupported topic_type")
 
                 ape_vae = APE(**ape_model_config)
 
@@ -117,4 +116,4 @@ if __name__ == "__main__":
                 values.append([topic_type, model_type, 'svi_mean_field', loss.__name__, val_loss, seed])
                 df = pd.DataFrame(values)
                 df.columns = ['topic_type', 'model_type', 'architecture', 'metric', 'loss', 'seed']
-                df.to_csv('no_training1_svi.csv')
+                df.to_csv('no_training_svi.csv')
