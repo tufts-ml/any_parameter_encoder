@@ -1,0 +1,13 @@
+program: ape_vae_sweep.py
+method: bayes
+metric:
+  name: val_loss
+  goal: minimize
+parameters:
+  learning_rate:
+    min: 0.001
+    max: 1.0
+  model_type:
+    values: ["avitm", "nvdm"]
+  architecture:
+    values: ["standard", "template", "pseudo_inverse"]
