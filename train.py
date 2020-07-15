@@ -64,32 +64,32 @@ def train_from_scratch(vae_svi, training_generator, validation_generator, schedu
                 document = document.to(device)
             # Model computations
             epoch_loss = vae_svi.step(document)
-            num_batches = 1
+            num_docs = len(document)
             step += 1
             num_words = torch.sum(document).item()
             if scaled:
-                writer.add_scalar(f'{name} training loss', epoch_loss / num_batches / num_words, step)
+                writer.add_scalar(f'{name} training loss', epoch_loss / num_docs / num_words, step)
             else:
-                writer.add_scalar(f'{name} training loss', epoch_loss / num_batches, step)
+                writer.add_scalar(f'{name} training loss', epoch_loss / num_docs, step)
             lr = list(scheduler.optim_objs.values())[0].get_lr()
             writer.add_scalar(f'{name} lr', np.array(lr), step)
             if step % 30 == 0:
                 # Validation
                 with torch.set_grad_enabled(False):
                     val_loss = 0
-                    num_val_batches = 0
+                    num_val_docs = 0
                     num_val_words = 0
                     for document in validation_generator:
                         # Transfer to GPU
                         if use_cuda:
                             document = document.to(device)
                         val_loss += vae_svi.evaluate_loss(document)
-                        num_val_batches += 1
+                        num_val_docs += len(document)
                         num_val_words += torch.sum(document).item()
                 if scaled:
-                    writer.add_scalar(f'{name} validation loss', val_loss / num_val_batches / num_val_words, step)
+                    writer.add_scalar(f'{name} validation loss', val_loss / num_val_docs / num_val_words, step)
                 else:
-                    writer.add_scalar(f'{name} validation loss', val_loss / num_val_batches, step)
+                    writer.add_scalar(f'{name} validation loss', val_loss / num_val_docs, step)
     return vae_svi
 
 def train_ape(vae_svi, data_generators, scheduler, epochs=1, use_cuda=True, results_dir=None, name='', display_step=30, scaled=False):
@@ -108,17 +108,17 @@ def train_ape(vae_svi, data_generators, scheduler, epochs=1, use_cuda=True, resu
                 document, topics = document.to(device), topics.to(device)
             # Model computations
             epoch_loss = vae_svi.step(document, topics)
-            num_batches = 1
+            num_docs = len(document)
             step += 1
             num_words = torch.sum(document).item()
             if scaled:
-                writer.add_scalar(f'{name} training loss', epoch_loss / num_batches / num_words, step)
+                writer.add_scalar(f'{name} training loss', epoch_loss / num_docs / num_words, step)
             else:
-                writer.add_scalar(f'{name} training loss', epoch_loss / num_batches, step)
+                writer.add_scalar(f'{name} training loss', epoch_loss / num_docs, step)
             lr = list(scheduler.optim_objs.values())[0].get_lr()
             writer.add_scalar(f'{name} lr', np.array(lr), step)
             if step % display_step == 0:
-                summary_dict = {'train': epoch_loss / num_batches}
+                summary_dict = {'train': epoch_loss / num_docs}
                 # Validation
                 for key in data_generators.keys():
                     if key != 'train':
@@ -130,16 +130,16 @@ def train_ape(vae_svi, data_generators, scheduler, epochs=1, use_cuda=True, resu
 def get_val_loss(vae_svi, validation_generator, use_cuda, device, scaled=False):
     with torch.set_grad_enabled(False):
         val_loss = 0
-        num_val_batches = 0
+        num_val_docs = 0
         num_words = 0
         for document, topics in validation_generator:
             # Transfer to GPU
             if use_cuda:
                 document, topics = document.to(device), topics.to(device)
             val_loss += vae_svi.evaluate_loss(document, topics)
-            num_val_batches += 1
+            num_val_docs += len(document)
             num_words += torch.sum(document).item()
     if scaled:
-        return val_loss / num_val_batches / num_words
+        return val_loss / num_val_docs / num_words
     else:
-        return val_loss / num_val_batches
+        return val_loss / num_val_docs
